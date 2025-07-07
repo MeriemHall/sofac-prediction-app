@@ -1,6 +1,6 @@
 # ============================================================================
 # SOFAC - Interface de Prédiction des Rendements 52-Semaines
-# Version Streamlit pour Managers
+# Version Streamlit pour Managers - Sans Emojis
 # ============================================================================
 
 import streamlit as st
@@ -17,7 +17,7 @@ warnings.filterwarnings('ignore')
 # Configuration de la page
 st.set_page_config(
     page_title="SOFAC - Prédiction des Taux",
-    page_icon="🏦",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -337,17 +337,17 @@ def generer_recommandations(predictions):
         recommandation = "TAUX VARIABLE"
         raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% en moyenne. Utiliser des taux variables pour profiter de la diminution des coûts d'emprunt."
         couleur = "success"
-        icone = "📉"
+        icone = "Baisse"
     elif changement_rendement > 0.3:
         recommandation = "TAUX FIXE"
         raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% en moyenne. Bloquer les taux actuels avant que les coûts d'emprunt n'augmentent."
         couleur = "warning"
-        icone = "📈"
+        icone = "Hausse"
     else:
-        recommandation = "STRATÉGIE FLEXIBLE"
+        recommandation = "STRATEGIE FLEXIBLE"
         raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%). Approche mixte selon les besoins de liquidité et durée des emprunts."
         couleur = "info"
-        icone = "↔️"
+        icone = "Stable"
     
     return {
         'recommandation': recommandation,
@@ -365,9 +365,9 @@ def creer_graphique_principal(df_mensuel, predictions):
     fig = make_subplots(
         rows=2, cols=2,
         subplot_titles=[
-            'Évolution des Rendements 52-Semaines',
-            'Variables Économiques Clés',
-            'Distribution des Prédictions',
+            'Evolution des Rendements 52-Semaines',
+            'Variables Economiques Cles',
+            'Distribution des Predictions',
             'Analyse Trimestrielle'
         ],
         specs=[[{"colspan": 2}, None],
@@ -381,7 +381,7 @@ def creer_graphique_principal(df_mensuel, predictions):
             x=historique_recent['Date'],
             y=historique_recent['Rendement_52s'],
             mode='lines+markers',
-            name='Historique Récent',
+            name='Historique Recent',
             line=dict(color='#60A5FA', width=4),
             marker=dict(size=8)
         ),
@@ -395,7 +395,7 @@ def creer_graphique_principal(df_mensuel, predictions):
             x=predictions_hebdo['Date'],
             y=predictions_hebdo['Rendement_Predit'],
             mode='lines+markers',
-            name='Prédictions 2025-2026',
+            name='Predictions 2025-2026',
             line=dict(color='#FF6B6B', width=4, dash='dash'),
             marker=dict(size=6)
         ),
@@ -455,7 +455,7 @@ def creer_graphique_principal(df_mensuel, predictions):
     
     fig.update_layout(
         title={
-            'text': '<b>SOFAC - Prédictions des Rendements 52-Semaines</b>',
+            'text': '<b>SOFAC - Predictions des Rendements 52-Semaines</b>',
             'x': 0.5,
             'font': {'size': 20, 'color': 'white'}
         },
@@ -470,7 +470,7 @@ def creer_graphique_principal(df_mensuel, predictions):
     fig.update_xaxes(title_text="Date", row=1, col=1)
     fig.update_yaxes(title_text="Rendement (%)", row=1, col=1)
     fig.update_xaxes(title_text="Rendement (%)", row=2, col=1)
-    fig.update_yaxes(title_text="Fréquence", row=2, col=1)
+    fig.update_yaxes(title_text="Frequence", row=2, col=1)
     fig.update_xaxes(title_text="Trimestre", row=2, col=2)
     fig.update_yaxes(title_text="Rendement Moyen (%)", row=2, col=2)
     
@@ -481,29 +481,29 @@ def main():
     # En-tête SOFAC
     st.markdown("""
     <div class="main-header">
-        <h1>🏦 SOFAC - Prédiction des Rendements 52-Semaines</h1>
-        <h3>Outil d'Aide à la Décision pour la Stratégie de Financement</h3>
-        <p>Bank Al-Maghrib • HCP • Analyse Prédictive Avancée</p>
+        <h1>SOFAC - Prediction des Rendements 52-Semaines</h1>
+        <h3>Outil d'Aide a la Decision pour la Strategie de Financement</h3>
+        <p>Bank Al-Maghrib • HCP • Analyse Predictive Avancee</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Sidebar avec contrôles
     with st.sidebar:
-        st.markdown("### ⚙️ Contrôles")
+        st.markdown("### Controles")
         
-        if st.button("🔄 Actualiser les Données", type="primary"):
+        if st.button("Actualiser les Donnees", type="primary"):
             st.cache_data.clear()
             st.rerun()
         
         st.markdown("---")
-        st.markdown("### 📊 Informations")
-        st.info(f"**Dernière mise à jour:** {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
-        st.success("✅ Modèle opérationnel")
-        st.info("📈 R² = 95.7% (Excellent)")
-        st.info("🎯 Précision = ±0.10%")
+        st.markdown("### Informations")
+        st.info(f"**Derniere mise a jour:** {datetime.now().strftime('%d/%m/%Y a %H:%M')}")
+        st.success("Modele operationnel")
+        st.info("R² = 95.7% (Excellent)")
+        st.info("Precision = ±0.10%")
     
     # Chargement des données avec indicateur de progression
-    with st.spinner("Chargement des données et construction du modèle..."):
+    with st.spinner("Chargement des donnees et construction du modele..."):
         df_historique = charger_donnees_historiques()
         df_mensuel = creer_donnees_mensuelles(df_historique)
         modele, r2_score_val, mae_val = construire_modele(df_mensuel)
@@ -516,7 +516,7 @@ def main():
     with col1:
         st.markdown("""
         <div class="metric-card">
-            <h4>📊 Rendement Actuel</h4>
+            <h4>Rendement Actuel</h4>
             <div class="highlight-metric">2.54%</div>
             <small>Mars 2025 (Bank Al-Maghrib)</small>
         </div>
@@ -527,7 +527,7 @@ def main():
         trend_class = "trend-down" if changement < 0 else "trend-up" if changement > 0 else "trend-stable"
         st.markdown(f"""
         <div class="metric-card">
-            <h4>📈 Moyenne Future</h4>
+            <h4>Moyenne Future</h4>
             <div class="highlight-metric">{recommandations['rendement_futur']:.2f}%</div>
             <small class="{trend_class}">{changement:+.2f}% vs. actuel</small>
         </div>
@@ -536,7 +536,7 @@ def main():
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <h4>⚡ Volatilité</h4>
+            <h4>Volatilite</h4>
             <div class="highlight-metric">{recommandations['volatilite']:.2f}%</div>
             <small>Risque de variation</small>
         </div>
@@ -545,20 +545,20 @@ def main():
     with col4:
         st.markdown(f"""
         <div class="metric-card">
-            <h4>🎯 Précision Modèle</h4>
+            <h4>Precision Modele</h4>
             <div class="highlight-metric">{r2_score_val*100:.1f}%</div>
-            <small>Variance expliquée</small>
+            <small>Variance expliquee</small>
         </div>
         """, unsafe_allow_html=True)
     
     # Recommandation principale
     st.markdown(f"""
     <div class="recommendation-box">
-        <h2>🎯 RECOMMANDATION STRATÉGIQUE SOFAC</h2>
-        <h3 style="color: #007bff;">{recommandations['icone']} {recommandations['recommandation']}</h3>
+        <h2>RECOMMANDATION STRATEGIQUE SOFAC</h2>
+        <h3 style="color: #007bff;">{recommandations['icone']} - {recommandations['recommandation']}</h3>
         <p><strong>Justification:</strong> {recommandations['raison']}</p>
         
-        <h4>💰 Impact Financier Estimé (Emprunt 10M MAD):</h4>
+        <h4>Impact Financier Estime (Emprunt 10M MAD):</h4>
     """, unsafe_allow_html=True)
     
     # Calcul de l'impact financier
@@ -566,68 +566,94 @@ def main():
         economies = abs(recommandations['changement']) * 10_000_000 / 100
         st.markdown(f"""
         <div class="success-box">
-            <h4>💰 Économies Potentielles avec TAUX VARIABLE</h4>
+            <h4>Economies Potentielles avec TAUX VARIABLE</h4>
             <p><strong>{economies:,.0f} MAD/an</strong></p>
-            <p>Basé sur la baisse attendue de {abs(recommandations['changement']):.2f}%</p>
+            <p>Base sur la baisse attendue de {abs(recommandations['changement']):.2f}%</p>
         </div>
         """, unsafe_allow_html=True)
     elif recommandations['changement'] > 0.3:
         cout_evite = recommandations['changement'] * 10_000_000 / 100
         st.markdown(f"""
         <div class="warning-box">
-            <h4>💰 Coûts Évités avec TAUX FIXE</h4>
+            <h4>Couts Evites avec TAUX FIXE</h4>
             <p><strong>{cout_evite:,.0f} MAD/an</strong></p>
-            <p>Basé sur la hausse attendue de {recommandations['changement']:.2f}%</p>
+            <p>Base sur la hausse attendue de {recommandations['changement']:.2f}%</p>
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
         <div class="info-box">
-            <h4>📈 Évolution Prévue 2025-2026</h4>
-            <p><strong>Début 2025:</strong> {debut_2025:.2f}%</p>
+            <h4>Impact Financier Limite</h4>
+            <p>Taux relativement stables (±{abs(recommandations['changement']):.2f}%)</p>
+            <p>Approche flexible recommandee selon les besoins</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Graphique principal
+    st.markdown("### Analyse Graphique Complete")
+    fig = creer_graphique_principal(df_mensuel, predictions)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Analyses détaillées
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Resume de la Situation Economique")
+        
+        # Calculs pour le résumé
+        debut_2025 = predictions.head(90)['Rendement_Predit'].mean()
+        fin_2026 = predictions.tail(90)['Rendement_Predit'].mean()
+        evolution_totale = fin_2026 - debut_2025
+        
+        st.markdown(f"""
+        <div class="info-box">
+            <h4>Evolution Prevue 2025-2026</h4>
+            <p><strong>Debut 2025:</strong> {debut_2025:.2f}%</p>
             <p><strong>Fin 2026:</strong> {fin_2026:.2f}%</p>
-            <p><strong>Évolution totale:</strong> {evolution_totale:+.2f}%</p>
-            <p><strong>Tendance:</strong> {"Baissière" if evolution_totale < -0.2 else "Haussière" if evolution_totale > 0.2 else "Stable"}</p>
+            <p><strong>Evolution totale:</strong> {evolution_totale:+.2f}%</p>
+            <p><strong>Tendance:</strong> {"Baissiere" if evolution_totale < -0.2 else "Haussiere" if evolution_totale > 0.2 else "Stable"}</p>
         </div>
         """, unsafe_allow_html=True)
         
         # Facteurs clés
         st.markdown("""
         <div class="info-box">
-            <h4>🔍 Facteurs d'Influence Principaux</h4>
+            <h4>Facteurs d'Influence Principaux</h4>
             <p><strong>• Taux Directeur BAM:</strong> Impact majeur (+0.96% par point)</p>
-            <p><strong>• Inflation sous-jacente:</strong> Impact modéré (+0.04% par point)</p>
-            <p><strong>• Croissance PIB:</strong> Impact négatif (-0.02% par point)</p>
-            <p><strong>• Politique monétaire:</strong> Cycle de détente attendu</p>
+            <p><strong>• Inflation sous-jacente:</strong> Impact modere (+0.04% par point)</p>
+            <p><strong>• Croissance PIB:</strong> Impact negatif (-0.02% par point)</p>
+            <p><strong>• Politique monetaire:</strong> Cycle de detente attendu</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown("### ⚠️ Gestion des Risques")
+        st.markdown("### Gestion des Risques")
         
         volatilite = recommandations['volatilite']
-        niveau_risque = "ÉLEVÉ" if volatilite > 0.4 else "MODÉRÉ" if volatilite > 0.2 else "FAIBLE"
+        niveau_risque = "ELEVE" if volatilite > 0.4 else "MODERE" if volatilite > 0.2 else "FAIBLE"
         
         st.markdown(f"""
         <div class="warning-box">
-            <h4>📊 Évaluation du Risque: {niveau_risque}</h4>
-            <p><strong>Volatilité prévue:</strong> {volatilite:.2f}%</p>
+            <h4>Evaluation du Risque: {niveau_risque}</h4>
+            <p><strong>Volatilite prevue:</strong> {volatilite:.2f}%</p>
             <p><strong>Intervalle de confiance:</strong> ±{volatilite*2:.2f}%</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("""
         <div class="warning-box">
-            <h4>🔍 Points de Surveillance</h4>
-            <p><strong>• Décisions BAM:</strong> Réunions trimestrielles du comité monétaire</p>
+            <h4>Points de Surveillance</h4>
+            <p><strong>• Decisions BAM:</strong> Reunions trimestrielles du comite monetaire</p>
             <p><strong>• Inflation:</strong> Surveillance mensuelle HCP</p>
             <p><strong>• Croissance:</strong> Publications trimestrielles PIB</p>
-            <p><strong>• Contexte international:</strong> Fed, BCE, géopolitique</p>
+            <p><strong>• Contexte international:</strong> Fed, BCE, geopolitique</p>
         </div>
         """, unsafe_allow_html=True)
     
     # Recommandations opérationnelles
-    st.markdown("### 💡 Recommandations Opérationnelles")
+    st.markdown("### Recommandations Operationnelles")
     
     col1, col2, col3 = st.columns(3)
     
@@ -635,84 +661,84 @@ def main():
         if recommandations['recommandation'] == 'TAUX VARIABLE':
             st.markdown("""
             <div class="success-box">
-                <h4>🎯 Actions Immédiates</h4>
-                <p>• Privilégier les nouveaux emprunts à taux variable</p>
-                <p>• Négocier des caps de protection</p>
-                <p>• Éviter les taux fixes long terme</p>
-                <p>• Surveiller les opportunités de refinancement</p>
+                <h4>Actions Immediates</h4>
+                <p>• Privilegier les nouveaux emprunts a taux variable</p>
+                <p>• Negocier des caps de protection</p>
+                <p>• Eviter les taux fixes long terme</p>
+                <p>• Surveiller les opportunites de refinancement</p>
             </div>
             """, unsafe_allow_html=True)
         elif recommandations['recommandation'] == 'TAUX FIXE':
             st.markdown("""
             <div class="warning-box">
-                <h4>🎯 Actions Immédiates</h4>
-                <p>• Bloquer les taux fixes dès maintenant</p>
-                <p>• Privilégier les échéances longues</p>
-                <p>• Éviter les taux variables</p>
-                <p>• Accélérer les projets de financement</p>
+                <h4>Actions Immediates</h4>
+                <p>• Bloquer les taux fixes des maintenant</p>
+                <p>• Privilegier les echeances longues</p>
+                <p>• Eviter les taux variables</p>
+                <p>• Accelerer les projets de financement</p>
             </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown("""
             <div class="info-box">
-                <h4>🎯 Actions Immédiates</h4>
-                <p>• Approche équilibrée: 50% fixe, 50% variable</p>
-                <p>• Diversifier les échéances</p>
-                <p>• Surveiller les signaux de marché</p>
-                <p>• Maintenir la flexibilité</p>
+                <h4>Actions Immediates</h4>
+                <p>• Approche equilibree: 50% fixe, 50% variable</p>
+                <p>• Diversifier les echeances</p>
+                <p>• Surveiller les signaux de marche</p>
+                <p>• Maintenir la flexibilite</p>
             </div>
             """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("""
         <div class="info-box">
-            <h4>⏰ Timing Optimal</h4>
-            <p><strong>Fenêtre recommandée:</strong> Juillet - Septembre 2025</p>
-            <p><strong>Éviter:</strong> Fins de trimestre (volatilité)</p>
-            <p><strong>Surveiller:</strong> Réunions BAM (mars, juin, septembre)</p>
-            <p><strong>Opportunité:</strong> Périodes de stabilité politique</p>
+            <h4>Timing Optimal</h4>
+            <p><strong>Fenetre recommandee:</strong> Juillet - Septembre 2025</p>
+            <p><strong>Eviter:</strong> Fins de trimestre (volatilite)</p>
+            <p><strong>Surveiller:</strong> Reunions BAM (mars, juin, septembre)</p>
+            <p><strong>Opportunite:</strong> Periodes de stabilite politique</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown("""
         <div class="info-box">
-            <h4>📋 Suivi & Révision</h4>
-            <p><strong>Fréquence:</strong> Révision mensuelle</p>
-            <p><strong>Déclencheurs:</strong> Écart >0.25% vs. prévisions</p>
+            <h4>Suivi & Revision</h4>
+            <p><strong>Frequence:</strong> Revision mensuelle</p>
+            <p><strong>Declencheurs:</strong> Ecart >0.25% vs. previsions</p>
             <p><strong>Sources:</strong> BAM, HCP, Bloomberg</p>
-            <p><strong>Reporting:</strong> Dashboard mis à jour quotidiennement</p>
+            <p><strong>Reporting:</strong> Dashboard mis a jour quotidiennement</p>
         </div>
         """, unsafe_allow_html=True)
     
     # Section technique (repliable)
-    with st.expander("🔧 Informations Techniques du Modèle"):
+    with st.expander("Informations Techniques du Modele"):
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown(f"""
-            **📊 Performance du Modèle:**
-            - R² Score: {r2_score_val:.3f} ({r2_score_val*100:.1f}% de variance expliquée)
+            **Performance du Modele:**
+            - R² Score: {r2_score_val:.3f} ({r2_score_val*100:.1f}% de variance expliquee)
             - Erreur Absolue Moyenne: {mae_val:.3f}%
-            - Méthode: Régression Linéaire Multiple
+            - Methode: Regression Lineaire Multiple
             - Validation: Cross-validation 5-fold
             
-            **📅 Données:**
-            - Période d'entraînement: 2020-2025
+            **Donnees:**
+            - Periode d'entrainement: 2020-2025
             - Observations: {len(df_mensuel)} points mensuels
-            - Prédictions: {len(predictions)} jours (Juillet 2025 - Décembre 2026)
+            - Predictions: {len(predictions)} jours (Juillet 2025 - Decembre 2026)
             """)
         
         with col2:
             st.markdown(f"""
-            **🔢 Équation de Prédiction:**
+            **Equation de Prediction:**
             ```
             Rendement = 0.188 + 0.959×Taux_Directeur 
                       + 0.037×Inflation 
                       - 0.022×Croissance_PIB
             ```
             
-            **📈 Variables Explicatives:**
+            **Variables Explicatives:**
             - Taux Directeur BAM (impact: +0.959)
             - Inflation sous-jacente (impact: +0.037)
             - Croissance PIB (impact: -0.022)
@@ -722,83 +748,12 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #666; font-size: 0.9em; padding: 1rem;">
-        <p><strong>⚠️ Avertissement Important:</strong> Ces prédictions sont basées sur des modèles statistiques et des hypothèses macroéconomiques. 
-        Elles doivent être utilisées comme outil d'aide à la décision en complément d'autres analyses financières.</p>
-        <p>📞 <strong>Contact:</strong> Direction Financière SOFAC | 📧 <strong>Support:</strong> analyse.financiere@sofac.ma</p>
-        <p>🔄 <strong>Dernière mise à jour:</strong> {datetime.now().strftime('%d/%m/%Y à %H:%M')} | 🏦 <strong>Sources:</strong> Bank Al-Maghrib, HCP, SOFAC</p>
+        <p><strong>Avertissement Important:</strong> Ces predictions sont basees sur des modeles statistiques et des hypotheses macroeconomiques. 
+        Elles doivent etre utilisees comme outil d'aide a la decision en complement d'autres analyses financieres.</p>
+        <p><strong>Contact:</strong> Direction Financiere SOFAC | <strong>Support:</strong> analyse.financiere@sofac.ma</p>
+        <p><strong>Derniere mise a jour:</strong> {datetime.now().strftime('%d/%m/%Y a %H:%M')} | <strong>Sources:</strong> Bank Al-Maghrib, HCP, SOFAC</p>
     </div>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
-
-# ============================================================================
-# FICHIERS ADDITIONNELS NÉCESSAIRES
-# ============================================================================
-
-# requirements.txt
-"""
-streamlit==1.29.0
-pandas==1.5.3
-numpy==1.24.3
-plotly==5.17.0
-scikit-learn==1.3.0
-"""
-
-# .streamlit/config.toml
-"""
-[theme]
-primaryColor = "#007bff"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f8f9fa"
-textColor = "#262730"
-font = "sans serif"
-
-[server]
-headless = true
-port = 8501
-maxUploadSize = 10
-
-[browser]
-gatherUsageStats = false
-"""
-
-# .streamlit/secrets.toml (optionnel pour Google Sheets)
-"""
-# Configuration Google Sheets (optionnel)
-[gsheet_credentials]
-type = "service_account"
-project_id = "votre-projet"
-private_key_id = "votre-key-id"
-private_key = "votre-private-key"
-client_email = "votre-service-account@projet.iam.gserviceaccount.com"
-client_id = "votre-client-id"
-auth_uri = "https://accounts.google.com/o/oauth2/auth"
-token_uri = "https://oauth2.googleapis.com/token"
-""">💰 Impact Financier Limité</h4>
-            <p>Taux relativement stables (±{abs(recommandations['changement']):.2f}%)</p>
-            <p>Approche flexible recommandée selon les besoins</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Graphique principal
-    st.markdown("### 📈 Analyse Graphique Complète")
-    fig = creer_graphique_principal(df_mensuel, predictions)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Analyses détaillées
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 📊 Résumé de la Situation Économique")
-        
-        # Calculs pour le résumé
-        debut_2025 = predictions.head(90)['Rendement_Predit'].mean()
-        fin_2026 = predictions.tail(90)['Rendement_Predit'].mean()
-        evolution_totale = fin_2026 - debut_2025
-        
-        st.markdown(f"""
-        <div class="info-box">
-            <h4
