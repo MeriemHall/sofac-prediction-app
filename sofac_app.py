@@ -248,7 +248,7 @@ def construire_modele(df_mensuel):
     return modele, r2, mae
 
 @st.cache_data
-def generer_predictions_futures(modele, mae_historique):
+def generer_predictions_futures(_modele, mae_historique):
     """Génération des prédictions pour juillet 2025 - décembre 2026"""
     np.random.seed(42)
     
