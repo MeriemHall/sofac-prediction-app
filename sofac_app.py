@@ -561,7 +561,110 @@ def main():
                     <p>Changement: {rec['changement_rendement']:+.2f}%</p>
                     <p>Risque: {rec['niveau_risque']}</p>
                 </div>
-                """, unsafe_allow_html=True),
+                """, unsafe_allow_html=True)
+    
+    with tab2:
+        st.header("🔮 Prédictions Détaillées")
+        
+        # Sélection du scénario
+        scenario_selectionne = st.selectbox(
+            "Choisissez un scénario:",
+            options=['Cas_de_Base', 'Conservateur', 'Optimiste'],
+            index=0,
+            help="Sélectionnez le scénario économique à analyser"
+        )
+        
+        pred_scenario = st.session_state.predictions[scenario_selectionne]
+        
+        # Statistiques du scénario
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Rendement Moyen", f"{pred_scenario['Rendement_Predit'].mean():.2f}%")
+        with col2:
+            st.metric("Rendement Min", f"{pred_scenario['Rendement_Predit'].min():.2f}%")
+        with col3:
+            st.metric("Rendement Max", f"{pred_scenario['Rendement_Predit'].max():.2f}%")
+        with col4:
+            st.metric("Écart-type", f"{pred_scenario['Rendement_Predit'].std():.2f}%")
+        
+        # Graphique détaillé avec intervalles de confiance
+        st.subheader(f"📊 Prédictions Quotidiennes - Scénario {scenario_selectionne}")
+        
+        # Échantillon pour affichage (tous les 3 jours pour lisibilité)
+        donnees_affichage = pred_scenario[::3]
+        
+        fig_detail = go.Figure()
+        
+        couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
+        
+        # Bandes de confiance
+        fig_detail.add_trace(
+            go.Scatter(
+                x=list(donnees_affichage['Date']) + list(donnees_affichage['Date'][::-1]),
+                y=list(donnees_affichage['Borne_Sup_95']) + list(donnees_affichage['Borne_Inf_95'][::-1]),
+                fill='toself',
+                fillcolor='rgba(74, 179, 209, 0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='Intervalle de Confiance 95%',
+                showlegend=True
+            )
+        )
+        
+        # Prédictions principales
+        fig_detail.add_trace(
+            go.Scatter(
+                x=donnees_affichage['Date'],
+                y=donnees_affichage['Rendement_Predit'],
+                mode='lines+markers',
+                name='Prédiction',
+                line=dict(color=couleurs[scenario_selectionne], width=3),
+                marker=dict(size=4)
+            )
+        )
+        
+        fig_detail.update_layout(
+            title=f"Prédictions Détaillées - {scenario_selectionne}",
+            xaxis_title="Date",
+            yaxis_title="Rendement (%)",
+            height=500,
+            template="plotly_white"
+        )
+        
+        st.plotly_chart(fig_detail, use_container_width=True)
+        
+        # Analyse mensuelle
+        st.subheader("📅 Analyse Mensuelle")
+        
+        # Groupement par mois
+        pred_scenario['Annee_Mois'] = pd.to_datetime(pred_scenario['Date']).dt.to_period('M')
+        analyse_mensuelle = pred_scenario.groupby('Annee_Mois').agg({
+            'Rendement_Predit': ['mean', 'min', 'max', 'std'],
+            'Taux_Directeur': 'mean',
+            'Inflation': 'mean',
+            'Croissance_PIB': 'mean'
+        }).round(3)
+        
+        analyse_mensuelle.columns = ['Rend_Moy', 'Rend_Min', 'Rend_Max', 'Volatilité', 
+                                   'Taux_Dir', 'Inflation', 'PIB']
+        analyse_mensuelle_display = analyse_mensuelle.reset_index()
+        analyse_mensuelle_display['Annee_Mois'] = analyse_mensuelle_display['Annee_Mois'].astype(str)
+        
+        st.dataframe(
+            analyse_mensuelle_display,
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Export des données
+        if st.button("📥 Télécharger les Prédictions"):
+            csv = pred_scenario.to_csv(index=False)
+            st.download_button(
+                label="Télécharger CSV",
+                data=csv,
+                file_name=f"sofac_predictions_{scenario_selectionne.lower()}.csv",
+                mime="text/csv"
+            ),
                     marker=dict(size=6)
                 )
             )
