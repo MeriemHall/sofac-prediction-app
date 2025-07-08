@@ -172,7 +172,6 @@ def create_monthly_dataset(donnees_historiques):
     
     return pd.DataFrame(donnees_mensuelles)
 
-@st.cache_data
 def train_prediction_model(df_mensuel):
     """Entraîner le modèle de régression"""
     variables_explicatives = ['Taux_Directeur', 'Inflation', 'Croissance_PIB']
@@ -272,7 +271,6 @@ def create_economic_scenarios():
     
     return scenarios
 
-@st.cache_data
 def generate_predictions(scenarios, modele, mae_historique):
     """Générer les prédictions avec correction de continuité"""
     
@@ -414,43 +412,45 @@ def main():
     with st.sidebar:
         st.header("📊 Informations du Modèle")
         
-        # Charger et traiter les données
-        with st.spinner("Chargement des données..."):
-            # Données historiques
-            donnees_hist_dict = {
-                '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
-                '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
-                '2020-09': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -7.2, 'rendement_52s': 1.68},
-                '2020-12': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -4.8, 'rendement_52s': 1.93},
-                '2021-03': {'taux_directeur': 1.50, 'inflation': 0.6, 'pib': 0.3, 'rendement_52s': 1.53},
-                '2021-06': {'taux_directeur': 1.50, 'inflation': 1.1, 'pib': 13.9, 'rendement_52s': 1.52},
-                '2021-12': {'taux_directeur': 1.50, 'inflation': 3.6, 'pib': 7.8, 'rendement_52s': 1.56},
-                '2022-03': {'taux_directeur': 1.50, 'inflation': 4.8, 'pib': 2.1, 'rendement_52s': 1.61},
-                '2022-06': {'taux_directeur': 1.50, 'inflation': 7.5, 'pib': 4.3, 'rendement_52s': 1.79},
-                '2022-09': {'taux_directeur': 2.00, 'inflation': 7.4, 'pib': 3.7, 'rendement_52s': 2.18},
-                '2023-03': {'taux_directeur': 3.00, 'inflation': 7.9, 'pib': 4.1, 'rendement_52s': 3.41},
-                '2023-06': {'taux_directeur': 3.00, 'inflation': 5.3, 'pib': 2.6, 'rendement_52s': 3.34},
-                '2023-09': {'taux_directeur': 3.00, 'inflation': 4.4, 'pib': 3.2, 'rendement_52s': 3.24},
-                '2024-03': {'taux_directeur': 3.00, 'inflation': 2.1, 'pib': 3.5, 'rendement_52s': 2.94},
-                '2024-09': {'taux_directeur': 2.75, 'inflation': 2.2, 'pib': 5.4, 'rendement_52s': 2.69},
-                '2024-12': {'taux_directeur': 2.50, 'inflation': 2.3, 'pib': 4.6, 'rendement_52s': 2.53},
-                '2025-03': {'taux_directeur': 2.25, 'inflation': 1.4, 'pib': 3.8, 'rendement_52s': 2.54},
-                '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
-            }
-            
-            df_mensuel = create_monthly_dataset(donnees_hist_dict)
-            modele, r2, mae, rmse, mae_vc = train_prediction_model(df_mensuel)
-            scenarios = create_economic_scenarios()
-            predictions = generate_predictions(scenarios, modele, mae)
-            recommandations = generate_recommendations(predictions)
+        # Initialiser les données dans session_state si pas déjà fait
+        if 'data_loaded' not in st.session_state:
+            with st.spinner("Chargement des données..."):
+                # Données historiques
+                donnees_hist_dict = {
+                    '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
+                    '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
+                    '2020-09': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -7.2, 'rendement_52s': 1.68},
+                    '2020-12': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -4.8, 'rendement_52s': 1.93},
+                    '2021-03': {'taux_directeur': 1.50, 'inflation': 0.6, 'pib': 0.3, 'rendement_52s': 1.53},
+                    '2021-06': {'taux_directeur': 1.50, 'inflation': 1.1, 'pib': 13.9, 'rendement_52s': 1.52},
+                    '2021-12': {'taux_directeur': 1.50, 'inflation': 3.6, 'pib': 7.8, 'rendement_52s': 1.56},
+                    '2022-03': {'taux_directeur': 1.50, 'inflation': 4.8, 'pib': 2.1, 'rendement_52s': 1.61},
+                    '2022-06': {'taux_directeur': 1.50, 'inflation': 7.5, 'pib': 4.3, 'rendement_52s': 1.79},
+                    '2022-09': {'taux_directeur': 2.00, 'inflation': 7.4, 'pib': 3.7, 'rendement_52s': 2.18},
+                    '2023-03': {'taux_directeur': 3.00, 'inflation': 7.9, 'pib': 4.1, 'rendement_52s': 3.41},
+                    '2023-06': {'taux_directeur': 3.00, 'inflation': 5.3, 'pib': 2.6, 'rendement_52s': 3.34},
+                    '2023-09': {'taux_directeur': 3.00, 'inflation': 4.4, 'pib': 3.2, 'rendement_52s': 3.24},
+                    '2024-03': {'taux_directeur': 3.00, 'inflation': 2.1, 'pib': 3.5, 'rendement_52s': 2.94},
+                    '2024-09': {'taux_directeur': 2.75, 'inflation': 2.2, 'pib': 5.4, 'rendement_52s': 2.69},
+                    '2024-12': {'taux_directeur': 2.50, 'inflation': 2.3, 'pib': 4.6, 'rendement_52s': 2.53},
+                    '2025-03': {'taux_directeur': 2.25, 'inflation': 1.4, 'pib': 3.8, 'rendement_52s': 2.54},
+                    '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
+                }
+                
+                st.session_state.df_mensuel = create_monthly_dataset(donnees_hist_dict)
+                st.session_state.modele, st.session_state.r2, st.session_state.mae, st.session_state.rmse, st.session_state.mae_vc = train_prediction_model(st.session_state.df_mensuel)
+                st.session_state.scenarios = create_economic_scenarios()
+                st.session_state.predictions = generate_predictions(st.session_state.scenarios, st.session_state.modele, st.session_state.mae)
+                st.session_state.recommandations = generate_recommendations(st.session_state.predictions)
+                st.session_state.data_loaded = True
         
         st.success("✅ Données chargées!")
         
         # Métriques du modèle
         st.subheader("🎯 Performance du Modèle")
-        st.metric("R² Score", f"{r2:.1%}", help="Pourcentage de variance expliquée")
-        st.metric("Précision", f"±{mae:.2f}%", help="Erreur absolue moyenne")
-        st.metric("Validation Croisée", f"±{mae_vc:.2f}%", help="Erreur en validation croisée")
+        st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Pourcentage de variance expliquée")
+        st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
+        st.metric("Validation Croisée", f"±{st.session_state.mae_vc:.2f}%", help="Erreur en validation croisée")
         
         # Situation actuelle
         st.subheader("📊 Situation Actuelle")
@@ -466,7 +466,7 @@ def main():
         # Métriques principales
         col1, col2, col3, col4 = st.columns(4)
         
-        cas_de_base = predictions['Cas_de_Base']
+        cas_de_base = st.session_state.predictions['Cas_de_Base']
         rendement_moyen = cas_de_base['Rendement_Predit'].mean()
         changement = rendement_moyen - 2.54
         volatilite = cas_de_base['Rendement_Predit'].std()
@@ -506,7 +506,7 @@ def main():
         fig_overview = go.Figure()
         
         # Données historiques récentes
-        df_recent = df_mensuel.tail(6)
+        df_recent = st.session_state.df_mensuel.tail(6)
         fig_overview.add_trace(
             go.Scatter(
                 x=df_recent['Date'],
@@ -521,7 +521,7 @@ def main():
         # Prédictions par scénario (échantillon hebdomadaire)
         couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
         
-        for nom_scenario, pred_df in predictions.items():
+        for nom_scenario, pred_df in st.session_state.predictions.items():
             # Échantillon hebdomadaire pour clarté
             donnees_hebdo = pred_df[::7]
             
@@ -532,6 +532,36 @@ def main():
                     mode='lines+markers',
                     name=f'{nom_scenario}',
                     line=dict(color=couleurs[nom_scenario], width=3),
+                    marker=dict(size=6)
+                )
+            )
+        
+        fig_overview.update_layout(
+            title="Évolution des Rendements 52-Semaines: Historique et Prédictions",
+            xaxis_title="Date",
+            yaxis_title="Rendement (%)",
+            height=500,
+            template="plotly_white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        st.plotly_chart(fig_overview, use_container_width=True)
+        
+        # Résumé des recommandations
+        st.subheader("🎯 Recommandations Rapides")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
+            with [col1, col2, col3][i]:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h4>{scenario}</h4>
+                    <p><strong>{rec['recommandation']}</strong></p>
+                    <p>Changement: {rec['changement_rendement']:+.2f}%</p>
+                    <p>Risque: {rec['niveau_risque']}</p>
+                </div>
+                """, unsafe_allow_html=True)),
                     marker=dict(size=6)
                 )
             )
@@ -574,7 +604,7 @@ def main():
             help="Sélectionnez le scénario économique à analyser"
         )
         
-        pred_scenario = predictions[scenario_selectionne]
+        pred_scenario = st.session_state.predictions[scenario_selectionne]
         
         # Statistiques du scénario
         col1, col2, col3, col4 = st.columns(4)
@@ -595,6 +625,8 @@ def main():
         donnees_affichage = pred_scenario[::3]
         
         fig_detail = go.Figure()
+        
+        couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
         
         # Bandes de confiance
         fig_detail.add_trace(
@@ -668,7 +700,7 @@ def main():
         st.header("💼 Recommandations Stratégiques")
         
         # Recommandation globale
-        liste_recommandations = [rec['recommandation'] for rec in recommandations.values()]
+        liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
         
         if liste_recommandations.count('TAUX VARIABLE') >= 2:
             strategie_globale = "TAUX VARIABLE"
@@ -694,8 +726,10 @@ def main():
         # Détail par scénario
         st.subheader("📊 Analyse Détaillée par Scénario")
         
-        for nom_scenario, rec in recommandations.items():
-            pred_df = predictions[nom_scenario]
+        couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
+        
+        for nom_scenario, rec in st.session_state.recommandations.items():
+            pred_df = st.session_state.predictions[nom_scenario]
             
             with st.expander(f"📈 Scénario {nom_scenario}", expanded=True):
                 col1, col2 = st.columns([2, 1])
@@ -740,7 +774,7 @@ def main():
         # Impact financier
         st.subheader("💰 Impact Financier Estimé")
         
-        changement_cas_base = recommandations['Cas_de_Base']['changement_rendement']
+        changement_cas_base = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
         
         montant_emprunt = st.slider(
             "Montant d'emprunt (millions MAD):",
@@ -785,15 +819,15 @@ def main():
         
         # Tableau comparatif
         donnees_comparaison = []
-        for nom_scenario, pred_df in predictions.items():
+        for nom_scenario, pred_df in st.session_state.predictions.items():
             donnees_comparaison.append({
                 'Scénario': nom_scenario,
                 'Rendement_Moyen': f"{pred_df['Rendement_Predit'].mean():.2f}%",
                 'Rendement_Min': f"{pred_df['Rendement_Predit'].min():.2f}%",
                 'Rendement_Max': f"{pred_df['Rendement_Predit'].max():.2f}%",
                 'Volatilité': f"{pred_df['Rendement_Predit'].std():.2f}%",
-                'Recommandation': recommandations[nom_scenario]['recommandation'],
-                'Niveau_Risque': recommandations[nom_scenario]['niveau_risque']
+                'Recommandation': st.session_state.recommandations[nom_scenario]['recommandation'],
+                'Niveau_Risque': st.session_state.recommandations[nom_scenario]['niveau_risque']
             })
         
         df_comparaison = pd.DataFrame(donnees_comparaison)
@@ -809,9 +843,9 @@ def main():
             
             # Coefficients du modèle
             coefficients = {
-                'Taux Directeur': modele.coef_[0],
-                'Inflation': modele.coef_[1], 
-                'Croissance PIB': modele.coef_[2]
+                'Taux Directeur': st.session_state.modele.coef_[0],
+                'Inflation': st.session_state.modele.coef_[1], 
+                'Croissance PIB': st.session_state.modele.coef_[2]
             }
             
             fig_coef = go.Figure(data=[
@@ -834,7 +868,7 @@ def main():
         with col2:
             st.markdown("**Distribution des Prédictions:**")
             
-            cas_base_data = predictions['Cas_de_Base']['Rendement_Predit']
+            cas_base_data = st.session_state.predictions['Cas_de_Base']['Rendement_Predit']
             
             fig_hist = go.Figure(data=[
                 go.Histogram(
@@ -866,7 +900,7 @@ def main():
                    [{"secondary_y": False}, {"secondary_y": False}]]
         )
         
-        cas_base_sample = predictions['Cas_de_Base'][::15]  # Échantillon bi-hebdomadaire
+        cas_base_sample = st.session_state.predictions['Cas_de_Base'][::15]  # Échantillon bi-hebdomadaire
         
         # Rendements
         fig_evolution.add_trace(
@@ -913,6 +947,38 @@ def main():
             st.markdown(f"""
             <div class="metric-card">
                 <h4>Qualité de l'Ajustement</h4>
+                <p><strong>R² Score:</strong> {st.session_state.r2:.1%}</p>
+                <p><strong>Interprétation:</strong> {st.session_state.r2*100:.1f}% de la variance expliquée</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h4>Précision</h4>
+                <p><strong>Erreur Moyenne:</strong> ±{st.session_state.mae:.2f}%</p>
+                <p><strong>Validation Croisée:</strong> ±{st.session_state.mae_vc:.2f}%</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h4>Robustesse</h4>
+                <p><strong>Échantillon:</strong> {len(st.session_state.df_mensuel)} observations</p>
+                <p><strong>Horizon:</strong> 18 mois</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #666; padding: 2rem;">
+        <p>🇲🇦 <strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
+        <p>Données: Bank Al-Maghrib, HCP | Modèle: Régression Linéaire Multiple | Horizon: Juillet 2025 - Décembre 2026</p>
+        <p><em>Les prédictions sont fournies à titre informatif et ne constituent pas des conseils financiers.</em></p>
+    </div>
+    """, unsafe_allow_html=True)>Qualité de l'Ajustement</h4>
                 <p><strong>R² Score:</strong> {r2:.1%}</p>
                 <p><strong>Interprétation:</strong> {r2*100:.1f}% de la variance expliquée</p>
             </div>
