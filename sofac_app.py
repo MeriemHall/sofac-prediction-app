@@ -601,3 +601,386 @@ def main():
 
 if __name__ == "__main__":
     main()
+# Enhanced Data Fetcher with 52-Week Treasury Yield
+# Add this to your existing sofac_app.py
+
+import requests
+from bs4 import BeautifulSoup
+import re
+from datetime import datetime
+import json
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def fetch_enhanced_moroccan_data():
+    """Enhanced fetcher including 52-week treasury yields"""
+    
+    live_data = {
+        'date': datetime.now().strftime('%Y-%m-%d'),
+        'policy_rate': 2.25,  # Fallback
+        'yield_52w': 2.40,    # Fallback
+        'inflation': 1.1,     # Fallback
+        'gdp_growth': 4.8,    # Fallback
+        'sources': {},
+        'fetch_attempts': {},
+        'fetch_success': False
+    }
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.8,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive'
+    }
+    
+    # =====================================================
+    # 1. FETCH BANK AL-MAGHRIB POLICY RATE
+    # =====================================================
+    try:
+        bkam_policy_url = "https://www.bkam.ma/Politique-monetaire/Cadre-strategique/Decision-de-la-politique-monetaire/Historique-des-decisions"
+        
+        response = requests.get(bkam_policy_url, headers=headers, timeout=15)
+        live_data['fetch_attempts']['policy_rate'] = f"Status: {response.status_code}"
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Look for the most recent policy rate in the table
+            tables = soup.find_all('table')
+            for table in tables:
+                rows = table.find_all('tr')
+                for row in rows[1:3]:  # Check first few data rows
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 2:
+                        date_cell = cells[0].get_text().strip()
+                        rate_cell = cells[1].get_text().strip()
+                        
+                        # Extract rate percentage
+                        rate_match = re.search(r'(\d+[,.]?\d*)', rate_cell)
+                        if rate_match:
+                            rate = float(rate_match.group(1).replace(',', '.'))
+                            if 0.5 <= rate <= 10:  # Reasonable range
+                                live_data['policy_rate'] = rate
+                                live_data['sources']['policy_rate'] = f'Bank Al-Maghrib Live ({date_cell})'
+                                live_data['fetch_success'] = True
+                                break
+                
+                if live_data['fetch_success']:
+                    break
+        
+    except Exception as e:
+        live_data['fetch_attempts']['policy_rate'] = f"Error: {str(e)[:50]}..."
+        live_data['sources']['policy_rate'] = 'Fallback (Fetch failed)'
+    
+    # =====================================================
+    # 2. FETCH 52-WEEK TREASURY YIELD (Multiple Approaches)
+    # =====================================================
+    
+    # Approach A: Try to access treasury data through alternative routes
+    try:
+        # Method 1: Try main Bank Al-Maghrib markets page
+        bkam_markets_urls = [
+            "https://www.bkam.ma/Marches/Principaux-indicateurs",
+            "https://www.bkam.ma/Marches",
+            "https://www.bkam.ma/Statistiques/Indicateurs-monétaires-et-financiers"
+        ]
+        
+        treasury_yield_found = False
+        
+        for url in bkam_markets_urls:
+            if treasury_yield_found:
+                break
+                
+            try:
+                response = requests.get(url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text().lower()
+                    
+                    # Search for 52-week patterns
+                    patterns = [
+                        r'52.*?semaines?.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?52.*?semaines?',
+                        r'bons.*?tr[eé]sor.*?52.*?(\d+[,.]?\d*)',
+                        r'treasury.*?52.*?week.*?(\d+[,.]?\d*)',
+                        r'52w.*?(\d+[,.]?\d*)%'
+                    ]
+                    
+                    for pattern in patterns:
+                        matches = re.findall(pattern, text)
+                        for match in matches:
+                            rate = float(match.replace(',', '.'))
+                            if 0.1 <= rate <= 15:  # Reasonable treasury yield range
+                                live_data['yield_52w'] = rate
+                                live_data['sources']['yield_52w'] = f'Bank Al-Maghrib Live (Markets Page)'
+                                treasury_yield_found = True
+                                break
+                        if treasury_yield_found:
+                            break
+            except:
+                continue
+        
+        # Method 2: Estimate from policy rate if not found
+        if not treasury_yield_found:
+            # Treasury yields typically trade at a small spread to policy rate
+            policy_spread = 0.10  # 10 basis points typical spread
+            live_data['yield_52w'] = live_data['policy_rate'] + policy_spread
+            live_data['sources']['yield_52w'] = 'Estimated from Policy Rate (+10bps)'
+        
+        live_data['fetch_attempts']['yield_52w'] = "Multiple approaches attempted"
+        
+    except Exception as e:
+        live_data['fetch_attempts']['yield_52w'] = f"Error: {str(e)[:50]}..."
+        live_data['sources']['yield_52w'] = 'Fallback (Estimation)'
+    
+    # =====================================================
+    # 3. FETCH HCP INFLATION DATA
+    # =====================================================
+    try:
+        hcp_inflation_urls = [
+            "https://www.hcp.ma/Actualite-Indices-des-prix-a-la-consommation-IPC_r349.html",
+            "https://www.hcp.ma/Economie_r327.html"
+        ]
+        
+        inflation_found = False
+        
+        for url in hcp_inflation_urls:
+            if inflation_found:
+                break
+                
+            try:
+                response = requests.get(url, headers=headers, timeout=15)
+                live_data['fetch_attempts']['inflation'] = f"Status: {response.status_code}"
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text().lower()
+                    
+                    # Look for recent inflation patterns
+                    patterns = [
+                        r'inflation.*?sous[- ]?jacente.*?(\d+[,.]?\d*)%.*?ann[eé]e',
+                        r'indicateur.*?inflation.*?(\d+[,.]?\d*)%.*?ann[eé]e',
+                        r'hausse.*?(\d+[,.]?\d*)%.*?ann[eé]e',
+                        r'(\d+[,.]?\d*)%.*?ann[eé]e.*?inflation',
+                        r'inflation.*?(\d+[,.]?\d*)%'
+                    ]
+                    
+                    for pattern in patterns:
+                        matches = re.findall(pattern, text)
+                        for match in matches:
+                            rate = float(match.replace(',', '.'))
+                            if 0 <= rate <= 15:  # Reasonable inflation range
+                                live_data['inflation'] = rate
+                                live_data['sources']['inflation'] = 'HCP Live'
+                                inflation_found = True
+                                break
+                        if inflation_found:
+                            break
+            except:
+                continue
+        
+    except Exception as e:
+        live_data['fetch_attempts']['inflation'] = f"Error: {str(e)[:50]}..."
+        live_data['sources']['inflation'] = 'Fallback (Fetch failed)'
+    
+    # =====================================================
+    # 4. FETCH HCP GDP GROWTH DATA
+    # =====================================================
+    try:
+        hcp_gdp_urls = [
+            "https://www.hcp.ma/Conjoncture-et-prevision-economique_r328.html",
+            "https://www.hcp.ma/Economie_r327.html"
+        ]
+        
+        gdp_found = False
+        
+        for url in hcp_gdp_urls:
+            if gdp_found:
+                break
+                
+            try:
+                response = requests.get(url, headers=headers, timeout=15)
+                live_data['fetch_attempts']['gdp_growth'] = f"Status: {response.status_code}"
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text().lower()
+                    
+                    # Look for GDP growth patterns
+                    patterns = [
+                        r'croissance.*?[eé]conomique.*?(\d+[,.]?\d*)%',
+                        r'pib.*?(\d+[,.]?\d*)%',
+                        r'progression.*?(\d+[,.]?\d*)%.*?trimestre',
+                        r'(\d+[,.]?\d*)%.*?premier.*?trimestre.*?2025',
+                        r'am[eé]lioration.*?(\d+[,.]?\d*)%'
+                    ]
+                    
+                    for pattern in patterns:
+                        matches = re.findall(pattern, text)
+                        for match in matches:
+                            rate = float(match.replace(',', '.'))
+                            if 0 <= rate <= 15:  # Reasonable GDP growth range
+                                live_data['gdp_growth'] = rate
+                                live_data['sources']['gdp_growth'] = 'HCP Live'
+                                gdp_found = True
+                                break
+                        if gdp_found:
+                            break
+            except:
+                continue
+        
+    except Exception as e:
+        live_data['fetch_attempts']['gdp_growth'] = f"Error: {str(e)[:50]}..."
+        live_data['sources']['gdp_growth'] = 'Fallback (Fetch failed)'
+    
+    # =====================================================
+    # 5. SET DEFAULT SOURCES AND FINAL PROCESSING
+    # =====================================================
+    
+    # Set default sources if not already set
+    if 'policy_rate' not in live_data['sources']:
+        live_data['sources']['policy_rate'] = 'Manual Fallback'
+    if 'yield_52w' not in live_data['sources']:
+        live_data['sources']['yield_52w'] = 'Manual Fallback'
+    if 'inflation' not in live_data['sources']:
+        live_data['sources']['inflation'] = 'Manual Fallback'
+    if 'gdp_growth' not in live_data['sources']:
+        live_data['sources']['gdp_growth'] = 'Manual Fallback'
+    
+    # Final data validation
+    live_data['policy_rate'] = max(0.1, min(10.0, live_data['policy_rate']))
+    live_data['yield_52w'] = max(0.1, min(15.0, live_data['yield_52w']))
+    live_data['inflation'] = max(0.0, min(20.0, live_data['inflation']))
+    live_data['gdp_growth'] = max(-10.0, min(20.0, live_data['gdp_growth']))
+    
+    live_data['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    return live_data
+
+def display_enhanced_data_panel(live_data):
+    """Enhanced display panel with detailed fetch information"""
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📡 Données en Temps Réel")
+    
+    # Success rate indicator
+    live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+    total_sources = len([k for k in live_data['sources'].keys() if k != 'last_updated'])
+    success_rate = (live_sources / total_sources) * 100
+    
+    if success_rate >= 75:
+        st.sidebar.success(f"🟢 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
+    elif success_rate >= 50:
+        st.sidebar.warning(f"🟡 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
+    elif success_rate >= 25:
+        st.sidebar.warning(f"🟠 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
+    else:
+        st.sidebar.error(f"🔴 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
+    
+    # Current values with source indicators
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        # Policy rate with indicator
+        source_indicator = "🟢" if 'Live' in live_data['sources']['policy_rate'] else "🔴"
+        st.metric(
+            f"{source_indicator} Taux Directeur", 
+            f"{live_data['policy_rate']:.2f}%",
+            help=f"Source: {live_data['sources']['policy_rate']}"
+        )
+        
+        # 52-week yield with indicator
+        source_indicator = "🟢" if 'Live' in live_data['sources']['yield_52w'] else "🟡" if 'Estimated' in live_data['sources']['yield_52w'] else "🔴"
+        st.metric(
+            f"{source_indicator} Rendement 52s", 
+            f"{live_data['yield_52w']:.2f}%",
+            help=f"Source: {live_data['sources']['yield_52w']}"
+        )
+    
+    with col2:
+        # Inflation with indicator
+        source_indicator = "🟢" if 'Live' in live_data['sources']['inflation'] else "🔴"
+        st.metric(
+            f"{source_indicator} Inflation", 
+            f"{live_data['inflation']:.2f}%",
+            help=f"Source: {live_data['sources']['inflation']}"
+        )
+        
+        # GDP with indicator
+        source_indicator = "🟢" if 'Live' in live_data['sources']['gdp_growth'] else "🔴"
+        st.metric(
+            f"{source_indicator} Croissance PIB", 
+            f"{live_data['gdp_growth']:.2f}%",
+            help=f"Source: {live_data['sources']['gdp_growth']}"
+        )
+    
+    # Last update and manual refresh
+    st.sidebar.info(f"🕐 Mis à jour: {live_data['last_updated']}")
+    
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("🔄 Actualiser"):
+            st.cache_data.clear()
+            st.rerun()
+    
+    with col2:
+        if st.button("📊 Détails"):
+            st.session_state.show_fetch_details = not st.session_state.get('show_fetch_details', False)
+    
+    # Detailed fetch information
+    if st.session_state.get('show_fetch_details', False):
+        with st.sidebar.expander("🔍 Détails des Tentatives", expanded=True):
+            st.markdown("**Sources de Données:**")
+            for key, source in live_data['sources'].items():
+                indicator_name = {
+                    'policy_rate': 'Taux Directeur',
+                    'yield_52w': 'Rendement 52s',
+                    'inflation': 'Inflation', 
+                    'gdp_growth': 'Croissance PIB'
+                }
+                
+                if key in indicator_name:
+                    status = "✅" if 'Live' in source else "⚠️" if 'Estimated' in source else "❌"
+                    st.write(f"{status} **{indicator_name[key]}:** {source}")
+            
+            if 'fetch_attempts' in live_data:
+                st.markdown("**Tentatives de Récupération:**")
+                for key, attempt in live_data['fetch_attempts'].items():
+                    st.write(f"• {key}: {attempt}")
+
+# Usage in your main function:
+def main_with_enhanced_data():
+    st.markdown("""
+    <div class="main-header">
+        <h1>🇲🇦 SOFAC - Modèle de Prédiction des Rendements 52-Semaines</h1>
+        <p>Système d'aide à la décision avec données automatiques Bank Al-Maghrib & HCP</p>
+        <p><strong>Rendement 52s:</strong> Automatique | <strong>Mise à jour:</strong> Horaire</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Fetch enhanced live data (including 52-week yields)
+    live_data = fetch_enhanced_moroccan_data()
+    
+    with st.sidebar:
+        st.header("📊 Informations du Modèle")
+        
+        # Display enhanced data panel
+        display_enhanced_data_panel(live_data)
+        
+        # Rest of your existing sidebar code...
+    
+    # Your existing tabs and content...
+
+# Add this notice for the 52-week yield
+def display_yield_notice():
+    if st.sidebar.button("ℹ️ À propos du Rendement 52s"):
+        st.sidebar.info("""
+        **Rendement 52-semaines:**
+        
+        Les données sont extraites de:
+        - Bank Al-Maghrib (pages marchés)
+        - Estimation basée sur le taux directeur
+        - Spread typique: +10 à +50 points de base
+        
+        **Note:** Certaines pages BAM limitent l'accès automatique. En cas d'échec, nous utilisons une estimation fiable basée sur la relation historique avec le taux directeur.
+        """)
