@@ -561,7 +561,7 @@ def main():
                     <p>Changement: {rec['changement_rendement']:+.2f}%</p>
                     <p>Risque: {rec['niveau_risque']}</p>
                 </div>
-                """, unsafe_allow_html=True)),
+                """, unsafe_allow_html=True),
                     marker=dict(size=6)
                 )
             )
