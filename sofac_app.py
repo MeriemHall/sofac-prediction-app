@@ -10,7 +10,6 @@ from sklearn.model_selection import cross_val_score
 import requests
 from bs4 import BeautifulSoup
 import re
-import json
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -65,9 +64,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour
+@st.cache_data(ttl=3600)
 def fetch_live_moroccan_data():
-    """Fetch live data from Bank Al-Maghrib and HCP with enhanced error handling"""
+    """Fetch live data from Bank Al-Maghrib and HCP"""
     
     live_data = {
         'date': datetime.now().strftime('%Y-%m-%d'),
@@ -76,21 +75,17 @@ def fetch_live_moroccan_data():
         'inflation': 1.1,
         'gdp_growth': 4.8,
         'sources': {},
-        'fetch_attempts': {},
         'success_count': 0,
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8,ar;q=0.7',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
     
     # Try to fetch Bank Al-Maghrib policy rate
     try:
         bkam_urls = [
-            "https://www.bkam.ma/Politique-monetaire/Cadre-strategique/Decision-de-la-politique-monetaire/Historique-des-decisions",
             "https://www.bkam.ma/Politique-monetaire",
             "https://www.bkam.ma/"
         ]
@@ -104,8 +99,7 @@ def fetch_live_moroccan_data():
                     
                     patterns = [
                         r'taux.*?directeur.*?(\d+[,.]?\d*)%',
-                        r'(\d+[,.]?\d*)%.*?taux.*?directeur',
-                        r'politique.*?mon[eé]taire.*?(\d+[,.]?\d*)%'
+                        r'(\d+[,.]?\d*)%.*?taux.*?directeur'
                     ]
                     
                     for pattern in patterns:
@@ -130,29 +124,22 @@ def fetch_live_moroccan_data():
         
         if 'policy_rate' not in live_data['sources']:
             live_data['sources']['policy_rate'] = 'Fallback Value'
-        
-    except Exception as e:
-        live_data['sources']['policy_rate'] = 'Fallback Value (Error)'
+    except:
+        live_data['sources']['policy_rate'] = 'Fallback Value'
     
     # Estimate 52-week yield from policy rate
-    try:
-        spread = 0.15  # 15 basis points typical spread
-        if live_data['policy_rate'] < 2.0:
-            spread = 0.25
-        elif live_data['policy_rate'] > 4.0:
-            spread = 0.10
-        
-        live_data['yield_52w'] = live_data['policy_rate'] + spread
-        live_data['sources']['yield_52w'] = f'Estimated from Policy Rate (+{spread*100:.0f}bps)'
-    except:
-        live_data['sources']['yield_52w'] = 'Fallback Estimation'
+    spread = 0.15
+    if live_data['policy_rate'] < 2.0:
+        spread = 0.25
+    elif live_data['policy_rate'] > 4.0:
+        spread = 0.10
+    
+    live_data['yield_52w'] = live_data['policy_rate'] + spread
+    live_data['sources']['yield_52w'] = f'Estimated from Policy Rate (+{spread*100:.0f}bps)'
     
     # Try to fetch HCP inflation data
     try:
-        hcp_urls = [
-            "https://www.hcp.ma/",
-            "https://www.hcp.ma/Prix_r370.html"
-        ]
+        hcp_urls = ["https://www.hcp.ma/"]
         
         for url in hcp_urls:
             try:
@@ -163,8 +150,7 @@ def fetch_live_moroccan_data():
                     
                     patterns = [
                         r'inflation.*?(\d+[,.]?\d*)%',
-                        r'(\d+[,.]?\d*)%.*?inflation',
-                        r'hausse.*?prix.*?(\d+[,.]?\d*)%'
+                        r'(\d+[,.]?\d*)%.*?inflation'
                     ]
                     
                     for pattern in patterns:
@@ -189,16 +175,11 @@ def fetch_live_moroccan_data():
         
         if 'inflation' not in live_data['sources']:
             live_data['sources']['inflation'] = 'Fallback Value'
-    
-    except Exception as e:
-        live_data['sources']['inflation'] = 'Fallback Value (Error)'
-    
-    # Try to fetch HCP GDP data (similar approach)
-    try:
-        # For now, use intelligent estimation based on current economic context
-        live_data['sources']['gdp_growth'] = 'Economic Estimation'
     except:
-        live_data['sources']['gdp_growth'] = 'Fallback Value'
+        live_data['sources']['inflation'] = 'Fallback Value'
+    
+    # GDP data estimation
+    live_data['sources']['gdp_growth'] = 'Economic Estimation'
     
     # Data validation
     live_data['policy_rate'] = max(0.1, min(10.0, live_data['policy_rate']))
@@ -214,12 +195,10 @@ def display_live_data_panel(live_data):
     st.sidebar.markdown("---")
     st.sidebar.subheader("📡 Données en Temps Réel")
     
-    # Calculate success rate
     live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
     total_sources = 4
     success_rate = (live_sources / total_sources) * 100
     
-    # Status indicator
     if success_rate >= 50:
         st.sidebar.markdown('<div class="data-status">🟢 Données partiellement en direct</div>', unsafe_allow_html=True)
     else:
@@ -227,7 +206,6 @@ def display_live_data_panel(live_data):
     
     st.sidebar.write(f"**Sources en direct:** {live_sources}/{total_sources} ({success_rate:.0f}%)")
     
-    # Current values
     col1, col2 = st.sidebar.columns(2)
     
     with col1:
@@ -246,7 +224,7 @@ def display_live_data_panel(live_data):
         )
     
     with col2:
-        indicator = "🟡" if 'Estimated' in live_data['sources']['yield_52w'] else "🔴"
+        indicator = "🟡"
         st.metric(
             f"{indicator} Rendement 52s", 
             f"{live_data['yield_52w']:.2f}%",
@@ -254,14 +232,12 @@ def display_live_data_panel(live_data):
             help=f"Source: {live_data['sources']['yield_52w']}"
         )
         
-        indicator = "🔴"
         st.metric(
-            f"{indicator} Croissance PIB", 
+            "🔴 Croissance PIB", 
             f"{live_data['gdp_growth']:.2f}%",
             help=f"Source: {live_data['sources']['gdp_growth']}"
         )
     
-    # Last update and refresh
     st.sidebar.info(f"🕐 Dernière mise à jour: {live_data['last_updated']}")
     
     if st.sidebar.button("🔄 Actualiser"):
@@ -293,7 +269,6 @@ def create_monthly_dataset_with_live_data(live_data):
         '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
     }
     
-    # Add current live data
     current_month = datetime.now().strftime('%Y-%m')
     if current_month not in donnees_historiques:
         donnees_historiques[current_month] = {
@@ -468,7 +443,7 @@ def create_economic_scenarios_with_live_base(live_data):
             elif nom_scenario == 'Cas_de_Base':
                 inflation_base = base_inflation + 0.1 * np.exp(-mois_depuis_debut / 12)
                 pib_base = base_gdp - 0.1 * (mois_depuis_debut / 18)
-            else:  # Optimiste
+            else:
                 inflation_base = base_inflation - 0.2 * (mois_depuis_debut / 18)
                 pib_base = base_gdp + 0.2 * (mois_depuis_debut / 18)
             
@@ -883,9 +858,7 @@ def main():
         
         # Data quality indicator
         quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-        quality_text = "Recommandation basée sur données majoritairement directes" if quality_score >= 2 else \
-                      "Recommandation basée sur données mixtes" if quality_score >= 1 else \
-                      "Recommandation basée sur estimations - à valider"
+        quality_text = "Recommandation basée sur données majoritairement directes" if quality_score >= 2 else "Recommandation basée sur données mixtes" if quality_score >= 1 else "Recommandation basée sur estimations - à valider"
         
         st.markdown(f"""
         <div class="recommendation-box" style="background: linear-gradient(135deg, {couleur_globale} 0%, {couleur_globale}AA 100%);">
@@ -1026,4 +999,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-            '
