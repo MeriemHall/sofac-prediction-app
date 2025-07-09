@@ -1481,7 +1481,7 @@ def main():
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main() "#28a745"
+    main()
         elif liste_recommandations.count('TAUX FIXE') >= 2:
             strategie_globale = "TAUX FIXE"
             raison_globale = f"Majorité des scénarios montrent des taux en hausse depuis le niveau live actuel de {live_data['yield_52w']:.2f}%"
