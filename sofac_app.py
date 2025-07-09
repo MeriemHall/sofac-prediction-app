@@ -7,6 +7,10 @@ from datetime import datetime, timedelta
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 from sklearn.model_selection import cross_val_score
+import requests
+from bs4 import BeautifulSoup
+import re
+import json
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -42,11 +46,511 @@ st.markdown("""
         margin: 2rem 0;
         text-align: center;
     }
+    .data-status {
+        background: #e8f5e8;
+        border: 1px solid #4caf50;
+        padding: 0.5rem;
+        border-radius: 5px;
+        margin: 0.5rem 0;
+        font-size: 0.9em;
+    }
+    .data-warning {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        padding: 0.5rem;
+        border-radius: 5px;
+        margin: 0.5rem 0;
+        font-size: 0.9em;
+    }
+    .data-error {
+        background: #f8d7da;
+        border: 1px solid #dc3545;
+        padding: 0.5rem;
+        border-radius: 5px;
+        margin: 0.5rem 0;
+        font-size: 0.9em;
+    }
 </style>
 """, unsafe_allow_html=True)
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour - updates every hour
+def fetch_live_moroccan_data():
+    """
+    Fetch live data from Bank Al-Maghrib and HCP with enhanced error handling
+    Updates automatically every hour
+    """
+    
+    live_data = {
+        'date': datetime.now().strftime('%Y-%m-%d'),
+        'policy_rate': 2.25,  # Current fallback
+        'yield_52w': 2.40,    # Current fallback
+        'inflation': 1.1,     # Current fallback
+        'gdp_growth': 4.8,    # Current fallback
+        'sources': {},
+        'fetch_attempts': {},
+        'success_count': 0,
+        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8,ar;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+    }
+    
+    # =====================================================
+    # 1. FETCH BANK AL-MAGHRIB POLICY RATE & 52-WEEK YIELD
+    # =====================================================
+    
+    # Policy Rate from Bank Al-Maghrib
+    try:
+        bkam_urls = [
+            "https://www.bkam.ma/Politique-monetaire/Cadre-strategique/Decision-de-la-politique-monetaire/Historique-des-decisions",
+            "https://www.bkam.ma/Politique-monetaire",
+            "https://www.bkam.ma/Marches/Principaux-indicateurs"
+        ]
+        
+        policy_rate_found = False
+        
+        for url in bkam_urls:
+            if policy_rate_found:
+                break
+                
+            try:
+                response = requests.get(url, headers=headers, timeout=15)
+                live_data['fetch_attempts']['policy_rate'] = f"BAM Status: {response.status_code}"
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text().lower()
+                    
+                    # Enhanced patterns for policy rate detection
+                    patterns = [
+                        r'taux.*?directeur.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?taux.*?directeur',
+                        r'politique.*?mon[eé]taire.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?politique.*?mon[eé]taire',
+                        r'taux.*?r[eé]po.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?r[eé]po',
+                        r'bank.*?al.*?maghrib.*?(\d+[,.]?\d*)%'
+                    ]
+                    
+                    for pattern in patterns:
+                        matches = re.findall(pattern, text)
+                        for match in matches:
+                            try:
+                                rate = float(match.replace(',', '.'))
+                                if 0.25 <= rate <= 8.0:  # Reasonable policy rate range
+                                    live_data['policy_rate'] = rate
+                                    live_data['sources']['policy_rate'] = f'Bank Al-Maghrib Live'
+                                    live_data['success_count'] += 1
+                                    policy_rate_found = True
+                                    break
+                            except ValueError:
+                                continue
+                        if policy_rate_found:
+                            break
+                    
+                    # Also look in tables
+                    if not policy_rate_found:
+                        tables = soup.find_all('table')
+                        for table in tables:
+                            rows = table.find_all('tr')
+                            for row in rows[1:5]:  # Check first few data rows
+                                cells = row.find_all(['td', 'th'])
+                                if len(cells) >= 2:
+                                    for cell in cells:
+                                        cell_text = cell.get_text().strip()
+                                        rate_match = re.search(r'(\d+[,.]?\d*)%?', cell_text)
+                                        if rate_match:
+                                            try:
+                                                rate = float(rate_match.group(1).replace(',', '.'))
+                                                if 0.25 <= rate <= 8.0:
+                                                    live_data['policy_rate'] = rate
+                                                    live_data['sources']['policy_rate'] = f'Bank Al-Maghrib Live (Table)'
+                                                    live_data['success_count'] += 1
+                                                    policy_rate_found = True
+                                                    break
+                                            except ValueError:
+                                                continue
+                                if policy_rate_found:
+                                    break
+                            if policy_rate_found:
+                                break
+                
+                if policy_rate_found:
+                    break
+                    
+            except requests.RequestException as e:
+                live_data['fetch_attempts']['policy_rate'] = f"BAM Error: {str(e)[:50]}..."
+                continue
+        
+        if not policy_rate_found:
+            live_data['sources']['policy_rate'] = 'Fallback Value (Latest Known)'
+    
+    except Exception as e:
+        live_data['fetch_attempts']['policy_rate'] = f"Exception: {str(e)[:50]}..."
+        live_data['sources']['policy_rate'] = 'Fallback Value (Error)'
+    
+    # 52-Week Treasury Yield (Multiple approaches)
+    try:
+        treasury_yield_found = False
+        
+        # Method 1: Try Bank Al-Maghrib market data pages
+        bkam_market_urls = [
+            "https://www.bkam.ma/Marches/Principaux-indicateurs",
+            "https://www.bkam.ma/Marches/Marche-monetaire",
+            "https://www.bkam.ma/Statistiques"
+        ]
+        
+        for url in bkam_market_urls:
+            if treasury_yield_found:
+                break
+                
+            try:
+                response = requests.get(url, headers=headers, timeout=15)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text().lower()
+                    
+                    # Enhanced patterns for 52-week yield detection
+                    patterns = [
+                        r'52.*?semaines?.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?52.*?semaines?',
+                        r'bons.*?tr[eé]sor.*?52.*?(\d+[,.]?\d*)',
+                        r'treasury.*?52.*?week.*?(\d+[,.]?\d*)',
+                        r'52w.*?(\d+[,.]?\d*)%?',
+                        r'rendement.*?52.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?rendement.*?52'
+                    ]
+                    
+                    for pattern in patterns:
+                        matches = re.findall(pattern, text)
+                        for match in matches:
+                            try:
+                                rate = float(match.replace(',', '.'))
+                                if 0.1 <= rate <= 12.0:  # Reasonable treasury yield range
+                                    live_data['yield_52w'] = rate
+                                    live_data['sources']['yield_52w'] = f'Bank Al-Maghrib Live (Markets)'
+                                    live_data['success_count'] += 1
+                                    treasury_yield_found = True
+                                    break
+                            except ValueError:
+                                continue
+                        if treasury_yield_found:
+                            break
+            except:
+                continue
+        
+        # Method 2: Estimate from policy rate if not found directly
+        if not treasury_yield_found:
+            # Treasury yields typically trade at a spread to policy rate
+            # Historical analysis shows 52-week yields are usually 10-50bp above policy rate
+            current_spread = 0.15  # 15 basis points typical spread
+            
+            # Adjust spread based on economic conditions
+            # If policy rate is low, spread tends to be higher
+            if live_data['policy_rate'] < 2.0:
+                current_spread = 0.25
+            elif live_data['policy_rate'] > 4.0:
+                current_spread = 0.10
+            
+            live_data['yield_52w'] = live_data['policy_rate'] + current_spread
+            live_data['sources']['yield_52w'] = f'Estimated from Policy Rate (+{current_spread*100:.0f}bps)'
+        
+        live_data['fetch_attempts']['yield_52w'] = "Multiple BAM sources attempted"
+        
+    except Exception as e:
+        live_data['fetch_attempts']['yield_52w'] = f"Error: {str(e)[:50]}..."
+        live_data['sources']['yield_52w'] = 'Fallback Estimation'
+    
+    # =====================================================
+    # 2. FETCH HCP INFLATION DATA
+    # =====================================================
+    try:
+        hcp_inflation_urls = [
+            "https://www.hcp.ma/Actualites_a5.html",
+            "https://www.hcp.ma/Prix_r370.html",
+            "https://www.hcp.ma/Indices-des-prix-a-la-consommation_r349.html",
+            "https://www.hcp.ma/"
+        ]
+        
+        inflation_found = False
+        
+        for url in hcp_inflation_urls:
+            if inflation_found:
+                break
+                
+            try:
+                response = requests.get(url, headers=headers, timeout=15)
+                live_data['fetch_attempts']['inflation'] = f"HCP Status: {response.status_code}"
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text().lower()
+                    
+                    # Enhanced patterns for inflation detection
+                    patterns = [
+                        r'inflation.*?(\d+[,.]?\d*)%.*?ann[ée]e?',
+                        r'(\d+[,.]?\d*)%.*?inflation.*?ann[ée]e?',
+                        r'hausse.*?prix.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?hausse.*?prix',
+                        r'ipc.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?ipc',
+                        r'indice.*?prix.*?consommation.*?(\d+[,.]?\d*)%',
+                        r'variation.*?ann[ée]e?.*?(\d+[,.]?\d*)%',
+                        r'glissement.*?annuel.*?(\d+[,.]?\d*)%'
+                    ]
+                    
+                    for pattern in patterns:
+                        matches = re.findall(pattern, text)
+                        for match in matches:
+                            try:
+                                rate = float(match.replace(',', '.'))
+                                if 0 <= rate <= 20:  # Reasonable inflation range
+                                    live_data['inflation'] = rate
+                                    live_data['sources']['inflation'] = 'HCP Live'
+                                    live_data['success_count'] += 1
+                                    inflation_found = True
+                                    break
+                            except ValueError:
+                                continue
+                        if inflation_found:
+                            break
+            except requests.RequestException as e:
+                live_data['fetch_attempts']['inflation'] = f"HCP Error: {str(e)[:50]}..."
+                continue
+        
+        if not inflation_found:
+            live_data['sources']['inflation'] = 'Fallback Value (Latest Known)'
+    
+    except Exception as e:
+        live_data['fetch_attempts']['inflation'] = f"Exception: {str(e)[:50]}..."
+        live_data['sources']['inflation'] = 'Fallback Value (Error)'
+    
+    # =====================================================
+    # 3. FETCH HCP GDP GROWTH DATA
+    # =====================================================
+    try:
+        hcp_gdp_urls = [
+            "https://www.hcp.ma/Conjoncture-et-prevision-economique_r328.html",
+            "https://www.hcp.ma/Comptes-nationaux_r302.html",
+            "https://www.hcp.ma/Economie_r327.html",
+            "https://www.hcp.ma/"
+        ]
+        
+        gdp_found = False
+        
+        for url in hcp_gdp_urls:
+            if gdp_found:
+                break
+                
+            try:
+                response = requests.get(url, headers=headers, timeout=15)
+                live_data['fetch_attempts']['gdp_growth'] = f"HCP Status: {response.status_code}"
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text().lower()
+                    
+                    # Enhanced patterns for GDP growth detection
+                    patterns = [
+                        r'croissance.*?[ée]conomique.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?croissance.*?[ée]conomique',
+                        r'pib.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?pib',
+                        r'progression.*?(\d+[,.]?\d*)%.*?trimestre',
+                        r'trimestre.*?(\d+[,.]?\d*)%.*?progression',
+                        r'([ée]volution.*?(\d+[,.]?\d*)%',
+                        r'(\d+[,.]?\d*)%.*?ann[ée]e.*?2025',
+                        r'2025.*?(\d+[,.]?\d*)%'
+                    ]
+                    
+                    for pattern in patterns:
+                        matches = re.findall(pattern, text)
+                        for match in matches:
+                            try:
+                                # Handle tuple results from some regex patterns
+                                if isinstance(match, tuple):
+                                    match = match[1] if match[1] else match[0]
+                                
+                                rate = float(match.replace(',', '.'))
+                                if -5 <= rate <= 15:  # Reasonable GDP growth range
+                                    live_data['gdp_growth'] = rate
+                                    live_data['sources']['gdp_growth'] = 'HCP Live'
+                                    live_data['success_count'] += 1
+                                    gdp_found = True
+                                    break
+                            except (ValueError, IndexError):
+                                continue
+                        if gdp_found:
+                            break
+            except requests.RequestException as e:
+                live_data['fetch_attempts']['gdp_growth'] = f"HCP Error: {str(e)[:50]}..."
+                continue
+        
+        if not gdp_found:
+            live_data['sources']['gdp_growth'] = 'Fallback Value (Latest Known)'
+    
+    except Exception as e:
+        live_data['fetch_attempts']['gdp_growth'] = f"Exception: {str(e)[:50]}..."
+        live_data['sources']['gdp_growth'] = 'Fallback Value (Error)'
+    
+    # =====================================================
+    # 4. FINAL DATA VALIDATION AND PROCESSING
+    # =====================================================
+    
+    # Data validation with reasonable bounds
+    live_data['policy_rate'] = max(0.1, min(10.0, live_data['policy_rate']))
+    live_data['yield_52w'] = max(0.1, min(15.0, live_data['yield_52w']))
+    live_data['inflation'] = max(0.0, min(25.0, live_data['inflation']))
+    live_data['gdp_growth'] = max(-10.0, min(20.0, live_data['gdp_growth']))
+    
+    # Ensure 52-week yield is not dramatically different from policy rate
+    if abs(live_data['yield_52w'] - live_data['policy_rate']) > 3.0:
+        live_data['yield_52w'] = live_data['policy_rate'] + 0.15
+        live_data['sources']['yield_52w'] = 'Adjusted (Spread Correction)'
+    
+    # Set default sources if not already set
+    for indicator in ['policy_rate', 'yield_52w', 'inflation', 'gdp_growth']:
+        if indicator not in live_data['sources']:
+            live_data['sources'][indicator] = 'Manual Fallback'
+    
+    return live_data
+
+def display_live_data_panel(live_data):
+    """Enhanced display panel with live data status"""
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📡 Données en Temps Réel")
+    
+    # Calculate success rate
+    live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+    total_sources = 4  # policy_rate, yield_52w, inflation, gdp_growth
+    success_rate = (live_sources / total_sources) * 100
+    
+    # Status indicator
+    if success_rate >= 75:
+        st.sidebar.markdown('<div class="data-status">🟢 Excellent: Données majoritairement en direct</div>', unsafe_allow_html=True)
+    elif success_rate >= 50:
+        st.sidebar.markdown('<div class="data-warning">🟡 Bon: Données partiellement en direct</div>', unsafe_allow_html=True)
+    elif success_rate >= 25:
+        st.sidebar.markdown('<div class="data-warning">🟠 Moyen: Quelques données en direct</div>', unsafe_allow_html=True)
+    else:
+        st.sidebar.markdown('<div class="data-error">🔴 Limité: Données principalement estimées</div>', unsafe_allow_html=True)
+    
+    st.sidebar.write(f"**Sources en direct:** {live_sources}/{total_sources} ({success_rate:.0f}%)")
+    
+    # Current values with enhanced indicators
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        # Policy rate
+        if 'Live' in live_data['sources']['policy_rate']:
+            indicator = "🟢"
+            delta_color = "normal"
+        else:
+            indicator = "🔴"
+            delta_color = "off"
+        
+        st.metric(
+            f"{indicator} Taux Directeur", 
+            f"{live_data['policy_rate']:.2f}%",
+            help=f"Source: {live_data['sources']['policy_rate']}"
+        )
+        
+        # Inflation
+        if 'Live' in live_data['sources']['inflation']:
+            indicator = "🟢"
+        else:
+            indicator = "🔴"
+        
+        st.metric(
+            f"{indicator} Inflation", 
+            f"{live_data['inflation']:.2f}%",
+            help=f"Source: {live_data['sources']['inflation']}"
+        )
+    
+    with col2:
+        # 52-week yield
+        if 'Live' in live_data['sources']['yield_52w']:
+            indicator = "🟢"
+        elif 'Estimated' in live_data['sources']['yield_52w']:
+            indicator = "🟡"
+        else:
+            indicator = "🔴"
+        
+        st.metric(
+            f"{indicator} Rendement 52s", 
+            f"{live_data['yield_52w']:.2f}%",
+            delta=f"+{(live_data['yield_52w'] - live_data['policy_rate']):.2f}%",
+            help=f"Source: {live_data['sources']['yield_52w']}"
+        )
+        
+        # GDP growth
+        if 'Live' in live_data['sources']['gdp_growth']:
+            indicator = "🟢"
+        else:
+            indicator = "🔴"
+        
+        st.metric(
+            f"{indicator} Croissance PIB", 
+            f"{live_data['gdp_growth']:.2f}%",
+            help=f"Source: {live_data['sources']['gdp_growth']}"
+        )
+    
+    # Last update and refresh controls
+    st.sidebar.info(f"🕐 Dernière mise à jour: {live_data['last_updated']}")
+    
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("🔄 Actualiser", help="Force la mise à jour des données"):
+            st.cache_data.clear()
+            st.rerun()
+    
+    with col2:
+        if st.button("📊 Détails", help="Afficher les détails des sources"):
+            st.session_state.show_fetch_details = not st.session_state.get('show_fetch_details', False)
+    
+    # Detailed fetch information
+    if st.session_state.get('show_fetch_details', False):
+        with st.sidebar.expander("🔍 Détails des Sources", expanded=True):
+            st.markdown("**Sources de Données:**")
+            
+            source_names = {
+                'policy_rate': 'Taux Directeur BAM',
+                'yield_52w': 'Rendement 52s BAM',
+                'inflation': 'Inflation HCP',
+                'gdp_growth': 'Croissance PIB HCP'
+            }
+            
+            for key, source in live_data['sources'].items():
+                if key in source_names:
+                    if 'Live' in source:
+                        status = "✅ Direct"
+                    elif 'Estimated' in source or 'Adjusted' in source:
+                        status = "⚠️ Estimé"
+                    else:
+                        status = "❌ Fallback"
+                    
+                    st.write(f"{status} **{source_names[key]}**")
+                    st.write(f"   {source}")
+            
+            if 'fetch_attempts' in live_data and live_data['fetch_attempts']:
+                st.markdown("**Tentatives de Récupération:**")
+                for key, attempt in live_data['fetch_attempts'].items():
+                    st.write(f"• {key}: {attempt}")
+
 @st.cache_data
-def create_monthly_dataset():
+def create_monthly_dataset_with_live_data(live_data):
+    """Create monthly dataset incorporating live data as the most recent point"""
+    
+    # Base historical data
     donnees_historiques = {
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
         '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
@@ -68,6 +572,16 @@ def create_monthly_dataset():
         '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
     }
     
+    # Add current live data as the most recent point
+    current_month = datetime.now().strftime('%Y-%m')
+    if current_month not in donnees_historiques:
+        donnees_historiques[current_month] = {
+            'taux_directeur': live_data['policy_rate'],
+            'inflation': live_data['inflation'],
+            'pib': live_data['gdp_growth'],
+            'rendement_52s': live_data['yield_52w']
+        }
+    
     def interpolation_lineaire(date_debut, date_fin, valeur_debut, valeur_fin, date_cible):
         debut_num = date_debut.toordinal()
         fin_num = date_fin.toordinal()
@@ -78,7 +592,9 @@ def create_monthly_dataset():
         return valeur_debut + progression * (valeur_fin - valeur_debut)
     
     date_debut = datetime(2020, 1, 1)
-    date_fin = datetime(2025, 6, 30)
+    date_fin = datetime.now().replace(day=1) + timedelta(days=32)
+    date_fin = date_fin.replace(day=1) - timedelta(days=1)  # End of current month
+    
     donnees_mensuelles = []
     date_courante = date_debut
     
@@ -123,7 +639,8 @@ def create_monthly_dataset():
             'Inflation': point_donnees['inflation'],
             'Croissance_PIB': point_donnees['pib'],
             'Rendement_52s': point_donnees['rendement_52s'],
-            'Est_Point_Ancrage': est_ancrage
+            'Est_Point_Ancrage': est_ancrage,
+            'Est_Live_Data': (date_str == current_month)
         })
         
         if date_courante.month == 12:
@@ -152,9 +669,16 @@ def train_prediction_model(df_mensuel):
     return modele, r2, mae, rmse, mae_vc
 
 @st.cache_data
-def create_economic_scenarios():
+def create_economic_scenarios_with_live_base(live_data):
+    """Create economic scenarios starting from current live data"""
+    
     date_debut = datetime(2025, 7, 1)
     date_fin = datetime(2026, 12, 31)
+    
+    # If we're past July 2025, start from current date
+    if datetime.now() > date_debut:
+        date_debut = datetime.now().replace(day=1) + timedelta(days=32)
+        date_debut = date_debut.replace(day=1)  # First day of next month
     
     dates_quotidiennes = []
     date_courante = date_debut
@@ -163,18 +687,36 @@ def create_economic_scenarios():
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
+    # Policy decisions adapted to current situation
+    base_rate = live_data['policy_rate']
+    
     decisions_politiques = {
         'Conservateur': {
-            '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
-            '2026-03': 1.75, '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50
+            '2025-06': base_rate, 
+            '2025-09': max(base_rate - 0.25, 1.5), 
+            '2025-12': max(base_rate - 0.5, 1.25),
+            '2026-03': max(base_rate - 0.75, 1.0), 
+            '2026-06': max(base_rate - 0.75, 1.0), 
+            '2026-09': max(base_rate - 1.0, 1.0), 
+            '2026-12': max(base_rate - 1.0, 1.0)
         },
         'Cas_de_Base': {
-            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
-            '2026-03': 1.50, '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25
+            '2025-06': base_rate, 
+            '2025-09': max(base_rate - 0.50, 1.0), 
+            '2025-12': max(base_rate - 0.75, 0.75),
+            '2026-03': max(base_rate - 1.0, 0.75), 
+            '2026-06': max(base_rate - 1.0, 0.75), 
+            '2026-09': max(base_rate - 1.25, 0.5), 
+            '2026-12': max(base_rate - 1.25, 0.5)
         },
         'Optimiste': {
-            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50,
-            '2026-03': 1.25, '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00
+            '2025-06': base_rate, 
+            '2025-09': max(base_rate - 0.75, 0.75), 
+            '2025-12': max(base_rate - 1.0, 0.5),
+            '2026-03': max(base_rate - 1.25, 0.5), 
+            '2026-06': max(base_rate - 1.5, 0.25), 
+            '2026-09': max(base_rate - 1.5, 0.25), 
+            '2026-12': max(base_rate - 1.5, 0.25)
         }
     }
     
@@ -184,11 +726,15 @@ def create_economic_scenarios():
         donnees_scenario = []
         taux_politiques = decisions_politiques[nom_scenario]
         
+        # Base scenario parameters on current live data
+        base_inflation = live_data['inflation']
+        base_gdp = live_data['gdp_growth']
+        
         for i, date in enumerate(dates_quotidiennes):
             jours_ahead = i + 1
             
             date_str = date.strftime('%Y-%m')
-            taux_directeur = 2.25
+            taux_directeur = base_rate
             for date_politique, taux in sorted(taux_politiques.items()):
                 if date_str >= date_politique:
                     taux_directeur = taux
@@ -199,14 +745,14 @@ def create_economic_scenarios():
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
             
             if nom_scenario == 'Conservateur':
-                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                inflation_base = base_inflation + 0.3 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = base_gdp - 0.3 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             elif nom_scenario == 'Cas_de_Base':
-                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
-            else:
-                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 + 0.1 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                inflation_base = base_inflation + 0.1 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = base_gdp - 0.1 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+            else:  # Optimiste
+                inflation_base = base_inflation - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = base_gdp + 0.2 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             
             inflation = max(0.0, min(5.0, inflation_base + np.random.normal(0, 0.01)))
             pib = max(-2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
@@ -225,30 +771,37 @@ def create_economic_scenarios():
     
     return scenarios
 
-def generate_predictions(scenarios, modele, mae_historique):
-    rendement_juin_reel = 1.75
+def generate_predictions_with_live_continuity(scenarios, modele, mae_historique, live_data):
+    """Generate predictions with smooth continuity from live data"""
+    
+    rendement_actuel = live_data['yield_52w']  # Use live 52-week yield as baseline
     predictions = {}
     
     for nom_scenario, scenario_df in scenarios.items():
         X_futur = scenario_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
         rendements_bruts = modele.predict(X_futur)
         
-        juillet_1_brut = rendements_bruts[0]
-        discontinuite = juillet_1_brut - rendement_juin_reel
-        
-        rendements_lisses = rendements_bruts.copy()
-        for i in range(len(rendements_lisses)):
-            jours_depuis_debut = i + 1
-            if jours_depuis_debut <= 30:
-                facteur_decroissance = np.exp(-jours_depuis_debut / 15)
-            elif jours_depuis_debut <= 90:
-                facteur_decroissance = np.exp(-30 / 15) * np.exp(-(jours_depuis_debut - 30) / 30)
-            else:
-                facteur_decroissance = 0
+        # Smooth continuity from current live data
+        if len(rendements_bruts) > 0:
+            premier_predit = rendements_bruts[0]
+            discontinuite = premier_predit - rendement_actuel
             
-            ajustement = discontinuite * facteur_decroissance
-            rendements_lisses[i] = rendements_bruts[i] - ajustement
+            rendements_lisses = rendements_bruts.copy()
+            for i in range(len(rendements_lisses)):
+                jours_depuis_debut = i + 1
+                if jours_depuis_debut <= 30:
+                    facteur_decroissance = np.exp(-jours_depuis_debut / 15)
+                elif jours_depuis_debut <= 90:
+                    facteur_decroissance = np.exp(-30 / 15) * np.exp(-(jours_depuis_debut - 30) / 30)
+                else:
+                    facteur_decroissance = 0
+                
+                ajustement = discontinuite * facteur_decroissance
+                rendements_lisses[i] = rendements_bruts[i] - ajustement
+        else:
+            rendements_lisses = rendements_bruts
         
+        # Scenario-specific adjustments
         ajustements = []
         for i, ligne in scenario_df.iterrows():
             ajustement = 0
@@ -281,6 +834,7 @@ def generate_predictions(scenarios, modele, mae_historique):
         scenario_df_copie['Rendement_Predit'] = rendements_finaux
         scenario_df_copie['Scenario'] = nom_scenario
         
+        # Enhanced confidence intervals
         for i, ligne in scenario_df_copie.iterrows():
             jours_ahead = ligne['Jours_Ahead']
             intervalle_base = mae_historique
@@ -299,8 +853,10 @@ def generate_predictions(scenarios, modele, mae_historique):
     
     return predictions
 
-def generate_recommendations(predictions):
-    rendement_actuel = 2.54
+def generate_recommendations_with_live_context(predictions, live_data):
+    """Generate recommendations using live data as baseline"""
+    
+    rendement_actuel = live_data['yield_52w']
     recommandations = {}
     
     for nom_scenario, pred_df in predictions.items():
@@ -308,16 +864,18 @@ def generate_recommendations(predictions):
         changement_rendement = rendement_futur_moyen - rendement_actuel
         volatilite = pred_df['Rendement_Predit'].std()
         
+        # Enhanced recommendation logic with live data context
         if changement_rendement > 0.3:
             recommandation = "TAUX FIXE"
-            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% en moyenne."
+            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis le niveau actuel de {rendement_actuel:.2f}%. Sécuriser les taux maintenant."
         elif changement_rendement < -0.3:
             recommandation = "TAUX VARIABLE"
-            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% en moyenne."
+            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis le niveau actuel de {rendement_actuel:.2f}%. Profiter de la diminution des coûts."
         else:
             recommandation = "STRATÉGIE FLEXIBLE"
-            raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%)."
+            raison = f"Rendements relativement stables autour du niveau actuel de {rendement_actuel:.2f}% (±{abs(changement_rendement):.2f}%)."
         
+        # Risk assessment with volatility consideration
         if volatilite < 0.2:
             niveau_risque = "FAIBLE"
         elif volatilite < 0.4:
@@ -325,13 +883,25 @@ def generate_recommendations(predictions):
         else:
             niveau_risque = "ÉLEVÉ"
         
+        # Confidence level based on data quality
+        live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+        if live_sources_count >= 3:
+            confiance = "ÉLEVÉE"
+        elif live_sources_count >= 2:
+            confiance = "MOYENNE"
+        else:
+            confiance = "LIMITÉE"
+        
         recommandations[nom_scenario] = {
             'recommandation': recommandation,
             'raison': raison,
             'niveau_risque': niveau_risque,
+            'confiance': confiance,
+            'rendement_actuel': rendement_actuel,
             'rendement_futur_moyen': rendement_futur_moyen,
             'changement_rendement': changement_rendement,
-            'volatilite': volatilite
+            'volatilite': volatilite,
+            'live_data_quality': f"{live_sources_count}/4 sources directes"
         }
     
     return recommandations
@@ -340,109 +910,170 @@ def main():
     st.markdown("""
     <div class="main-header">
         <h1>🇲🇦 SOFAC - Modèle de Prédiction des Rendements 52-Semaines</h1>
-        <p>Système d'aide à la décision pour optimiser les coûts de financement</p>
-        <p><strong>Horizon:</strong> Juillet 2025 - Décembre 2026 | <strong>Perspective:</strong> Emprunteur</p>
+        <p>Système d'aide à la décision avec données automatiques Bank Al-Maghrib & HCP</p>
+        <p><strong>Mise à jour:</strong> Horaire | <strong>Prochaine mise à jour:</strong> {}</p>
     </div>
-    """, unsafe_allow_html=True)
+    """.format((datetime.now() + timedelta(hours=1)).strftime('%H:%M')), unsafe_allow_html=True)
+    
+    # Fetch live data first
+    with st.spinner("🔄 Récupération des données en temps réel..."):
+        live_data = fetch_live_moroccan_data()
     
     with st.sidebar:
         st.header("📊 Informations du Modèle")
         
-        if 'data_loaded' not in st.session_state:
-            with st.spinner("Chargement des données..."):
-                st.session_state.df_mensuel = create_monthly_dataset()
+        # Display live data panel
+        display_live_data_panel(live_data)
+        
+        # Initialize or load cached model data
+        if 'data_loaded' not in st.session_state or st.session_state.get('last_update') != live_data['date']:
+            with st.spinner("🤖 Recalibration du modèle..."):
+                st.session_state.df_mensuel = create_monthly_dataset_with_live_data(live_data)
                 st.session_state.modele, st.session_state.r2, st.session_state.mae, st.session_state.rmse, st.session_state.mae_vc = train_prediction_model(st.session_state.df_mensuel)
-                st.session_state.scenarios = create_economic_scenarios()
-                st.session_state.predictions = generate_predictions(st.session_state.scenarios, st.session_state.modele, st.session_state.mae)
-                st.session_state.recommandations = generate_recommendations(st.session_state.predictions)
+                st.session_state.scenarios = create_economic_scenarios_with_live_base(live_data)
+                st.session_state.predictions = generate_predictions_with_live_continuity(st.session_state.scenarios, st.session_state.modele, st.session_state.mae, live_data)
+                st.session_state.recommandations = generate_recommendations_with_live_context(st.session_state.predictions, live_data)
                 st.session_state.data_loaded = True
+                st.session_state.last_update = live_data['date']
         
-        st.success("✅ Données chargées!")
+        st.success("✅ Modèle calibré avec données actuelles!")
         
+        # Model performance metrics
         st.subheader("🎯 Performance du Modèle")
-        st.metric("R² Score", f"{st.session_state.r2:.1%}")
-        st.metric("Précision", f"±{st.session_state.mae:.2f}%")
-        st.metric("Validation Croisée", f"±{st.session_state.mae_vc:.2f}%")
+        st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Pourcentage de variance expliquée")
+        st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
+        st.metric("Validation Croisée", f"±{st.session_state.mae_vc:.2f}%", help="Erreur en validation croisée")
         
-        st.subheader("📊 Situation Actuelle")
-        st.metric("Rendement Actuel", "2.54%")
-        st.metric("Taux Directeur", "2.25%")
+        # Live data incorporation notice
+        st.info("🔄 Le modèle est automatiquement recalibré avec les dernières données disponibles.")
     
-    tab1, tab2, tab3 = st.tabs(["📈 Vue d'Ensemble", "🔮 Prédictions Détaillées", "💼 Recommandations"])
+    # Main content tabs
+    tab1, tab2, tab3, tab4 = st.tabs(["📈 Vue d'Ensemble", "🔮 Prédictions Détaillées", "💼 Recommandations", "📊 Données Live"])
     
     with tab1:
         st.header("📈 Vue d'Ensemble des Prédictions")
         
+        # Key metrics with live data context
         col1, col2, col3, col4 = st.columns(4)
         
         cas_de_base = st.session_state.predictions['Cas_de_Base']
         rendement_moyen = cas_de_base['Rendement_Predit'].mean()
-        changement = rendement_moyen - 2.54
+        changement = rendement_moyen - live_data['yield_52w']
         volatilite = cas_de_base['Rendement_Predit'].std()
         
         with col1:
-            st.metric("Rendement Moyen Prédit", f"{rendement_moyen:.2f}%", delta=f"{changement:+.2f}%")
-        with col2:
-            st.metric("Changement vs Actuel", f"{changement:+.2f}%")
-        with col3:
-            st.metric("Volatilité", f"{volatilite:.2f}%")
-        with col4:
-            st.metric("Horizon de Prédiction", f"{len(cas_de_base)} jours")
+            st.metric(
+                "Rendement Actuel (Live)", 
+                f"{live_data['yield_52w']:.2f}%",
+                help=f"Source: {live_data['sources']['yield_52w']}"
+            )
         
-        st.subheader("📊 Évolution des Rendements par Scénario")
+        with col2:
+            st.metric(
+                "Rendement Moyen Prédit", 
+                f"{rendement_moyen:.2f}%",
+                delta=f"{changement:+.2f}%"
+            )
+        
+        with col3:
+            st.metric(
+                "Volatilité Attendue", 
+                f"{volatilite:.2f}%",
+                help="Écart-type des prédictions"
+            )
+        
+        with col4:
+            quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+            st.metric(
+                "Qualité des Données", 
+                f"{quality_score}/4",
+                delta="Direct" if quality_score >= 3 else "Mixte"
+            )
+        
+        # Enhanced overview chart with live data integration
+        st.subheader("📊 Évolution des Rendements: Historique et Prédictions")
         
         fig_overview = go.Figure()
         
-        df_recent = st.session_state.df_mensuel.tail(6)
-        fig_overview.add_trace(
-            go.Scatter(
-                x=df_recent['Date'],
-                y=df_recent['Rendement_52s'],
-                mode='lines+markers',
-                name='Historique 2025',
-                line=dict(color='#60A5FA', width=4),
-                marker=dict(size=8)
-            )
-        )
+        # Historical data
+        df_recent = st.session_state.df_mensuel.tail(8)
         
+        # Separate live data points
+        df_historical = df_recent[~df_recent.get('Est_Live_Data', False)]
+        df_live = df_recent[df_recent.get('Est_Live_Data', False)]
+        
+        # Historical points
+        if not df_historical.empty:
+            fig_overview.add_trace(
+                go.Scatter(
+                    x=df_historical['Date'],
+                    y=df_historical['Rendement_52s'],
+                    mode='lines+markers',
+                    name='Historique',
+                    line=dict(color='#60A5FA', width=4),
+                    marker=dict(size=8)
+                )
+            )
+        
+        # Live data point
+        if not df_live.empty:
+            fig_overview.add_trace(
+                go.Scatter(
+                    x=df_live['Date'],
+                    y=df_live['Rendement_52s'],
+                    mode='markers',
+                    name='Données Live',
+                    marker=dict(color='#22C55E', size=12, symbol='star'),
+                    text=['Point de données en direct'],
+                    textposition='top center'
+                )
+            )
+        
+        # Prediction scenarios
         couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
         
         for nom_scenario, pred_df in st.session_state.predictions.items():
-            donnees_hebdo = pred_df[::7]
+            donnees_hebdo = pred_df[::7]  # Weekly sampling
             
             fig_overview.add_trace(
                 go.Scatter(
                     x=donnees_hebdo['Date'],
                     y=donnees_hebdo['Rendement_Predit'],
                     mode='lines+markers',
-                    name=f'{nom_scenario}',
+                    name=f'Prédiction {nom_scenario}',
                     line=dict(color=couleurs[nom_scenario], width=3),
                     marker=dict(size=6)
                 )
             )
         
         fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines: Historique et Prédictions",
+            title="Évolution des Rendements 52-Semaines avec Données Live",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
             height=500,
-            template="plotly_white"
+            template="plotly_white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         
         st.plotly_chart(fig_overview, use_container_width=True)
         
-        st.subheader("🎯 Recommandations Rapides")
+        # Quick recommendations with live context
+        st.subheader("🎯 Recommandations Rapides (Basées sur Données Live)")
         
         col1, col2, col3 = st.columns(3)
         
         for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
             with [col1, col2, col3][i]:
+                confidence_color = "#4CAF50" if rec['confiance'] == "ÉLEVÉE" else "#FF9800" if rec['confiance'] == "MOYENNE" else "#F44336"
+                
                 st.markdown(f"""
                 <div class="metric-card">
                     <h4>{scenario}</h4>
                     <p><strong>{rec['recommandation']}</strong></p>
                     <p>Changement: {rec['changement_rendement']:+.2f}%</p>
                     <p>Risque: {rec['niveau_risque']}</p>
+                    <p style="color: {confidence_color};">Confiance: {rec['confiance']}</p>
+                    <small>{rec['live_data_quality']}</small>
                 </div>
                 """, unsafe_allow_html=True)
     
@@ -452,11 +1083,13 @@ def main():
         scenario_selectionne = st.selectbox(
             "Choisissez un scénario:",
             options=['Cas_de_Base', 'Conservateur', 'Optimiste'],
-            index=0
+            index=0,
+            help="Sélectionnez le scénario économique à analyser"
         )
         
         pred_scenario = st.session_state.predictions[scenario_selectionne]
         
+        # Enhanced metrics with live data context
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -466,16 +1099,16 @@ def main():
         with col3:
             st.metric("Rendement Max", f"{pred_scenario['Rendement_Predit'].max():.2f}%")
         with col4:
-            st.metric("Écart-type", f"{pred_scenario['Rendement_Predit'].std():.2f}%")
+            st.metric("Écart vs Live", f"{(pred_scenario['Rendement_Predit'].mean() - live_data['yield_52w']):+.2f}%")
         
+        # Detailed prediction chart
         st.subheader(f"📊 Prédictions Quotidiennes - Scénario {scenario_selectionne}")
         
-        donnees_affichage = pred_scenario[::3]
+        donnees_affichage = pred_scenario[::3]  # Every 3 days for clarity
         
         fig_detail = go.Figure()
         
-        couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
-        
+        # Confidence bands
         fig_detail.add_trace(
             go.Scatter(
                 x=list(donnees_affichage['Date']) + list(donnees_affichage['Date'][::-1]),
@@ -488,6 +1121,7 @@ def main():
             )
         )
         
+        # Main prediction line
         fig_detail.add_trace(
             go.Scatter(
                 x=donnees_affichage['Date'],
@@ -499,8 +1133,21 @@ def main():
             )
         )
         
+        # Add current live data point for reference
+        fig_detail.add_trace(
+            go.Scatter(
+                x=[datetime.now().strftime('%Y-%m-%d')],
+                y=[live_data['yield_52w']],
+                mode='markers',
+                name='Point Live Actuel',
+                marker=dict(color='#22C55E', size=15, symbol='star'),
+                text=[f"Live: {live_data['yield_52w']:.2f}%"],
+                textposition='top center'
+            )
+        )
+        
         fig_detail.update_layout(
-            title=f"Prédictions Détaillées - {scenario_selectionne}",
+            title=f"Prédictions Détaillées - {scenario_selectionne} (Continuité depuis données live)",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
             height=500,
@@ -508,479 +1155,334 @@ def main():
         )
         
         st.plotly_chart(fig_detail, use_container_width=True)
+        
+        # Export functionality
+        if st.button("📥 Télécharger les Prédictions"):
+            # Add live data context to export
+            pred_export = pred_scenario.copy()
+            pred_export['Live_Baseline'] = live_data['yield_52w']
+            pred_export['Live_Data_Quality'] = f"{sum(1 for s in live_data['sources'].values() if 'Live' in s)}/4"
+            
+            csv = pred_export.to_csv(index=False)
+            st.download_button(
+                label="Télécharger CSV avec contexte live",
+                data=csv,
+                file_name=f"sofac_predictions_{scenario_selectionne.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
     
     with tab3:
-        st.header("💼 Recommandations Stratégiques")
+        st.header("💼 Recommandations Stratégiques (Données Live)")
         
+        # Global recommendation with live data integration
         liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
         
         if liste_recommandations.count('TAUX VARIABLE') >= 2:
             strategie_globale = "TAUX VARIABLE"
-            raison_globale = "Majorité des scénarios montrent des taux en baisse"
-            couleur_globale = "#28a745"
-        elif liste_recommandations.count('TAUX FIXE') >= 2:
-            strategie_globale = "TAUX FIXE"
-            raison_globale = "Majorité des scénarios montrent des taux en hausse"
+            raison_globale = f"Majorité des scénarios montrent des taux en baisse depuis le niveau live actuel de {live_data['yield_52w']:.2f}%"
             couleur_globale = "#dc3545"
         else:
             strategie_globale = "STRATÉGIE FLEXIBLE"
-            raison_globale = "Signaux mixtes suggèrent une approche diversifiée"
+            raison_globale = f"Signaux mixtes depuis le niveau live actuel de {live_data['yield_52w']:.2f}% - approche diversifiée recommandée"
             couleur_globale = "#ffc107"
+        
+        # Data quality indicator for recommendations
+        quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+        quality_text = "Recommandation basée sur données majoritairement directes" if quality_score >= 3 else \
+                      "Recommandation basée sur données mixtes" if quality_score >= 2 else \
+                      "Recommandation basée sur estimations - à valider"
         
         st.markdown(f"""
         <div class="recommendation-box" style="background: linear-gradient(135deg, {couleur_globale} 0%, {couleur_globale}AA 100%);">
             <h2>🏆 RECOMMANDATION GLOBALE SOFAC</h2>
             <h3>{strategie_globale}</h3>
             <p>{raison_globale}</p>
+            <small>{quality_text} ({quality_score}/4 sources directes)</small>
         </div>
         """, unsafe_allow_html=True)
         
+        # Detailed scenario analysis with live context
         st.subheader("📊 Analyse Détaillée par Scénario")
         
         for nom_scenario, rec in st.session_state.recommandations.items():
             with st.expander(f"📈 Scénario {nom_scenario}", expanded=True):
-                st.markdown(f"""
-                **Recommandation:** {rec['recommandation']}
+                col1, col2 = st.columns([2, 1])
                 
-                **Justification:** {rec['raison']}
+                with col1:
+                    st.markdown(f"""
+                    **Recommandation:** {rec['recommandation']}
+                    
+                    **Justification:** {rec['raison']}
+                    
+                    **Métriques (vs niveau live {live_data['yield_52w']:.2f}%):**
+                    - Rendement moyen prédit: {rec['rendement_futur_moyen']:.2f}%
+                    - Changement attendu: {rec['changement_rendement']:+.2f}%
+                    - Volatilité: {rec['volatilite']:.2f}%
+                    - Niveau de risque: {rec['niveau_risque']}
+                    - Confiance: {rec['confiance']} ({rec['live_data_quality']})
+                    """)
                 
-                **Métriques:**
-                - Rendement moyen prédit: {rec['rendement_futur_moyen']:.2f}%
-                - Changement vs actuel: {rec['changement_rendement']:+.2f}%
-                - Volatilité: {rec['volatilite']:.2f}%
-                - Niveau de risque: {rec['niveau_risque']}
-                """)
+                with col2:
+                    # Mini chart with live baseline
+                    fig_mini = go.Figure()
+                    
+                    pred_df = st.session_state.predictions[nom_scenario]
+                    echantillon_mini = pred_df[::30]  # Monthly sampling
+                    
+                    # Live baseline
+                    fig_mini.add_hline(
+                        y=live_data['yield_52w'], 
+                        line_dash="dash", 
+                        line_color="green",
+                        annotation_text=f"Live: {live_data['yield_52w']:.2f}%"
+                    )
+                    
+                    # Prediction line
+                    fig_mini.add_trace(
+                        go.Scatter(
+                            x=echantillon_mini['Date'],
+                            y=echantillon_mini['Rendement_Predit'],
+                            mode='lines+markers',
+                            name=nom_scenario,
+                            line=dict(color=couleurs[nom_scenario], width=2)
+                        )
+                    )
+                    
+                    fig_mini.update_layout(
+                        height=200,
+                        showlegend=False,
+                        template="plotly_white",
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        yaxis_title="Rendement (%)"
+                    )
+                    
+                    st.plotly_chart(fig_mini, use_container_width=True)
         
-        st.subheader("💰 Impact Financier Estimé")
+        # Enhanced financial impact calculator
+        st.subheader("💰 Calculateur d'Impact Financier (Basé sur Données Live)")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            montant_emprunt = st.slider(
+                "Montant d'emprunt (millions MAD):",
+                min_value=1,
+                max_value=100,
+                value=10,
+                step=1
+            )
+        
+        with col2:
+            duree_emprunt = st.slider(
+                "Durée d'emprunt (années):",
+                min_value=1,
+                max_value=10,
+                value=3,
+                step=1
+            )
         
         changement_cas_base = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
+        impact_total = changement_cas_base * montant_emprunt * 1_000_000 / 100 * duree_emprunt
         
-        montant_emprunt = st.slider(
-            "Montant d'emprunt (millions MAD):",
-            min_value=1,
-            max_value=100,
-            value=10,
-            step=1
-        )
-        
-        if abs(changement_cas_base) > 0.3:
-            if changement_cas_base < 0:
-                economies = abs(changement_cas_base) * montant_emprunt * 1_000_000 / 100
+        if abs(changement_cas_base) > 0.2:
+            if changement_cas_base < 0:  # Baisse attendue
                 st.success(f"""
                 💰 **Économies Potentielles avec TAUX VARIABLE:**
                 
-                - {economies:,.0f} MAD/an
-                - Basé sur une baisse attendue de {abs(changement_cas_base):.2f}%
-                - Pour un emprunt de {montant_emprunt}M MAD
+                - **Économies annuelles:** {abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
+                - **Économies totales ({duree_emprunt} ans):** {abs(impact_total):,.0f} MAD
+                - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+                - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
-            else:
-                cout_evite = changement_cas_base * montant_emprunt * 1_000_000 / 100
+            else:  # Hausse attendue
                 st.warning(f"""
                 💰 **Coûts Évités avec TAUX FIXE:**
                 
-                - {cout_evite:,.0f} MAD/an
-                - Basé sur une hausse attendue de {changement_cas_base:.2f}%
-                - Pour un emprunt de {montant_emprunt}M MAD
+                - **Surcoûts évités annuellement:** {changement_cas_base * montant_emprunt * 10_000:,.0f} MAD
+                - **Surcoûts évités totaux ({duree_emprunt} ans):** {impact_total:,.0f} MAD
+                - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+                - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
         else:
             st.info(f"""
             💰 **Impact Financier Limité:**
             
-            - Taux relativement stables (±{abs(changement_cas_base):.2f}%)
-            - Approche flexible recommandée
+            - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+            - **Impact annuel:** ±{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
+            - **Approche flexible recommandée**
+            - **Qualité prédiction:** {quality_score}/4 sources directes
             """)
     
+    with tab4:
+        st.header("📊 Tableau de Bord des Données Live")
+        
+        # Live data dashboard
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("🎯 Sources de Données en Temps Réel")
+            
+            source_status = []
+            indicators = {
+                'policy_rate': ('Bank Al-Maghrib', 'Taux Directeur', '🏦'),
+                'yield_52w': ('Bank Al-Maghrib', 'Rendement 52s', '📈'),
+                'inflation': ('HCP', 'Inflation', '📊'),
+                'gdp_growth': ('HCP', 'Croissance PIB', '💹')
+            }
+            
+            for key, (institution, indicator, icon) in indicators.items():
+                source = live_data['sources'][key]
+                if 'Live' in source:
+                    status = "🟢 Direct"
+                    status_color = "#4CAF50"
+                elif 'Estimated' in source or 'Adjusted' in source:
+                    status = "🟡 Estimé"
+                    status_color = "#FF9800"
+                else:
+                    status = "🔴 Fallback"
+                    status_color = "#F44336"
+                
+                st.markdown(f"""
+                <div style="border: 1px solid {status_color}; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;">
+                    <h4>{icon} {indicator}</h4>
+                    <p><strong>Institution:</strong> {institution}</p>
+                    <p><strong>Statut:</strong> <span style="color: {status_color};">{status}</span></p>
+                    <p><strong>Valeur:</strong> {live_data[key]:.2f}%</p>
+                    <small>{source}</small>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            st.subheader("🔄 Historique des Mises à Jour")
+            
+            # Fetch attempts information
+            if live_data.get('fetch_attempts'):
+                st.markdown("**Dernières Tentatives de Récupération:**")
+                for source, attempt in live_data['fetch_attempts'].items():
+                    source_name = {
+                        'policy_rate': 'Taux Directeur',
+                        'yield_52w': 'Rendement 52s',
+                        'inflation': 'Inflation',
+                        'gdp_growth': 'Croissance PIB'
+                    }.get(source, source)
+                    
+                    st.write(f"**{source_name}:** {attempt}")
+            
+            # Update schedule
+            st.markdown("**Calendrier de Mise à Jour:**")
+            st.write("• **Automatique:** Toutes les heures")
+            st.write("• **Manuel:** Bouton 'Actualiser'")
+            st.write("• **Recalibration:** Lors de nouvelles données")
+            
+            next_update = (datetime.now() + timedelta(hours=1)).strftime('%H:%M')
+            st.write(f"• **Prochaine mise à jour:** {next_update}")
+            
+            # Data quality trend (placeholder for future enhancement)
+            st.markdown("**Qualité des Données (24h):**")
+            current_quality = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+            st.progress(current_quality / 4)
+            st.write(f"Score actuel: {current_quality}/4 sources directes")
+        
+        # Live data visualization
+        st.subheader("📈 Évolution des Indicateurs Clés")
+        
+        # Create a comparison chart showing current vs recent historical values
+        fig_indicators = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=['Taux Directeur (%)', 'Rendement 52s (%)', 'Inflation (%)', 'Croissance PIB (%)'],
+            vertical_spacing=0.12
+        )
+        
+        # Historical trend (last 6 months) vs current live value
+        recent_data = st.session_state.df_mensuel.tail(6)
+        
+        indicators_data = [
+            ('Taux_Directeur', live_data['policy_rate'], 1, 1),
+            ('Rendement_52s', live_data['yield_52w'], 1, 2),
+            ('Inflation', live_data['inflation'], 2, 1),
+            ('Croissance_PIB', live_data['gdp_growth'], 2, 2)
+        ]
+        
+        for col, live_val, row, col_pos in indicators_data:
+            # Historical trend
+            fig_indicators.add_trace(
+                go.Scatter(
+                    x=recent_data['Date'],
+                    y=recent_data[col],
+                    mode='lines+markers',
+                    name=f'Historique {col}',
+                    line=dict(color='#60A5FA', width=2),
+                    showlegend=False
+                ),
+                row=row, col=col_pos
+            )
+            
+            # Current live value
+            fig_indicators.add_trace(
+                go.Scatter(
+                    x=[datetime.now().strftime('%Y-%m')],
+                    y=[live_val],
+                    mode='markers',
+                    name=f'Live {col}',
+                    marker=dict(color='#22C55E', size=12, symbol='star'),
+                    showlegend=False
+                ),
+                row=row, col=col_pos
+            )
+        
+        fig_indicators.update_layout(
+            height=500,
+            template="plotly_white",
+            title_text="Indicateurs Économiques: Évolution Récente et Valeurs Live"
+        )
+        
+        st.plotly_chart(fig_indicators, use_container_width=True)
+        
+        # Export live data report
+        if st.button("📥 Exporter Rapport de Données Live"):
+            report_data = {
+                'timestamp': live_data['last_updated'],
+                'data_quality_score': f"{sum(1 for s in live_data['sources'].values() if 'Live' in s)}/4",
+                'indicators': {
+                    'policy_rate': {'value': live_data['policy_rate'], 'source': live_data['sources']['policy_rate']},
+                    'yield_52w': {'value': live_data['yield_52w'], 'source': live_data['sources']['yield_52w']},
+                    'inflation': {'value': live_data['inflation'], 'source': live_data['sources']['inflation']},
+                    'gdp_growth': {'value': live_data['gdp_growth'], 'source': live_data['sources']['gdp_growth']}
+                },
+                'fetch_attempts': live_data.get('fetch_attempts', {}),
+                'recommendations_summary': {
+                    scenario: rec['recommandation'] 
+                    for scenario, rec in st.session_state.recommandations.items()
+                }
+            }
+            
+            report_json = json.dumps(report_data, indent=2, ensure_ascii=False)
+            st.download_button(
+                label="Télécharger Rapport JSON",
+                data=report_json,
+                file_name=f"sofac_live_data_report_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                mime="application/json"
+            )
+    
+    # Enhanced footer with live data attribution
     st.markdown("---")
-    st.markdown("""
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+    
+    st.markdown(f"""
     <div style="text-align: center; color: #666; padding: 2rem;">
-        <p>🇲🇦 <strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
-        <p>Données: Bank Al-Maghrib, HCP | Modèle: Régression Linéaire Multiple | Horizon: Juillet 2025 - Décembre 2026</p>
-        <p><em>Les prédictions sont fournies à titre informatif et ne constituent pas des conseils financiers.</em></p>
+        <p>🇲🇦 <strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines avec Données Live</strong></p>
+        <p>Sources: Bank Al-Maghrib ({live_sources_count > 0 and '🟢' or '🔴'}) | HCP ({live_sources_count > 1 and '🟢' or '🔴'}) | 
+        Dernière mise à jour: {current_time}</p>
+        <p>Qualité des données: {live_sources_count}/4 sources directes | 
+        Prochaine actualisation automatique: {(datetime.now() + timedelta(hours=1)).strftime('%H:%M')}</p>
+        <p><em>Les prédictions sont basées sur les dernières données disponibles et ne constituent pas des conseils financiers.</em></p>
     </div>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
-# Enhanced Data Fetcher with 52-Week Treasury Yield
-# Add this to your existing sofac_app.py
-
-import requests
-from bs4 import BeautifulSoup
-import re
-from datetime import datetime
-import json
-
-@st.cache_data(ttl=3600)  # Cache for 1 hour
-def fetch_enhanced_moroccan_data():
-    """Enhanced fetcher including 52-week treasury yields"""
-    
-    live_data = {
-        'date': datetime.now().strftime('%Y-%m-%d'),
-        'policy_rate': 2.25,  # Fallback
-        'yield_52w': 2.40,    # Fallback
-        'inflation': 1.1,     # Fallback
-        'gdp_growth': 4.8,    # Fallback
-        'sources': {},
-        'fetch_attempts': {},
-        'fetch_success': False
-    }
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'fr-FR,fr;q=0.8,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive'
-    }
-    
-    # =====================================================
-    # 1. FETCH BANK AL-MAGHRIB POLICY RATE
-    # =====================================================
-    try:
-        bkam_policy_url = "https://www.bkam.ma/Politique-monetaire/Cadre-strategique/Decision-de-la-politique-monetaire/Historique-des-decisions"
-        
-        response = requests.get(bkam_policy_url, headers=headers, timeout=15)
-        live_data['fetch_attempts']['policy_rate'] = f"Status: {response.status_code}"
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Look for the most recent policy rate in the table
-            tables = soup.find_all('table')
-            for table in tables:
-                rows = table.find_all('tr')
-                for row in rows[1:3]:  # Check first few data rows
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) >= 2:
-                        date_cell = cells[0].get_text().strip()
-                        rate_cell = cells[1].get_text().strip()
-                        
-                        # Extract rate percentage
-                        rate_match = re.search(r'(\d+[,.]?\d*)', rate_cell)
-                        if rate_match:
-                            rate = float(rate_match.group(1).replace(',', '.'))
-                            if 0.5 <= rate <= 10:  # Reasonable range
-                                live_data['policy_rate'] = rate
-                                live_data['sources']['policy_rate'] = f'Bank Al-Maghrib Live ({date_cell})'
-                                live_data['fetch_success'] = True
-                                break
-                
-                if live_data['fetch_success']:
-                    break
-        
-    except Exception as e:
-        live_data['fetch_attempts']['policy_rate'] = f"Error: {str(e)[:50]}..."
-        live_data['sources']['policy_rate'] = 'Fallback (Fetch failed)'
-    
-    # =====================================================
-    # 2. FETCH 52-WEEK TREASURY YIELD (Multiple Approaches)
-    # =====================================================
-    
-    # Approach A: Try to access treasury data through alternative routes
-    try:
-        # Method 1: Try main Bank Al-Maghrib markets page
-        bkam_markets_urls = [
-            "https://www.bkam.ma/Marches/Principaux-indicateurs",
-            "https://www.bkam.ma/Marches",
-            "https://www.bkam.ma/Statistiques/Indicateurs-monétaires-et-financiers"
-        ]
-        
-        treasury_yield_found = False
-        
-        for url in bkam_markets_urls:
-            if treasury_yield_found:
-                break
-                
-            try:
-                response = requests.get(url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    text = soup.get_text().lower()
-                    
-                    # Search for 52-week patterns
-                    patterns = [
-                        r'52.*?semaines?.*?(\d+[,.]?\d*)%',
-                        r'(\d+[,.]?\d*)%.*?52.*?semaines?',
-                        r'bons.*?tr[eé]sor.*?52.*?(\d+[,.]?\d*)',
-                        r'treasury.*?52.*?week.*?(\d+[,.]?\d*)',
-                        r'52w.*?(\d+[,.]?\d*)%'
-                    ]
-                    
-                    for pattern in patterns:
-                        matches = re.findall(pattern, text)
-                        for match in matches:
-                            rate = float(match.replace(',', '.'))
-                            if 0.1 <= rate <= 15:  # Reasonable treasury yield range
-                                live_data['yield_52w'] = rate
-                                live_data['sources']['yield_52w'] = f'Bank Al-Maghrib Live (Markets Page)'
-                                treasury_yield_found = True
-                                break
-                        if treasury_yield_found:
-                            break
-            except:
-                continue
-        
-        # Method 2: Estimate from policy rate if not found
-        if not treasury_yield_found:
-            # Treasury yields typically trade at a small spread to policy rate
-            policy_spread = 0.10  # 10 basis points typical spread
-            live_data['yield_52w'] = live_data['policy_rate'] + policy_spread
-            live_data['sources']['yield_52w'] = 'Estimated from Policy Rate (+10bps)'
-        
-        live_data['fetch_attempts']['yield_52w'] = "Multiple approaches attempted"
-        
-    except Exception as e:
-        live_data['fetch_attempts']['yield_52w'] = f"Error: {str(e)[:50]}..."
-        live_data['sources']['yield_52w'] = 'Fallback (Estimation)'
-    
-    # =====================================================
-    # 3. FETCH HCP INFLATION DATA
-    # =====================================================
-    try:
-        hcp_inflation_urls = [
-            "https://www.hcp.ma/Actualite-Indices-des-prix-a-la-consommation-IPC_r349.html",
-            "https://www.hcp.ma/Economie_r327.html"
-        ]
-        
-        inflation_found = False
-        
-        for url in hcp_inflation_urls:
-            if inflation_found:
-                break
-                
-            try:
-                response = requests.get(url, headers=headers, timeout=15)
-                live_data['fetch_attempts']['inflation'] = f"Status: {response.status_code}"
-                
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    text = soup.get_text().lower()
-                    
-                    # Look for recent inflation patterns
-                    patterns = [
-                        r'inflation.*?sous[- ]?jacente.*?(\d+[,.]?\d*)%.*?ann[eé]e',
-                        r'indicateur.*?inflation.*?(\d+[,.]?\d*)%.*?ann[eé]e',
-                        r'hausse.*?(\d+[,.]?\d*)%.*?ann[eé]e',
-                        r'(\d+[,.]?\d*)%.*?ann[eé]e.*?inflation',
-                        r'inflation.*?(\d+[,.]?\d*)%'
-                    ]
-                    
-                    for pattern in patterns:
-                        matches = re.findall(pattern, text)
-                        for match in matches:
-                            rate = float(match.replace(',', '.'))
-                            if 0 <= rate <= 15:  # Reasonable inflation range
-                                live_data['inflation'] = rate
-                                live_data['sources']['inflation'] = 'HCP Live'
-                                inflation_found = True
-                                break
-                        if inflation_found:
-                            break
-            except:
-                continue
-        
-    except Exception as e:
-        live_data['fetch_attempts']['inflation'] = f"Error: {str(e)[:50]}..."
-        live_data['sources']['inflation'] = 'Fallback (Fetch failed)'
-    
-    # =====================================================
-    # 4. FETCH HCP GDP GROWTH DATA
-    # =====================================================
-    try:
-        hcp_gdp_urls = [
-            "https://www.hcp.ma/Conjoncture-et-prevision-economique_r328.html",
-            "https://www.hcp.ma/Economie_r327.html"
-        ]
-        
-        gdp_found = False
-        
-        for url in hcp_gdp_urls:
-            if gdp_found:
-                break
-                
-            try:
-                response = requests.get(url, headers=headers, timeout=15)
-                live_data['fetch_attempts']['gdp_growth'] = f"Status: {response.status_code}"
-                
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    text = soup.get_text().lower()
-                    
-                    # Look for GDP growth patterns
-                    patterns = [
-                        r'croissance.*?[eé]conomique.*?(\d+[,.]?\d*)%',
-                        r'pib.*?(\d+[,.]?\d*)%',
-                        r'progression.*?(\d+[,.]?\d*)%.*?trimestre',
-                        r'(\d+[,.]?\d*)%.*?premier.*?trimestre.*?2025',
-                        r'am[eé]lioration.*?(\d+[,.]?\d*)%'
-                    ]
-                    
-                    for pattern in patterns:
-                        matches = re.findall(pattern, text)
-                        for match in matches:
-                            rate = float(match.replace(',', '.'))
-                            if 0 <= rate <= 15:  # Reasonable GDP growth range
-                                live_data['gdp_growth'] = rate
-                                live_data['sources']['gdp_growth'] = 'HCP Live'
-                                gdp_found = True
-                                break
-                        if gdp_found:
-                            break
-            except:
-                continue
-        
-    except Exception as e:
-        live_data['fetch_attempts']['gdp_growth'] = f"Error: {str(e)[:50]}..."
-        live_data['sources']['gdp_growth'] = 'Fallback (Fetch failed)'
-    
-    # =====================================================
-    # 5. SET DEFAULT SOURCES AND FINAL PROCESSING
-    # =====================================================
-    
-    # Set default sources if not already set
-    if 'policy_rate' not in live_data['sources']:
-        live_data['sources']['policy_rate'] = 'Manual Fallback'
-    if 'yield_52w' not in live_data['sources']:
-        live_data['sources']['yield_52w'] = 'Manual Fallback'
-    if 'inflation' not in live_data['sources']:
-        live_data['sources']['inflation'] = 'Manual Fallback'
-    if 'gdp_growth' not in live_data['sources']:
-        live_data['sources']['gdp_growth'] = 'Manual Fallback'
-    
-    # Final data validation
-    live_data['policy_rate'] = max(0.1, min(10.0, live_data['policy_rate']))
-    live_data['yield_52w'] = max(0.1, min(15.0, live_data['yield_52w']))
-    live_data['inflation'] = max(0.0, min(20.0, live_data['inflation']))
-    live_data['gdp_growth'] = max(-10.0, min(20.0, live_data['gdp_growth']))
-    
-    live_data['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    return live_data
-
-def display_enhanced_data_panel(live_data):
-    """Enhanced display panel with detailed fetch information"""
-    
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📡 Données en Temps Réel")
-    
-    # Success rate indicator
-    live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-    total_sources = len([k for k in live_data['sources'].keys() if k != 'last_updated'])
-    success_rate = (live_sources / total_sources) * 100
-    
-    if success_rate >= 75:
-        st.sidebar.success(f"🟢 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
-    elif success_rate >= 50:
-        st.sidebar.warning(f"🟡 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
-    elif success_rate >= 25:
-        st.sidebar.warning(f"🟠 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
-    else:
-        st.sidebar.error(f"🔴 {live_sources}/{total_sources} sources en direct ({success_rate:.0f}%)")
-    
-    # Current values with source indicators
-    col1, col2 = st.sidebar.columns(2)
-    
-    with col1:
-        # Policy rate with indicator
-        source_indicator = "🟢" if 'Live' in live_data['sources']['policy_rate'] else "🔴"
-        st.metric(
-            f"{source_indicator} Taux Directeur", 
-            f"{live_data['policy_rate']:.2f}%",
-            help=f"Source: {live_data['sources']['policy_rate']}"
-        )
-        
-        # 52-week yield with indicator
-        source_indicator = "🟢" if 'Live' in live_data['sources']['yield_52w'] else "🟡" if 'Estimated' in live_data['sources']['yield_52w'] else "🔴"
-        st.metric(
-            f"{source_indicator} Rendement 52s", 
-            f"{live_data['yield_52w']:.2f}%",
-            help=f"Source: {live_data['sources']['yield_52w']}"
-        )
-    
-    with col2:
-        # Inflation with indicator
-        source_indicator = "🟢" if 'Live' in live_data['sources']['inflation'] else "🔴"
-        st.metric(
-            f"{source_indicator} Inflation", 
-            f"{live_data['inflation']:.2f}%",
-            help=f"Source: {live_data['sources']['inflation']}"
-        )
-        
-        # GDP with indicator
-        source_indicator = "🟢" if 'Live' in live_data['sources']['gdp_growth'] else "🔴"
-        st.metric(
-            f"{source_indicator} Croissance PIB", 
-            f"{live_data['gdp_growth']:.2f}%",
-            help=f"Source: {live_data['sources']['gdp_growth']}"
-        )
-    
-    # Last update and manual refresh
-    st.sidebar.info(f"🕐 Mis à jour: {live_data['last_updated']}")
-    
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.button("🔄 Actualiser"):
-            st.cache_data.clear()
-            st.rerun()
-    
-    with col2:
-        if st.button("📊 Détails"):
-            st.session_state.show_fetch_details = not st.session_state.get('show_fetch_details', False)
-    
-    # Detailed fetch information
-    if st.session_state.get('show_fetch_details', False):
-        with st.sidebar.expander("🔍 Détails des Tentatives", expanded=True):
-            st.markdown("**Sources de Données:**")
-            for key, source in live_data['sources'].items():
-                indicator_name = {
-                    'policy_rate': 'Taux Directeur',
-                    'yield_52w': 'Rendement 52s',
-                    'inflation': 'Inflation', 
-                    'gdp_growth': 'Croissance PIB'
-                }
-                
-                if key in indicator_name:
-                    status = "✅" if 'Live' in source else "⚠️" if 'Estimated' in source else "❌"
-                    st.write(f"{status} **{indicator_name[key]}:** {source}")
-            
-            if 'fetch_attempts' in live_data:
-                st.markdown("**Tentatives de Récupération:**")
-                for key, attempt in live_data['fetch_attempts'].items():
-                    st.write(f"• {key}: {attempt}")
-
-# Usage in your main function:
-def main_with_enhanced_data():
-    st.markdown("""
-    <div class="main-header">
-        <h1>🇲🇦 SOFAC - Modèle de Prédiction des Rendements 52-Semaines</h1>
-        <p>Système d'aide à la décision avec données automatiques Bank Al-Maghrib & HCP</p>
-        <p><strong>Rendement 52s:</strong> Automatique | <strong>Mise à jour:</strong> Horaire</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Fetch enhanced live data (including 52-week yields)
-    live_data = fetch_enhanced_moroccan_data()
-    
-    with st.sidebar:
-        st.header("📊 Informations du Modèle")
-        
-        # Display enhanced data panel
-        display_enhanced_data_panel(live_data)
-        
-        # Rest of your existing sidebar code...
-    
-    # Your existing tabs and content...
-
-# Add this notice for the 52-week yield
-def display_yield_notice():
-    if st.sidebar.button("ℹ️ À propos du Rendement 52s"):
-        st.sidebar.info("""
-        **Rendement 52-semaines:**
-        
-        Les données sont extraites de:
-        - Bank Al-Maghrib (pages marchés)
-        - Estimation basée sur le taux directeur
-        - Spread typique: +10 à +50 points de base
-        
-        **Note:** Certaines pages BAM limitent l'accès automatique. En cas d'échec, nous utilisons une estimation fiable basée sur la relation historique avec le taux directeur.
-        """)
+    main() "#28a745"
+        elif liste_recommandations.count('TAUX FIXE') >= 2:
+            strategie_globale = "TAUX FIXE"
+            raison_globale = f"Majorité des scénarios montrent des taux en hausse depuis le niveau live actuel de {live_data['yield_52w']:.2f}%"
+            couleur_globale =
