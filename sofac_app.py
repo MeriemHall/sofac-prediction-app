@@ -240,6 +240,18 @@ def display_live_data_panel(live_data):
     
     st.sidebar.info(f"🕐 Dernière mise à jour: {live_data['last_updated']}")
     
+    # Add explanation for yield difference
+    if abs(live_data['yield_52w'] - 1.75) > 0.5:  # If significant difference from June 2025
+        st.sidebar.warning(f"""
+        ⚠️ **Écart de Continuité Détecté**
+        
+        • **Dernier historique (Juin 2025):** 1.75%
+        • **Niveau live actuel:** {live_data['yield_52w']:.2f}%
+        • **Écart:** {(live_data['yield_52w'] - 1.75):+.2f}%
+        
+        Les prédictions sont ajustées pour assurer la continuité depuis le niveau actuel.
+        """)
+    
     if st.sidebar.button("🔄 Actualiser"):
         st.cache_data.clear()
         st.rerun()
@@ -467,7 +479,8 @@ def create_economic_scenarios_with_live_base(live_data):
 def generate_predictions_with_live_continuity(scenarios, modele, mae_historique, live_data):
     """Generate predictions with smooth continuity from live data"""
     
-    rendement_actuel = live_data['yield_52w']
+    # Use actual live yield as starting point instead of June 2025 data
+    rendement_actuel = live_data['yield_52w']  # This is the current 2.40%
     predictions = {}
     
     for nom_scenario, scenario_df in scenarios.items():
@@ -475,24 +488,41 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
         rendements_bruts = modele.predict(X_futur)
         
         if len(rendements_bruts) > 0:
-            premier_predit = rendements_bruts[0]
-            discontinuite = premier_predit - rendement_actuel
+            # Force first prediction to start from current live yield
+            rendements_ajustes = rendements_bruts.copy()
             
-            rendements_lisses = rendements_bruts.copy()
-            for i in range(len(rendements_lisses)):
-                jours_depuis_debut = i + 1
-                if jours_depuis_debut <= 30:
-                    facteur_decroissance = np.exp(-jours_depuis_debut / 15)
-                elif jours_depuis_debut <= 90:
-                    facteur_decroissance = np.exp(-30 / 15) * np.exp(-(jours_depuis_debut - 30) / 30)
-                else:
-                    facteur_decroissance = 0
+            # Calculate the adjustment needed to start from live yield
+            if len(scenario_df) > 0:
+                first_date = pd.to_datetime(scenario_df['Date'].iloc[0])
+                current_date = datetime.now()
                 
-                ajustement = discontinuite * facteur_decroissance
-                rendements_lisses[i] = rendements_bruts[i] - ajustement
+                # If prediction starts in the future, interpolate from current yield
+                if first_date > current_date:
+                    days_gap = (first_date - current_date).days
+                    # Gradual transition over the gap period
+                    transition_factor = min(days_gap / 30, 1.0)  # 30-day transition
+                    
+                    # Adjust first prediction to be closer to current yield
+                    target_first_yield = rendement_actuel + (rendements_bruts[0] - rendement_actuel) * transition_factor
+                    adjustment = target_first_yield - rendements_bruts[0]
+                    
+                    # Apply graduated adjustment
+                    for i in range(len(rendements_ajustes)):
+                        decay_factor = np.exp(-i / 60)  # 60-day decay
+                        rendements_ajustes[i] = rendements_bruts[i] + adjustment * decay_factor
+                else:
+                    # If prediction starts now, use current yield directly
+                    rendements_ajustes[0] = rendement_actuel
+                    # Smooth transition for subsequent days
+                    for i in range(1, min(30, len(rendements_ajustes))):
+                        weight = np.exp(-i / 10)
+                        rendements_ajustes[i] = rendements_bruts[i] * (1 - weight) + rendement_actuel * weight
+            
+            rendements_lisses = rendements_ajustes
         else:
             rendements_lisses = rendements_bruts
         
+        # Continue with existing scenario adjustments
         ajustements = []
         for i, ligne in scenario_df.iterrows():
             ajustement = 0
@@ -510,6 +540,10 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
         scenario_df_copie = scenario_df.copy()
         scenario_df_copie['Rendement_Predit'] = rendements_finaux
         scenario_df_copie['Scenario'] = nom_scenario
+        
+        # Add live baseline for reference
+        scenario_df_copie['Live_Baseline'] = rendement_actuel
+        scenario_df_copie['Model_Raw'] = rendements_bruts if len(rendements_bruts) > 0 else 0
         
         for i, ligne in scenario_df_copie.iterrows():
             jours_ahead = ligne['Jours_Ahead']
