@@ -240,17 +240,6 @@ def display_live_data_panel(live_data):
     
     st.sidebar.info(f"🕐 Dernière mise à jour: {live_data['last_updated']}")
     
-    # Show model baseline vs live data for transparency
-    st.sidebar.markdown("**📊 Référence du Modèle:**")
-    st.sidebar.write(f"• **Baseline Juin 2025:** 1.75%")
-    st.sidebar.write(f"• **Estimation Live:** {live_data['yield_52w']:.2f}%")
-    st.sidebar.write(f"• **Écart:** {(live_data['yield_52w'] - 1.75):+.2f}%")
-    
-    st.sidebar.info("""
-    ℹ️ **Note:** Les prédictions démarrent depuis le niveau historique de juin 2025 (1.75%) 
-    avec correction de continuité, conformément au modèle original.
-    """)
-    
     if st.sidebar.button("🔄 Actualiser"):
         st.cache_data.clear()
         st.rerun()
@@ -378,11 +367,14 @@ def train_prediction_model(df_mensuel):
 
 @st.cache_data
 def create_economic_scenarios_with_live_base(live_data):
-    """Create economic scenarios starting from July 1, 2025 (matching original model)"""
+    """Create economic scenarios starting from live data"""
     
-    # EXACT dates from original model
-    date_debut = datetime(2025, 7, 1)  # Start exactly July 1, 2025
+    date_debut = datetime(2025, 7, 1)
     date_fin = datetime(2026, 12, 31)
+    
+    if datetime.now() > date_debut:
+        date_debut = datetime.now().replace(day=1) + timedelta(days=32)
+        date_debut = date_debut.replace(day=1)
     
     dates_quotidiennes = []
     date_courante = date_debut
@@ -391,21 +383,35 @@ def create_economic_scenarios_with_live_base(live_data):
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    # Use original policy rate baseline, not live data for scenarios
-    base_rate = 2.25  # June 2025 baseline from original model
+    base_rate = live_data['policy_rate']
     
     decisions_politiques = {
         'Conservateur': {
-            '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
-            '2026-03': 1.75, '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50
+            '2025-06': base_rate, 
+            '2025-09': max(base_rate - 0.25, 1.5), 
+            '2025-12': max(base_rate - 0.5, 1.25),
+            '2026-03': max(base_rate - 0.75, 1.0), 
+            '2026-06': max(base_rate - 0.75, 1.0), 
+            '2026-09': max(base_rate - 1.0, 1.0), 
+            '2026-12': max(base_rate - 1.0, 1.0)
         },
         'Cas_de_Base': {
-            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
-            '2026-03': 1.50, '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25
+            '2025-06': base_rate, 
+            '2025-09': max(base_rate - 0.50, 1.0), 
+            '2025-12': max(base_rate - 0.75, 0.75),
+            '2026-03': max(base_rate - 1.0, 0.75), 
+            '2026-06': max(base_rate - 1.0, 0.75), 
+            '2026-09': max(base_rate - 1.25, 0.5), 
+            '2026-12': max(base_rate - 1.25, 0.5)
         },
         'Optimiste': {
-            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50,
-            '2026-03': 1.25, '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00
+            '2025-06': base_rate, 
+            '2025-09': max(base_rate - 0.75, 0.75), 
+            '2025-12': max(base_rate - 1.0, 0.5),
+            '2026-03': max(base_rate - 1.25, 0.5), 
+            '2026-06': max(base_rate - 1.5, 0.25), 
+            '2026-09': max(base_rate - 1.5, 0.25), 
+            '2026-12': max(base_rate - 1.5, 0.25)
         }
     }
     
@@ -415,34 +421,31 @@ def create_economic_scenarios_with_live_base(live_data):
         donnees_scenario = []
         taux_politiques = decisions_politiques[nom_scenario]
         
-        # Use original model parameters, not live data
-        base_inflation = 1.3  # June 2025 from original model
-        base_gdp = 3.7        # June 2025 from original model
+        base_inflation = live_data['inflation']
+        base_gdp = live_data['gdp_growth']
         
         for i, date in enumerate(dates_quotidiennes):
             jours_ahead = i + 1
             
             date_str = date.strftime('%Y-%m')
-            taux_directeur = 2.25  # Default
+            taux_directeur = base_rate
             for date_politique, taux in sorted(taux_politiques.items()):
                 if date_str >= date_politique:
                     taux_directeur = taux
             
-            # EXACT random seed from original model
             np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
             
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
             
-            # EXACT scenario formulas from original model
             if nom_scenario == 'Conservateur':
-                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                inflation_base = base_inflation + 0.3 * np.exp(-mois_depuis_debut / 18)
+                pib_base = base_gdp - 0.3 * (mois_depuis_debut / 18)
             elif nom_scenario == 'Cas_de_Base':
-                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
-            else:  # Optimiste
-                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 + 0.1 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                inflation_base = base_inflation + 0.1 * np.exp(-mois_depuis_debut / 12)
+                pib_base = base_gdp - 0.1 * (mois_depuis_debut / 18)
+            else:
+                inflation_base = base_inflation - 0.2 * (mois_depuis_debut / 18)
+                pib_base = base_gdp + 0.2 * (mois_depuis_debut / 18)
             
             inflation = max(0.0, min(5.0, inflation_base + np.random.normal(0, 0.01)))
             pib = max(-2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
@@ -462,10 +465,9 @@ def create_economic_scenarios_with_live_base(live_data):
     return scenarios
 
 def generate_predictions_with_live_continuity(scenarios, modele, mae_historique, live_data):
-    """Generate predictions with smooth continuity from live data - EXACTLY like original Jupyter notebook"""
+    """Generate predictions with smooth continuity from live data"""
     
-    # Use June 2025 baseline as in original model, NOT current live yield
-    rendement_juin_reel = 1.75  # June 2025 Bank Al-Maghrib baseline from original model
+    rendement_actuel = live_data['yield_52w']
     predictions = {}
     
     for nom_scenario, scenario_df in scenarios.items():
@@ -473,15 +475,12 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
         rendements_bruts = modele.predict(X_futur)
         
         if len(rendements_bruts) > 0:
-            # EXACT replication of original Jupyter notebook logic
-            juillet_1_brut = rendements_bruts[0]
-            discontinuite = juillet_1_brut - rendement_juin_reel  # Use 1.75%, not live yield
+            premier_predit = rendements_bruts[0]
+            discontinuite = premier_predit - rendement_actuel
             
             rendements_lisses = rendements_bruts.copy()
             for i in range(len(rendements_lisses)):
                 jours_depuis_debut = i + 1
-                
-                # EXACT continuity correction from original model
                 if jours_depuis_debut <= 30:
                     facteur_decroissance = np.exp(-jours_depuis_debut / 15)
                 elif jours_depuis_debut <= 90:
@@ -494,32 +493,14 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
         else:
             rendements_lisses = rendements_bruts
         
-        # EXACT scenario adjustments from original model
         ajustements = []
         for i, ligne in scenario_df.iterrows():
             ajustement = 0
             
-            # Original scenario adjustments
             if nom_scenario == 'Conservateur':
                 ajustement += 0.1
             elif nom_scenario == 'Optimiste':
                 ajustement -= 0.05
-            
-            # Original temporal uncertainty
-            jours_ahead = ligne['Jours_Ahead']
-            incertitude = (jours_ahead / 365) * 0.1
-            
-            if nom_scenario == 'Conservateur':
-                ajustement += incertitude
-            elif nom_scenario == 'Optimiste':
-                ajustement -= incertitude * 0.5
-            
-            # Original day-of-week effects
-            effets_jours = {
-                'Monday': 0.01, 'Tuesday': 0.00, 'Wednesday': -0.01,
-                'Thursday': 0.00, 'Friday': 0.02, 'Saturday': -0.01, 'Sunday': -0.01
-            }
-            ajustement += effets_jours.get(ligne['Jour_Semaine'], 0)
             
             ajustements.append(ajustement)
         
@@ -530,21 +511,11 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
         scenario_df_copie['Rendement_Predit'] = rendements_finaux
         scenario_df_copie['Scenario'] = nom_scenario
         
-        # Store original model baseline for transparency
-        scenario_df_copie['Model_Baseline_June2025'] = rendement_juin_reel
-        scenario_df_copie['Raw_Prediction'] = rendements_bruts if len(rendements_bruts) > 0 else 0
-        scenario_df_copie['Continuity_Adjustment'] = rendements_lisses - rendements_bruts if len(rendements_bruts) > 0 else 0
-        scenario_df_copie['Scenario_Adjustment'] = ajustements
-        
-        # Original confidence intervals
         for i, ligne in scenario_df_copie.iterrows():
             jours_ahead = ligne['Jours_Ahead']
             intervalle_base = mae_historique
             facteur_temps = 1 + (jours_ahead / 365) * 0.2
             intervalle_ajuste = intervalle_base * facteur_temps
-            
-            if ligne['Est_Weekend']:
-                intervalle_ajuste *= 1.1
             
             ic_95 = intervalle_ajuste * 2
             
@@ -555,7 +526,25 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
     
     return predictions
 
-def generate_recommendations_with_live_context(predictions, live_data):
+def get_current_model_prediction(modele, live_data):
+    """Get the model's prediction for current conditions"""
+    try:
+        # Use live economic indicators to predict current 52-week yield
+        current_features = pd.DataFrame({
+            'Taux_Directeur': [live_data['policy_rate']],
+            'Inflation': [live_data['inflation']],
+            'Croissance_PIB': [live_data['gdp_growth']]
+        })
+        
+        current_prediction = modele.predict(current_features)[0]
+        
+        # Ensure reasonable bounds
+        current_prediction = max(0.1, min(8.0, current_prediction))
+        
+        return current_prediction
+    except:
+        # Fallback to estimation if model prediction fails
+        return live_data['policy_rate'] + 0.15
     """Generate recommendations using live data as baseline"""
     
     rendement_actuel = live_data['yield_52w']
@@ -631,7 +620,7 @@ def main():
                 st.session_state.modele, st.session_state.r2, st.session_state.mae, st.session_state.rmse, st.session_state.mae_vc = train_prediction_model(st.session_state.df_mensuel)
                 st.session_state.scenarios = create_economic_scenarios_with_live_base(live_data)
                 st.session_state.predictions = generate_predictions_with_live_continuity(st.session_state.scenarios, st.session_state.modele, st.session_state.mae, live_data)
-                st.session_state.recommandations = generate_recommendations_with_live_context(st.session_state.predictions, live_data)
+                st.session_state.recommandations = generate_recommendations_with_live_context(st.session_state.predictions, live_data, st.session_state.modele)
                 st.session_state.data_loaded = True
                 st.session_state.last_update = live_data['date']
         
@@ -655,15 +644,18 @@ def main():
         col1, col2, col3, col4 = st.columns(4)
         
         cas_de_base = st.session_state.predictions['Cas_de_Base']
+        
+        # Get current model prediction instead of estimated yield
+        rendement_actuel_modele = get_current_model_prediction(st.session_state.modele, live_data)
         rendement_moyen = cas_de_base['Rendement_Predit'].mean()
-        changement = rendement_moyen - live_data['yield_52w']
+        changement = rendement_moyen - rendement_actuel_modele
         volatilite = cas_de_base['Rendement_Predit'].std()
         
         with col1:
             st.metric(
-                "Rendement Actuel (Live)", 
-                f"{live_data['yield_52w']:.2f}%",
-                help=f"Source: {live_data['sources']['yield_52w']}"
+                "Rendement Actuel (Modèle)", 
+                f"{rendement_actuel_modele:.2f}%",
+                help=f"Prédiction du modèle pour les conditions économiques actuelles"
             )
         
         with col2:
@@ -693,125 +685,65 @@ def main():
         
         fig_overview = go.Figure()
         
-        # Historical data - show last 6 months properly
+        # Historical data
         df_recent = st.session_state.df_mensuel.tail(8)
+        df_historical = df_recent[~df_recent.get('Est_Live_Data', False)]
+        df_live = df_recent[df_recent.get('Est_Live_Data', False)]
         
-        # Add historical points (excluding live data point to avoid confusion)
-        fig_overview.add_trace(
-            go.Scatter(
-                x=df_recent['Date'],
-                y=df_recent['Rendement_52s'],
-                mode='lines+markers',
-                name='Historique (jusqu\'à Juin 2025)',
-                line=dict(color='#60A5FA', width=4),
-                marker=dict(size=8)
+        # Historical points
+        if not df_historical.empty:
+            fig_overview.add_trace(
+                go.Scatter(
+                    x=df_historical['Date'],
+                    y=df_historical['Rendement_52s'],
+                    mode='lines+markers',
+                    name='Historique',
+                    line=dict(color='#60A5FA', width=4),
+                    marker=dict(size=8)
+                )
             )
-        )
         
-        # Add June 2025 baseline point clearly
-        fig_overview.add_trace(
-            go.Scatter(
-                x=['2025-06'],
-                y=[1.75],
-                mode='markers',
-                name='Baseline Juin 2025 (1.75%)',
-                marker=dict(color='#10B981', size=12, symbol='diamond'),
-                text=['Baseline Modèle: 1.75%'],
-                textposition='top center'
+        # Live data point
+        if not df_live.empty:
+            fig_overview.add_trace(
+                go.Scatter(
+                    x=df_live['Date'],
+                    y=df_live['Rendement_52s'],
+                    mode='markers',
+                    name='Données Live',
+                    marker=dict(color='#22C55E', size=12, symbol='star'),
+                    text=['Point de données en direct'],
+                    textposition='top center'
+                )
             )
-        )
         
-        # Prediction scenarios - show WEEKLY sampling starting from July 1st
+        # Prediction scenarios
         couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
         
         for nom_scenario, pred_df in st.session_state.predictions.items():
-            # Show weekly predictions (every 7 days) to match original model
-            donnees_hebdo = pred_df[::7]  # Every 7 days starting from July 1st
+            donnees_hebdo = pred_df[::7]
             
-            # Ensure we show July 1st value
-            july_1_data = pred_df[pred_df['Date'] == '2025-07-01']
-            if not july_1_data.empty:
-                july_1_value = july_1_data['Rendement_Predit'].iloc[0]
-                
-                fig_overview.add_trace(
-                    go.Scatter(
-                        x=['2025-07-01'],
-                        y=[july_1_value],
-                        mode='markers',
-                        name=f'{nom_scenario} - Juillet 1er ({july_1_value:.3f}%)',
-                        marker=dict(color=couleurs[nom_scenario], size=10, symbol='circle'),
-                        text=[f'Juillet 1: {july_1_value:.3f}%'],
-                        textposition='top center'
-                    )
-                )
-            
-            # Add weekly trend line
             fig_overview.add_trace(
                 go.Scatter(
                     x=donnees_hebdo['Date'],
                     y=donnees_hebdo['Rendement_Predit'],
                     mode='lines+markers',
-                    name=f'Tendance {nom_scenario}',
-                    line=dict(color=couleurs[nom_scenario], width=2, dash='solid'),
-                    marker=dict(size=4),
-                    opacity=0.8
+                    name=f'Prédiction {nom_scenario}',
+                    line=dict(color=couleurs[nom_scenario], width=3),
+                    marker=dict(size=6)
                 )
             )
         
-        # Add current live data for reference (but separate from model)
-        fig_overview.add_trace(
-            go.Scatter(
-                x=[datetime.now().strftime('%Y-%m-%d')],
-                y=[live_data['yield_52w']],
-                mode='markers',
-                name=f'Estimation Live Actuelle ({live_data["yield_52w"]:.2f}%)',
-                marker=dict(color='#EF4444', size=12, symbol='star'),
-                text=[f'Live: {live_data["yield_52w"]:.2f}%'],
-                textposition='bottom center'
-            )
-        )
-        
         fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines: Historique → Baseline → Prédictions",
+            title="Évolution des Rendements 52-Semaines avec Données Live",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
-            height=600,
+            height=500,
             template="plotly_white",
-            legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02),
-            xaxis=dict(
-                tickformat="%Y-%m",
-                dtick="M1"  # Monthly ticks
-            )
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         
         st.plotly_chart(fig_overview, use_container_width=True)
-        
-        # Add explanation table showing key values
-        st.subheader("🔍 Valeurs Clés de Référence")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("**📊 Points de Référence:**")
-            st.write(f"• Juin 2025 (Baseline): 1.75%")
-            july_1_cas_base = st.session_state.predictions['Cas_de_Base']
-            july_1_value = july_1_cas_base[july_1_cas_base['Date'] == '2025-07-01']['Rendement_Predit'].iloc[0] if not july_1_cas_base[july_1_cas_base['Date'] == '2025-07-01'].empty else "N/A"
-            st.write(f"• Juillet 1, 2025: {july_1_value:.3f}%")
-            st.write(f"• Estimation Live: {live_data['yield_52w']:.2f}%")
-        
-        with col2:
-            st.markdown("**📈 Écarts:**")
-            if july_1_value != "N/A":
-                ecart_baseline = july_1_value - 1.75
-                st.write(f"• Juillet 1 vs Baseline: {ecart_baseline:+.3f}%")
-                ecart_live = july_1_value - live_data['yield_52w']
-                st.write(f"• Juillet 1 vs Live: {ecart_live:+.3f}%")
-            
-        with col3:
-            st.markdown("**ℹ️ Logique du Modèle:**")
-            st.write("• Démarre depuis Juin 2025")
-            st.write("• Correction de continuité")
-            st.write("• Prédictions hebdomadaires")
         
         # Quick recommendations
         st.subheader("🎯 Recommandations Rapides (Basées sur Données Live)")
@@ -855,7 +787,7 @@ def main():
         with col3:
             st.metric("Rendement Max", f"{pred_scenario['Rendement_Predit'].max():.2f}%")
         with col4:
-            st.metric("Écart vs Live", f"{(pred_scenario['Rendement_Predit'].mean() - live_data['yield_52w']):+.2f}%")
+            st.metric("Écart vs Modèle Actuel", f"{(pred_scenario['Rendement_Predit'].mean() - get_current_model_prediction(st.session_state.modele, live_data)):+.2f}%")
         
         # Detailed prediction chart
         st.subheader(f"📊 Prédictions Quotidiennes - Scénario {scenario_selectionne}")
@@ -889,15 +821,16 @@ def main():
             )
         )
         
-        # Current live data point
+        # Current model prediction point
+        current_prediction = get_current_model_prediction(st.session_state.modele, live_data)
         fig_detail.add_trace(
             go.Scatter(
                 x=[datetime.now().strftime('%Y-%m-%d')],
-                y=[live_data['yield_52w']],
+                y=[current_prediction],
                 mode='markers',
-                name='Point Live Actuel',
+                name='Prédiction Modèle Actuelle',
                 marker=dict(color='#22C55E', size=15, symbol='star'),
-                text=[f"Live: {live_data['yield_52w']:.2f}%"],
+                text=[f"Modèle: {current_prediction:.2f}%"],
                 textposition='top center'
             )
         )
@@ -934,15 +867,18 @@ def main():
         
         if liste_recommandations.count('TAUX VARIABLE') >= 2:
             strategie_globale = "TAUX VARIABLE"
-            raison_globale = f"Majorité des scénarios montrent des taux en baisse depuis le niveau live actuel de {live_data['yield_52w']:.2f}%"
+            current_model_pred = get_current_model_prediction(st.session_state.modele, live_data)
+            raison_globale = f"Majorité des scénarios montrent des taux en baisse depuis le niveau prédit actuel de {current_model_pred:.2f}%"
             couleur_globale = "#28a745"
         elif liste_recommandations.count('TAUX FIXE') >= 2:
             strategie_globale = "TAUX FIXE"
-            raison_globale = f"Majorité des scénarios montrent des taux en hausse depuis le niveau live actuel de {live_data['yield_52w']:.2f}%"
+            current_model_pred = get_current_model_prediction(st.session_state.modele, live_data)
+            raison_globale = f"Majorité des scénarios montrent des taux en hausse depuis le niveau prédit actuel de {current_model_pred:.2f}%"
             couleur_globale = "#dc3545"
         else:
             strategie_globale = "STRATÉGIE FLEXIBLE"
-            raison_globale = f"Signaux mixtes depuis le niveau live actuel de {live_data['yield_52w']:.2f}% - approche diversifiée recommandée"
+            current_model_pred = get_current_model_prediction(st.session_state.modele, live_data)
+            raison_globale = f"Signaux mixtes depuis le niveau prédit actuel de {current_model_pred:.2f}% - approche diversifiée recommandée"
             couleur_globale = "#ffc107"
         
         # Data quality indicator
@@ -971,7 +907,7 @@ def main():
                     
                     **Justification:** {rec['raison']}
                     
-                    **Métriques (vs niveau live {live_data['yield_52w']:.2f}%):**
+                    **Métriques (vs niveau prédit actuel {get_current_model_prediction(st.session_state.modele, live_data):.2f}%):**
                     - Rendement moyen prédit: {rec['rendement_futur_moyen']:.2f}%
                     - Changement attendu: {rec['changement_rendement']:+.2f}%
                     - Volatilité: {rec['volatilite']:.2f}%
@@ -986,12 +922,13 @@ def main():
                     pred_df = st.session_state.predictions[nom_scenario]
                     echantillon_mini = pred_df[::30]
                     
-                    # Live baseline
+                    # Model prediction baseline
+                    current_pred = get_current_model_prediction(st.session_state.modele, live_data)
                     fig_mini.add_hline(
-                        y=live_data['yield_52w'], 
+                        y=current_pred, 
                         line_dash="dash", 
                         line_color="green",
-                        annotation_text=f"Live: {live_data['yield_52w']:.2f}%"
+                        annotation_text=f"Modèle Actuel: {current_pred:.2f}%"
                     )
                     
                     # Prediction line
@@ -1048,7 +985,7 @@ def main():
                 
                 - **Économies annuelles:** {abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
                 - **Économies totales ({duree_emprunt} ans):** {abs(impact_total):,.0f} MAD
-                - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+                - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs niveau prédit actuel {get_current_model_prediction(st.session_state.modele, live_data):.2f}%
                 - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
             else:
@@ -1057,14 +994,14 @@ def main():
                 
                 - **Surcoûts évités annuellement:** {changement_cas_base * montant_emprunt * 10_000:,.0f} MAD
                 - **Surcoûts évités totaux ({duree_emprunt} ans):** {impact_total:,.0f} MAD
-                - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+                - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs niveau prédit actuel {get_current_model_prediction(st.session_state.modele, live_data):.2f}%
                 - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
         else:
             st.info(f"""
             💰 **Impact Financier Limité:**
             
-            - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+            - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs niveau prédit actuel {get_current_model_prediction(st.session_state.modele, live_data):.2f}%
             - **Impact annuel:** ±{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
             - **Approche flexible recommandée**
             - **Qualité prédiction:** {quality_score}/4 sources directes
@@ -1088,3 +1025,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
