@@ -378,14 +378,11 @@ def train_prediction_model(df_mensuel):
 
 @st.cache_data
 def create_economic_scenarios_with_live_base(live_data):
-    """Create economic scenarios starting from live data"""
+    """Create economic scenarios starting from July 1, 2025 (matching original model)"""
     
-    date_debut = datetime(2025, 7, 1)
+    # EXACT dates from original model
+    date_debut = datetime(2025, 7, 1)  # Start exactly July 1, 2025
     date_fin = datetime(2026, 12, 31)
-    
-    if datetime.now() > date_debut:
-        date_debut = datetime.now().replace(day=1) + timedelta(days=32)
-        date_debut = date_debut.replace(day=1)
     
     dates_quotidiennes = []
     date_courante = date_debut
@@ -394,35 +391,21 @@ def create_economic_scenarios_with_live_base(live_data):
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    base_rate = live_data['policy_rate']
+    # Use original policy rate baseline, not live data for scenarios
+    base_rate = 2.25  # June 2025 baseline from original model
     
     decisions_politiques = {
         'Conservateur': {
-            '2025-06': base_rate, 
-            '2025-09': max(base_rate - 0.25, 1.5), 
-            '2025-12': max(base_rate - 0.5, 1.25),
-            '2026-03': max(base_rate - 0.75, 1.0), 
-            '2026-06': max(base_rate - 0.75, 1.0), 
-            '2026-09': max(base_rate - 1.0, 1.0), 
-            '2026-12': max(base_rate - 1.0, 1.0)
+            '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
+            '2026-03': 1.75, '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50
         },
         'Cas_de_Base': {
-            '2025-06': base_rate, 
-            '2025-09': max(base_rate - 0.50, 1.0), 
-            '2025-12': max(base_rate - 0.75, 0.75),
-            '2026-03': max(base_rate - 1.0, 0.75), 
-            '2026-06': max(base_rate - 1.0, 0.75), 
-            '2026-09': max(base_rate - 1.25, 0.5), 
-            '2026-12': max(base_rate - 1.25, 0.5)
+            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
+            '2026-03': 1.50, '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25
         },
         'Optimiste': {
-            '2025-06': base_rate, 
-            '2025-09': max(base_rate - 0.75, 0.75), 
-            '2025-12': max(base_rate - 1.0, 0.5),
-            '2026-03': max(base_rate - 1.25, 0.5), 
-            '2026-06': max(base_rate - 1.5, 0.25), 
-            '2026-09': max(base_rate - 1.5, 0.25), 
-            '2026-12': max(base_rate - 1.5, 0.25)
+            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50,
+            '2026-03': 1.25, '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00
         }
     }
     
@@ -432,31 +415,34 @@ def create_economic_scenarios_with_live_base(live_data):
         donnees_scenario = []
         taux_politiques = decisions_politiques[nom_scenario]
         
-        base_inflation = live_data['inflation']
-        base_gdp = live_data['gdp_growth']
+        # Use original model parameters, not live data
+        base_inflation = 1.3  # June 2025 from original model
+        base_gdp = 3.7        # June 2025 from original model
         
         for i, date in enumerate(dates_quotidiennes):
             jours_ahead = i + 1
             
             date_str = date.strftime('%Y-%m')
-            taux_directeur = base_rate
+            taux_directeur = 2.25  # Default
             for date_politique, taux in sorted(taux_politiques.items()):
                 if date_str >= date_politique:
                     taux_directeur = taux
             
+            # EXACT random seed from original model
             np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
             
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
             
+            # EXACT scenario formulas from original model
             if nom_scenario == 'Conservateur':
-                inflation_base = base_inflation + 0.3 * np.exp(-mois_depuis_debut / 18)
-                pib_base = base_gdp - 0.3 * (mois_depuis_debut / 18)
+                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             elif nom_scenario == 'Cas_de_Base':
-                inflation_base = base_inflation + 0.1 * np.exp(-mois_depuis_debut / 12)
-                pib_base = base_gdp - 0.1 * (mois_depuis_debut / 18)
-            else:
-                inflation_base = base_inflation - 0.2 * (mois_depuis_debut / 18)
-                pib_base = base_gdp + 0.2 * (mois_depuis_debut / 18)
+                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+            else:  # Optimiste
+                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 + 0.1 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             
             inflation = max(0.0, min(5.0, inflation_base + np.random.normal(0, 0.01)))
             pib = max(-2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
@@ -707,65 +693,125 @@ def main():
         
         fig_overview = go.Figure()
         
-        # Historical data
+        # Historical data - show last 6 months properly
         df_recent = st.session_state.df_mensuel.tail(8)
-        df_historical = df_recent[~df_recent.get('Est_Live_Data', False)]
-        df_live = df_recent[df_recent.get('Est_Live_Data', False)]
         
-        # Historical points
-        if not df_historical.empty:
-            fig_overview.add_trace(
-                go.Scatter(
-                    x=df_historical['Date'],
-                    y=df_historical['Rendement_52s'],
-                    mode='lines+markers',
-                    name='Historique',
-                    line=dict(color='#60A5FA', width=4),
-                    marker=dict(size=8)
-                )
+        # Add historical points (excluding live data point to avoid confusion)
+        fig_overview.add_trace(
+            go.Scatter(
+                x=df_recent['Date'],
+                y=df_recent['Rendement_52s'],
+                mode='lines+markers',
+                name='Historique (jusqu\'à Juin 2025)',
+                line=dict(color='#60A5FA', width=4),
+                marker=dict(size=8)
             )
+        )
         
-        # Live data point
-        if not df_live.empty:
-            fig_overview.add_trace(
-                go.Scatter(
-                    x=df_live['Date'],
-                    y=df_live['Rendement_52s'],
-                    mode='markers',
-                    name='Données Live',
-                    marker=dict(color='#22C55E', size=12, symbol='star'),
-                    text=['Point de données en direct'],
-                    textposition='top center'
-                )
+        # Add June 2025 baseline point clearly
+        fig_overview.add_trace(
+            go.Scatter(
+                x=['2025-06'],
+                y=[1.75],
+                mode='markers',
+                name='Baseline Juin 2025 (1.75%)',
+                marker=dict(color='#10B981', size=12, symbol='diamond'),
+                text=['Baseline Modèle: 1.75%'],
+                textposition='top center'
             )
+        )
         
-        # Prediction scenarios
+        # Prediction scenarios - show WEEKLY sampling starting from July 1st
         couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
         
         for nom_scenario, pred_df in st.session_state.predictions.items():
-            donnees_hebdo = pred_df[::7]
+            # Show weekly predictions (every 7 days) to match original model
+            donnees_hebdo = pred_df[::7]  # Every 7 days starting from July 1st
             
+            # Ensure we show July 1st value
+            july_1_data = pred_df[pred_df['Date'] == '2025-07-01']
+            if not july_1_data.empty:
+                july_1_value = july_1_data['Rendement_Predit'].iloc[0]
+                
+                fig_overview.add_trace(
+                    go.Scatter(
+                        x=['2025-07-01'],
+                        y=[july_1_value],
+                        mode='markers',
+                        name=f'{nom_scenario} - Juillet 1er ({july_1_value:.3f}%)',
+                        marker=dict(color=couleurs[nom_scenario], size=10, symbol='circle'),
+                        text=[f'Juillet 1: {july_1_value:.3f}%'],
+                        textposition='top center'
+                    )
+                )
+            
+            # Add weekly trend line
             fig_overview.add_trace(
                 go.Scatter(
                     x=donnees_hebdo['Date'],
                     y=donnees_hebdo['Rendement_Predit'],
                     mode='lines+markers',
-                    name=f'Prédiction {nom_scenario}',
-                    line=dict(color=couleurs[nom_scenario], width=3),
-                    marker=dict(size=6)
+                    name=f'Tendance {nom_scenario}',
+                    line=dict(color=couleurs[nom_scenario], width=2, dash='solid'),
+                    marker=dict(size=4),
+                    opacity=0.8
                 )
             )
         
+        # Add current live data for reference (but separate from model)
+        fig_overview.add_trace(
+            go.Scatter(
+                x=[datetime.now().strftime('%Y-%m-%d')],
+                y=[live_data['yield_52w']],
+                mode='markers',
+                name=f'Estimation Live Actuelle ({live_data["yield_52w"]:.2f}%)',
+                marker=dict(color='#EF4444', size=12, symbol='star'),
+                text=[f'Live: {live_data["yield_52w"]:.2f}%'],
+                textposition='bottom center'
+            )
+        )
+        
         fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines avec Données Live",
+            title="Évolution des Rendements 52-Semaines: Historique → Baseline → Prédictions",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
-            height=500,
+            height=600,
             template="plotly_white",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02),
+            xaxis=dict(
+                tickformat="%Y-%m",
+                dtick="M1"  # Monthly ticks
+            )
         )
         
         st.plotly_chart(fig_overview, use_container_width=True)
+        
+        # Add explanation table showing key values
+        st.subheader("🔍 Valeurs Clés de Référence")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("**📊 Points de Référence:**")
+            st.write(f"• Juin 2025 (Baseline): 1.75%")
+            july_1_cas_base = st.session_state.predictions['Cas_de_Base']
+            july_1_value = july_1_cas_base[july_1_cas_base['Date'] == '2025-07-01']['Rendement_Predit'].iloc[0] if not july_1_cas_base[july_1_cas_base['Date'] == '2025-07-01'].empty else "N/A"
+            st.write(f"• Juillet 1, 2025: {july_1_value:.3f}%")
+            st.write(f"• Estimation Live: {live_data['yield_52w']:.2f}%")
+        
+        with col2:
+            st.markdown("**📈 Écarts:**")
+            if july_1_value != "N/A":
+                ecart_baseline = july_1_value - 1.75
+                st.write(f"• Juillet 1 vs Baseline: {ecart_baseline:+.3f}%")
+                ecart_live = july_1_value - live_data['yield_52w']
+                st.write(f"• Juillet 1 vs Live: {ecart_live:+.3f}%")
+            
+        with col3:
+            st.markdown("**ℹ️ Logique du Modèle:**")
+            st.write("• Démarre depuis Juin 2025")
+            st.write("• Correction de continuité")
+            st.write("• Prédictions hebdomadaires")
         
         # Quick recommendations
         st.subheader("🎯 Recommandations Rapides (Basées sur Données Live)")
