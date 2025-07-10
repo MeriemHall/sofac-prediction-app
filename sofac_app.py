@@ -267,7 +267,7 @@ def create_monthly_dataset_with_live_data(live_data):
         '2024-09': {'taux_directeur': 2.75, 'inflation': 2.2, 'pib': 5.4, 'rendement_52s': 2.69},
         '2024-12': {'taux_directeur': 2.50, 'inflation': 2.3, 'pib': 4.6, 'rendement_52s': 2.53},
         '2025-03': {'taux_directeur': 2.25, 'inflation': 1.4, 'pib': 3.8, 'rendement_52s': 2.54},
-        '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}  # Keep original June value
+        '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
     }
     
     # Only add live data for future months (after June 2025)
@@ -647,16 +647,11 @@ def main():
     with tab1:
         st.header("📈 Vue d'Ensemble des Prédictions")
         
-        # Key metrics with live data context
+        # Key metrics with corrected baseline
         col1, col2, col3, col4 = st.columns(4)
         
         cas_de_base = st.session_state.predictions['Cas_de_Base']
         rendement_moyen = cas_de_base['Rendement_Predit'].mean()
-        
-        # Use the correct June 2025 baseline for comparison
-        rendement_baseline = 1.75  # June 2025 historical value
-        changement = rendement_moyen - rendement_baseline
-        volatilite = cas_de_base['Rendement_Predit'].std()_Predit'].mean()
         
         # Use the correct June 2025 baseline for comparison
         rendement_baseline = 1.75  # June 2025 historical value
@@ -690,37 +685,6 @@ def main():
                 "Qualité des Données", 
                 f"{quality_score}/4",
                 delta="Direct" if quality_score >= 2 else "Mixte"
-            )_Predit'].mean()
-        changement = rendement_moyen - live_data['yield_52w']
-        volatilite = cas_de_base['Rendement_Predit'].std()
-        
-        with col1:
-            st.metric(
-                "Rendement Actuel (Live)", 
-                f"{live_data['yield_52w']:.2f}%",
-                help=f"Source: {live_data['sources']['yield_52w']}"
-            )
-        
-        with col2:
-            st.metric(
-                "Rendement Moyen Prédit", 
-                f"{rendement_moyen:.2f}%",
-                delta=f"{changement:+.2f}%"
-            )
-        
-        with col3:
-            st.metric(
-                "Volatilité Attendue", 
-                f"{volatilite:.2f}%",
-                help="Écart-type des prédictions"
-            )
-        
-        with col4:
-            quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-            st.metric(
-                "Qualité des Données", 
-                f"{quality_score}/4",
-                delta="Direct" if quality_score >= 2 else "Mixte"
             )
         
         # Overview chart
@@ -730,41 +694,24 @@ def main():
         
         # Historical data
         df_recent = st.session_state.df_mensuel.tail(8)
-        df_historical = df_recent[~df_recent.get('Est_Live_Data', False)]
-        df_live = df_recent[df_recent.get('Est_Live_Data', False)]
         
-        # Historical points
-        if not df_historical.empty:
-            fig_overview.add_trace(
-                go.Scatter(
-                    x=df_historical['Date'],
-                    y=df_historical['Rendement_52s'],
-                    mode='lines+markers',
-                    name='Historique',
-                    line=dict(color='#60A5FA', width=4),
-                    marker=dict(size=8)
-                )
+        # All historical data (no live data confusion)
+        fig_overview.add_trace(
+            go.Scatter(
+                x=df_recent['Date'],
+                y=df_recent['Rendement_52s'],
+                mode='lines+markers',
+                name='Historique',
+                line=dict(color='#60A5FA', width=4),
+                marker=dict(size=8)
             )
+        )
         
-        # Live data point
-        if not df_live.empty:
-            fig_overview.add_trace(
-                go.Scatter(
-                    x=df_live['Date'],
-                    y=df_live['Rendement_52s'],
-                    mode='markers',
-                    name='Données Live',
-                    marker=dict(color='#22C55E', size=12, symbol='star'),
-                    text=['Point de données en direct'],
-                    textposition='top center'
-                )
-            )
-        
-        # Prediction scenarios
+        # Prediction scenarios starting from July 2025
         couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
         
         for nom_scenario, pred_df in st.session_state.predictions.items():
-            donnees_hebdo = pred_df[::7]
+            donnees_hebdo = pred_df[::7]  # Weekly sampling for clarity
             
             fig_overview.add_trace(
                 go.Scatter(
@@ -778,7 +725,7 @@ def main():
             )
         
         fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines avec Données Live",
+            title="Évolution des Rendements 52-Semaines: Historique (2020-2025) et Prédictions (2025-2026)",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
             height=500,
@@ -887,19 +834,19 @@ def main():
         # Export functionality
         if st.button("📥 Télécharger les Prédictions"):
             pred_export = pred_scenario.copy()
-            pred_export['Live_Baseline'] = live_data['yield_52w']
+            pred_export['June_2025_Baseline'] = 1.75
             pred_export['Live_Data_Quality'] = f"{sum(1 for s in live_data['sources'].values() if 'Live' in s)}/4"
             
             csv = pred_export.to_csv(index=False)
             st.download_button(
-                label="Télécharger CSV avec contexte live",
+                label="Télécharger CSV avec contexte",
                 data=csv,
                 file_name=f"sofac_predictions_{scenario_selectionne.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
             )
     
     with tab3:
-        st.header("💼 Recommandations Stratégiques (Données Live)")
+        st.header("💼 Recommandations Stratégiques")
         
         # Global recommendation
         liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
@@ -943,7 +890,7 @@ def main():
                     
                     **Justification:** {rec['raison']}
                     
-                    **Métriques (vs niveau live {live_data['yield_52w']:.2f}%):**
+                    **Métriques (vs juin 2025: 1.75%):**
                     - Rendement moyen prédit: {rec['rendement_futur_moyen']:.2f}%
                     - Changement attendu: {rec['changement_rendement']:+.2f}%
                     - Volatilité: {rec['volatilite']:.2f}%
@@ -958,12 +905,12 @@ def main():
                     pred_df = st.session_state.predictions[nom_scenario]
                     echantillon_mini = pred_df[::30]
                     
-                    # Live baseline
+                    # June 2025 baseline
                     fig_mini.add_hline(
-                        y=live_data['yield_52w'], 
+                        y=1.75, 
                         line_dash="dash", 
-                        line_color="green",
-                        annotation_text=f"Live: {live_data['yield_52w']:.2f}%"
+                        line_color="blue",
+                        annotation_text="Juin 2025: 1.75%"
                     )
                     
                     # Prediction line
@@ -1020,7 +967,7 @@ def main():
                 
                 - **Économies annuelles:** {abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
                 - **Économies totales ({duree_emprunt} ans):** {abs(impact_total):,.0f} MAD
-                - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+                - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs juin 2025 (1.75%)
                 - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
             else:
@@ -1029,14 +976,14 @@ def main():
                 
                 - **Surcoûts évités annuellement:** {changement_cas_base * montant_emprunt * 10_000:,.0f} MAD
                 - **Surcoûts évités totaux ({duree_emprunt} ans):** {impact_total:,.0f} MAD
-                - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+                - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs juin 2025 (1.75%)
                 - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
         else:
             st.info(f"""
             💰 **Impact Financier Limité:**
             
-            - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs niveau live {live_data['yield_52w']:.2f}%
+            - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs juin 2025 (1.75%)
             - **Impact annuel:** ±{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
             - **Approche flexible recommandée**
             - **Qualité prédiction:** {quality_score}/4 sources directes
@@ -1049,11 +996,10 @@ def main():
     
     st.markdown(f"""
     <div style="text-align: center; color: #666; padding: 2rem;">
-        <p>🇲🇦 <strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines avec Données Live</strong></p>
+        <p>🇲🇦 <strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
         <p>Sources: Bank Al-Maghrib ({live_sources_count > 0 and '🟢' or '🔴'}) | HCP ({live_sources_count > 1 and '🟢' or '🔴'}) | 
         Dernière mise à jour: {current_time}</p>
-        <p>Qualité des données: {live_sources_count}/4 sources directes | 
-        Prochaine actualisation automatique: {(datetime.now() + timedelta(hours=1)).strftime('%H:%M')}</p>
+        <p>Baseline: Juin 2025 (1.75%) | Prédictions: Juillet 2025 - Décembre 2026</p>
         <p><em>Les prédictions sont basées sur les dernières données disponibles et ne constituent pas des conseils financiers.</em></p>
     </div>
     """, unsafe_allow_html=True)
