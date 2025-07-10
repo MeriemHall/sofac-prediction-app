@@ -244,8 +244,33 @@ def display_live_data_panel(live_data):
         st.cache_data.clear()
         st.rerun()
 
-@st.cache_data
-def create_monthly_dataset_with_live_data(live_data):
+def get_current_predicted_yield(predictions_data, live_data):
+    """Get today's predicted yield value"""
+    
+    today = datetime.now()
+    today_str = today.strftime('%Y-%m-%d')
+    
+    # Try to find today's prediction in the base case scenario
+    cas_de_base = predictions_data.get('Cas_de_Base')
+    if cas_de_base is not None:
+        # Look for today's date in predictions
+        today_prediction = cas_de_base[cas_de_base['Date'] == today_str]
+        
+        if not today_prediction.empty:
+            return today_prediction['Rendement_Predit'].iloc[0]
+        
+        # If today not found, find the closest date
+        cas_de_base['Date_obj'] = pd.to_datetime(cas_de_base['Date'])
+        today_obj = pd.to_datetime(today_str)
+        
+        # Find closest prediction date
+        closest_idx = (cas_de_base['Date_obj'] - today_obj).abs().idxmin()
+        closest_prediction = cas_de_base.loc[closest_idx, 'Rendement_Predit']
+        
+        return closest_prediction
+    
+    # Fallback: use June 2025 historical value
+    return 1.75
     """Create monthly dataset incorporating live data as future point only"""
     
     # Base historical data - DO NOT MODIFY
@@ -647,22 +672,22 @@ def main():
     with tab1:
         st.header("📈 Vue d'Ensemble des Prédictions")
         
-        # Key metrics with corrected baseline
+        # Key metrics with today's predicted value as current
         col1, col2, col3, col4 = st.columns(4)
         
         cas_de_base = st.session_state.predictions['Cas_de_Base']
         rendement_moyen = cas_de_base['Rendement_Predit'].mean()
         
-        # Use the correct June 2025 baseline for comparison
-        rendement_baseline = 1.75  # June 2025 historical value
-        changement = rendement_moyen - rendement_baseline
+        # Get today's predicted value as "Rendement Actuel"
+        rendement_actuel_today = get_current_predicted_yield(st.session_state.predictions, live_data)
+        changement = rendement_moyen - rendement_actuel_today
         volatilite = cas_de_base['Rendement_Predit'].std()
         
         with col1:
             st.metric(
-                "Rendement Actuel (Juin 2025)", 
-                f"{rendement_baseline:.2f}%",
-                help="Dernière valeur historique - Juin 2025"
+                "Rendement Actuel", 
+                f"{rendement_actuel_today:.2f}%",
+                help=f"Valeur prédite pour aujourd'hui ({datetime.now().strftime('%Y-%m-%d')})"
             )
         
         with col2:
@@ -687,23 +712,36 @@ def main():
                 delta="Direct" if quality_score >= 2 else "Mixte"
             )
         
-        # Overview chart
-        st.subheader("📊 Évolution des Rendements: Historique et Prédictions")
+        # Overview chart with clear separation
+        st.subheader("📊 Évolution des Rendements: Historique vs Prédictions")
         
         fig_overview = go.Figure()
         
-        # Historical data
-        df_recent = st.session_state.df_mensuel.tail(8)
+        # Historical data (2020 - June 2025)
+        df_recent = st.session_state.df_mensuel
         
-        # All historical data (no live data confusion)
         fig_overview.add_trace(
             go.Scatter(
                 x=df_recent['Date'],
                 y=df_recent['Rendement_52s'],
                 mode='lines+markers',
-                name='Historique',
+                name='Données Historiques (2020-Juin 2025)',
                 line=dict(color='#60A5FA', width=4),
                 marker=dict(size=8)
+            )
+        )
+        
+        # Add June 2025 endpoint marker
+        june_2025_value = 1.75
+        fig_overview.add_trace(
+            go.Scatter(
+                x=['2025-06'],
+                y=[june_2025_value],
+                mode='markers',
+                name='Dernière Donnée Historique',
+                marker=dict(color='#1E40AF', size=12, symbol='square'),
+                text=['Juin 2025: 1.75%'],
+                textposition='top center'
             )
         )
         
@@ -719,13 +757,37 @@ def main():
                     y=donnees_hebdo['Rendement_Predit'],
                     mode='lines+markers',
                     name=f'Prédiction {nom_scenario}',
-                    line=dict(color=couleurs[nom_scenario], width=3),
+                    line=dict(color=couleurs[nom_scenario], width=3, dash='dot' if nom_scenario != 'Cas_de_Base' else 'solid'),
                     marker=dict(size=6)
                 )
             )
         
+        # Add vertical line to separate historical from predictions
+        fig_overview.add_vline(
+            x='2025-06',
+            line_dash="dash",
+            line_color="gray",
+            annotation_text="Fin Historique / Début Prédictions"
+        )
+        
+        # Highlight today's point if it exists
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        if any(today_str in pred_df['Date'].values for pred_df in st.session_state.predictions.values()):
+            today_value = get_current_predicted_yield(st.session_state.predictions, live_data)
+            fig_overview.add_trace(
+                go.Scatter(
+                    x=[today_str],
+                    y=[today_value],
+                    mode='markers',
+                    name="Aujourd'hui",
+                    marker=dict(color='#22C55E', size=15, symbol='star'),
+                    text=[f"Aujourd'hui: {today_value:.2f}%"],
+                    textposition='top center'
+                )
+            )
+        
         fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines: Historique (2020-2025) et Prédictions (2025-2026)",
+            title="Rendements 52-Semaines: Historique (2020-Juin 2025) → Prédictions (Juillet 2025-Décembre 2026)",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
             height=500,
