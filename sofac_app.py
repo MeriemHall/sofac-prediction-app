@@ -656,6 +656,11 @@ def main():
         # Use the correct June 2025 baseline for comparison
         rendement_baseline = 1.75  # June 2025 historical value
         changement = rendement_moyen - rendement_baseline
+        volatilite = cas_de_base['Rendement_Predit'].std()_Predit'].mean()
+        
+        # Use the correct June 2025 baseline for comparison
+        rendement_baseline = 1.75  # June 2025 historical value
+        changement = rendement_moyen - rendement_baseline
         volatilite = cas_de_base['Rendement_Predit'].std()
         
         with col1:
