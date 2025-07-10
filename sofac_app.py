@@ -244,36 +244,11 @@ def display_live_data_panel(live_data):
         st.cache_data.clear()
         st.rerun()
 
-def get_current_predicted_yield(predictions_data, live_data):
-    """Get today's predicted yield value"""
+@st.cache_data
+def create_monthly_dataset():
+    """Create monthly dataset using historical data only"""
     
-    today = datetime.now()
-    today_str = today.strftime('%Y-%m-%d')
-    
-    # Try to find today's prediction in the base case scenario
-    cas_de_base = predictions_data.get('Cas_de_Base')
-    if cas_de_base is not None:
-        # Look for today's date in predictions
-        today_prediction = cas_de_base[cas_de_base['Date'] == today_str]
-        
-        if not today_prediction.empty:
-            return today_prediction['Rendement_Predit'].iloc[0]
-        
-        # If today not found, find the closest date
-        cas_de_base['Date_obj'] = pd.to_datetime(cas_de_base['Date'])
-        today_obj = pd.to_datetime(today_str)
-        
-        # Find closest prediction date
-        closest_idx = (cas_de_base['Date_obj'] - today_obj).abs().idxmin()
-        closest_prediction = cas_de_base.loc[closest_idx, 'Rendement_Predit']
-        
-        return closest_prediction
-    
-    # Fallback: use June 2025 historical value
-    return 1.75
-    """Create monthly dataset incorporating live data as future point only"""
-    
-    # Base historical data - DO NOT MODIFY
+    # Historical data - preserved exactly
     donnees_historiques = {
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
         '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
@@ -295,19 +270,6 @@ def get_current_predicted_yield(predictions_data, live_data):
         '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
     }
     
-    # Only add live data for future months (after June 2025)
-    current_month = datetime.now().strftime('%Y-%m')
-    current_date = datetime.now()
-    
-    # Only add live data if we're past June 2025 and it's a new month
-    if current_date > datetime(2025, 6, 30) and current_month not in donnees_historiques:
-        donnees_historiques[current_month] = {
-            'taux_directeur': live_data['policy_rate'],
-            'inflation': live_data['inflation'],
-            'pib': live_data['gdp_growth'],
-            'rendement_52s': live_data['yield_52w']
-        }
-    
     def interpolation_lineaire(date_debut, date_fin, valeur_debut, valeur_fin, date_cible):
         debut_num = date_debut.toordinal()
         fin_num = date_fin.toordinal()
@@ -318,12 +280,7 @@ def get_current_predicted_yield(predictions_data, live_data):
         return valeur_debut + progression * (valeur_fin - valeur_debut)
     
     date_debut = datetime(2020, 1, 1)
-    # Extend to current month only if we're past June 2025
-    if current_date > datetime(2025, 6, 30):
-        date_fin = datetime.now().replace(day=1) + timedelta(days=32)
-        date_fin = date_fin.replace(day=1) - timedelta(days=1)
-    else:
-        date_fin = datetime(2025, 6, 30)
+    date_fin = datetime(2025, 6, 30)
     
     donnees_mensuelles = []
     date_courante = date_debut
@@ -363,17 +320,13 @@ def get_current_predicted_yield(predictions_data, live_data):
                 date_apres = min(dates_apres)
                 point_donnees = dates_ancrage[date_apres].copy()
         
-        # Mark if this is live data (only for months after June 2025)
-        is_live_data = (current_date > datetime(2025, 6, 30) and date_str == current_month and date_str not in ['2025-06'])
-        
         donnees_mensuelles.append({
             'Date': date_str,
             'Taux_Directeur': point_donnees['taux_directeur'],
             'Inflation': point_donnees['inflation'],
             'Croissance_PIB': point_donnees['pib'],
             'Rendement_52s': point_donnees['rendement_52s'],
-            'Est_Point_Ancrage': est_ancrage,
-            'Est_Live_Data': is_live_data
+            'Est_Point_Ancrage': est_ancrage
         })
         
         if date_courante.month == 12:
@@ -403,15 +356,11 @@ def train_prediction_model(df_mensuel):
     return modele, r2, mae, rmse, mae_vc
 
 @st.cache_data
-def create_economic_scenarios_with_live_base(live_data):
-    """Create economic scenarios starting from live data"""
+def create_economic_scenarios():
+    """Create economic scenarios starting from July 2025"""
     
     date_debut = datetime(2025, 7, 1)
     date_fin = datetime(2026, 12, 31)
-    
-    if datetime.now() > date_debut:
-        date_debut = datetime.now().replace(day=1) + timedelta(days=32)
-        date_debut = date_debut.replace(day=1)
     
     dates_quotidiennes = []
     date_courante = date_debut
@@ -420,35 +369,19 @@ def create_economic_scenarios_with_live_base(live_data):
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    base_rate = live_data['policy_rate']
-    
+    # Base scenarios on realistic policy expectations
     decisions_politiques = {
         'Conservateur': {
-            '2025-06': base_rate, 
-            '2025-09': max(base_rate - 0.25, 1.5), 
-            '2025-12': max(base_rate - 0.5, 1.25),
-            '2026-03': max(base_rate - 0.75, 1.0), 
-            '2026-06': max(base_rate - 0.75, 1.0), 
-            '2026-09': max(base_rate - 1.0, 1.0), 
-            '2026-12': max(base_rate - 1.0, 1.0)
+            '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
+            '2026-03': 1.75, '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50
         },
         'Cas_de_Base': {
-            '2025-06': base_rate, 
-            '2025-09': max(base_rate - 0.50, 1.0), 
-            '2025-12': max(base_rate - 0.75, 0.75),
-            '2026-03': max(base_rate - 1.0, 0.75), 
-            '2026-06': max(base_rate - 1.0, 0.75), 
-            '2026-09': max(base_rate - 1.25, 0.5), 
-            '2026-12': max(base_rate - 1.25, 0.5)
+            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
+            '2026-03': 1.50, '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25
         },
         'Optimiste': {
-            '2025-06': base_rate, 
-            '2025-09': max(base_rate - 0.75, 0.75), 
-            '2025-12': max(base_rate - 1.0, 0.5),
-            '2026-03': max(base_rate - 1.25, 0.5), 
-            '2026-06': max(base_rate - 1.5, 0.25), 
-            '2026-09': max(base_rate - 1.5, 0.25), 
-            '2026-12': max(base_rate - 1.5, 0.25)
+            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50,
+            '2026-03': 1.25, '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00
         }
     }
     
@@ -458,14 +391,11 @@ def create_economic_scenarios_with_live_base(live_data):
         donnees_scenario = []
         taux_politiques = decisions_politiques[nom_scenario]
         
-        base_inflation = live_data['inflation']
-        base_gdp = live_data['gdp_growth']
-        
         for i, date in enumerate(dates_quotidiennes):
             jours_ahead = i + 1
             
             date_str = date.strftime('%Y-%m')
-            taux_directeur = base_rate
+            taux_directeur = 2.25
             for date_politique, taux in sorted(taux_politiques.items()):
                 if date_str >= date_politique:
                     taux_directeur = taux
@@ -475,14 +405,14 @@ def create_economic_scenarios_with_live_base(live_data):
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
             
             if nom_scenario == 'Conservateur':
-                inflation_base = base_inflation + 0.3 * np.exp(-mois_depuis_debut / 18)
-                pib_base = base_gdp - 0.3 * (mois_depuis_debut / 18)
+                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             elif nom_scenario == 'Cas_de_Base':
-                inflation_base = base_inflation + 0.1 * np.exp(-mois_depuis_debut / 12)
-                pib_base = base_gdp - 0.1 * (mois_depuis_debut / 18)
+                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             else:
-                inflation_base = base_inflation - 0.2 * (mois_depuis_debut / 18)
-                pib_base = base_gdp + 0.2 * (mois_depuis_debut / 18)
+                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 + 0.1 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             
             inflation = max(0.0, min(5.0, inflation_base + np.random.normal(0, 0.01)))
             pib = max(-2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
@@ -501,11 +431,11 @@ def create_economic_scenarios_with_live_base(live_data):
     
     return scenarios
 
-def generate_predictions_with_live_continuity(scenarios, modele, mae_historique, live_data):
+def generate_predictions(scenarios, modele, mae_historique):
     """Generate predictions with smooth continuity from June 2025 baseline"""
     
     # Use the correct June 2025 baseline from historical data
-    rendement_juin_reel = 1.75  # This is the historical June 2025 value
+    rendement_juin_reel = 1.75
     predictions = {}
     
     for nom_scenario, scenario_df in scenarios.items():
@@ -550,6 +480,13 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
             elif nom_scenario == 'Optimiste':
                 ajustement -= incertitude * 0.5
             
+            # Day of week effects
+            effets_jours = {
+                'Monday': 0.01, 'Tuesday': 0.00, 'Wednesday': -0.01,
+                'Thursday': 0.00, 'Friday': 0.02, 'Saturday': -0.01, 'Sunday': -0.01
+            }
+            ajustement += effets_jours.get(ligne['Jour_Semaine'], 0)
+            
             ajustements.append(ajustement)
         
         rendements_finaux = rendements_lisses + np.array(ajustements)
@@ -566,6 +503,9 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
             facteur_temps = 1 + (jours_ahead / 365) * 0.2
             intervalle_ajuste = intervalle_base * facteur_temps
             
+            if ligne['Est_Weekend']:
+                intervalle_ajuste *= 1.1
+            
             ic_95 = intervalle_ajuste * 2
             
             scenario_df_copie.loc[i, 'Borne_Inf_95'] = max(0.1, ligne['Rendement_Predit'] - ic_95)
@@ -575,7 +515,7 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
     
     return predictions
 
-def generate_recommendations_with_live_context(predictions, live_data):
+def generate_recommendations(predictions):
     """Generate recommendations using June 2025 historical baseline"""
     
     # Use the correct June 2025 baseline for recommendations
@@ -589,13 +529,13 @@ def generate_recommendations_with_live_context(predictions, live_data):
         
         if changement_rendement > 0.3:
             recommandation = "TAUX FIXE"
-            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis juin 2025."
+            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis juin 2025. Bloquer les taux actuels avant que les coûts d'emprunt n'augmentent."
         elif changement_rendement < -0.3:
             recommandation = "TAUX VARIABLE"
-            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis juin 2025."
+            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis juin 2025. Utiliser des taux variables pour profiter de la diminution des coûts d'emprunt."
         else:
             recommandation = "STRATÉGIE FLEXIBLE"
-            raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%) depuis juin 2025."
+            raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%) depuis juin 2025. Approche mixte selon les besoins."
         
         if volatilite < 0.2:
             niveau_risque = "FAIBLE"
@@ -604,24 +544,14 @@ def generate_recommendations_with_live_context(predictions, live_data):
         else:
             niveau_risque = "ÉLEVÉ"
         
-        live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-        if live_sources_count >= 2:
-            confiance = "ÉLEVÉE"
-        elif live_sources_count >= 1:
-            confiance = "MOYENNE"
-        else:
-            confiance = "LIMITÉE"
-        
         recommandations[nom_scenario] = {
             'recommandation': recommandation,
             'raison': raison,
             'niveau_risque': niveau_risque,
-            'confiance': confiance,
             'rendement_actuel': rendement_actuel,
             'rendement_futur_moyen': rendement_futur_moyen,
             'changement_rendement': changement_rendement,
-            'volatilite': volatilite,
-            'live_data_quality': f"{live_sources_count}/4 sources directes"
+            'volatilite': volatilite
         }
     
     return recommandations
@@ -646,17 +576,16 @@ def main():
         display_live_data_panel(live_data)
         
         # Load cached model data
-        if 'data_loaded' not in st.session_state or st.session_state.get('last_update') != live_data['date']:
-            with st.spinner("🤖 Recalibration du modèle..."):
-                st.session_state.df_mensuel = create_monthly_dataset_with_live_data(live_data)
+        if 'data_loaded' not in st.session_state:
+            with st.spinner("🤖 Calibration du modèle..."):
+                st.session_state.df_mensuel = create_monthly_dataset()
                 st.session_state.modele, st.session_state.r2, st.session_state.mae, st.session_state.rmse, st.session_state.mae_vc = train_prediction_model(st.session_state.df_mensuel)
-                st.session_state.scenarios = create_economic_scenarios_with_live_base(live_data)
-                st.session_state.predictions = generate_predictions_with_live_continuity(st.session_state.scenarios, st.session_state.modele, st.session_state.mae, live_data)
-                st.session_state.recommandations = generate_recommendations_with_live_context(st.session_state.predictions, live_data)
+                st.session_state.scenarios = create_economic_scenarios()
+                st.session_state.predictions = generate_predictions(st.session_state.scenarios, st.session_state.modele, st.session_state.mae)
+                st.session_state.recommandations = generate_recommendations(st.session_state.predictions)
                 st.session_state.data_loaded = True
-                st.session_state.last_update = live_data['date']
         
-        st.success("✅ Modèle calibré avec données actuelles!")
+        st.success("✅ Modèle calibré avec données historiques!")
         
         # Model performance metrics
         st.subheader("🎯 Performance du Modèle")
@@ -664,7 +593,7 @@ def main():
         st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
         st.metric("Validation Croisée", f"±{st.session_state.mae_vc:.2f}%", help="Erreur en validation croisée")
         
-        st.info("🔄 Le modèle est automatiquement recalibré avec les dernières données disponibles.")
+        st.info("🔄 Données live utilisées pour surveillance économique uniquement.")
     
     # Main content tabs
     tab1, tab2, tab3 = st.tabs(["📈 Vue d'Ensemble", "🔮 Prédictions Détaillées", "💼 Recommandations"])
@@ -672,22 +601,22 @@ def main():
     with tab1:
         st.header("📈 Vue d'Ensemble des Prédictions")
         
-        # Key metrics with today's predicted value as current
+        # Key metrics
         col1, col2, col3, col4 = st.columns(4)
         
         cas_de_base = st.session_state.predictions['Cas_de_Base']
         rendement_moyen = cas_de_base['Rendement_Predit'].mean()
         
-        # Get today's predicted value as "Rendement Actuel"
-        rendement_actuel_today = get_current_predicted_yield(st.session_state.predictions, live_data)
-        changement = rendement_moyen - rendement_actuel_today
+        # Use the correct June 2025 baseline for comparison
+        rendement_baseline = 1.75  # June 2025 historical value
+        changement = rendement_moyen - rendement_baseline
         volatilite = cas_de_base['Rendement_Predit'].std()
         
         with col1:
             st.metric(
-                "Rendement Actuel", 
-                f"{rendement_actuel_today:.2f}%",
-                help=f"Valeur prédite pour aujourd'hui ({datetime.now().strftime('%Y-%m-%d')})"
+                "Rendement Actuel (Juin 2025)", 
+                f"{rendement_baseline:.2f}%",
+                help="Dernière valeur historique - Juin 2025"
             )
         
         with col2:
@@ -712,36 +641,22 @@ def main():
                 delta="Direct" if quality_score >= 2 else "Mixte"
             )
         
-        # Overview chart with clear separation
-        st.subheader("📊 Évolution des Rendements: Historique vs Prédictions")
+        # Overview chart
+        st.subheader("📊 Évolution des Rendements: Historique et Prédictions")
         
         fig_overview = go.Figure()
         
-        # Historical data (2020 - June 2025)
-        df_recent = st.session_state.df_mensuel
+        # Historical data
+        df_recent = st.session_state.df_mensuel.tail(8)
         
         fig_overview.add_trace(
             go.Scatter(
                 x=df_recent['Date'],
                 y=df_recent['Rendement_52s'],
                 mode='lines+markers',
-                name='Données Historiques (2020-Juin 2025)',
+                name='Historique',
                 line=dict(color='#60A5FA', width=4),
                 marker=dict(size=8)
-            )
-        )
-        
-        # Add June 2025 endpoint marker
-        june_2025_value = 1.75
-        fig_overview.add_trace(
-            go.Scatter(
-                x=['2025-06'],
-                y=[june_2025_value],
-                mode='markers',
-                name='Dernière Donnée Historique',
-                marker=dict(color='#1E40AF', size=12, symbol='square'),
-                text=['Juin 2025: 1.75%'],
-                textposition='top center'
             )
         )
         
@@ -757,37 +672,13 @@ def main():
                     y=donnees_hebdo['Rendement_Predit'],
                     mode='lines+markers',
                     name=f'Prédiction {nom_scenario}',
-                    line=dict(color=couleurs[nom_scenario], width=3, dash='dot' if nom_scenario != 'Cas_de_Base' else 'solid'),
+                    line=dict(color=couleurs[nom_scenario], width=3),
                     marker=dict(size=6)
                 )
             )
         
-        # Add vertical line to separate historical from predictions
-        fig_overview.add_vline(
-            x='2025-06',
-            line_dash="dash",
-            line_color="gray",
-            annotation_text="Fin Historique / Début Prédictions"
-        )
-        
-        # Highlight today's point if it exists
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        if any(today_str in pred_df['Date'].values for pred_df in st.session_state.predictions.values()):
-            today_value = get_current_predicted_yield(st.session_state.predictions, live_data)
-            fig_overview.add_trace(
-                go.Scatter(
-                    x=[today_str],
-                    y=[today_value],
-                    mode='markers',
-                    name="Aujourd'hui",
-                    marker=dict(color='#22C55E', size=15, symbol='star'),
-                    text=[f"Aujourd'hui: {today_value:.2f}%"],
-                    textposition='top center'
-                )
-            )
-        
         fig_overview.update_layout(
-            title="Rendements 52-Semaines: Historique (2020-Juin 2025) → Prédictions (Juillet 2025-Décembre 2026)",
+            title="Évolution des Rendements 52-Semaines: Historique (2020-2025) et Prédictions (2025-2026)",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
             height=500,
@@ -798,22 +689,18 @@ def main():
         st.plotly_chart(fig_overview, use_container_width=True)
         
         # Quick recommendations
-        st.subheader("🎯 Recommandations Rapides (Basées sur Données Live)")
+        st.subheader("🎯 Recommandations Rapides")
         
         col1, col2, col3 = st.columns(3)
         
         for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
             with [col1, col2, col3][i]:
-                confidence_color = "#4CAF50" if rec['confiance'] == "ÉLEVÉE" else "#FF9800" if rec['confiance'] == "MOYENNE" else "#F44336"
-                
                 st.markdown(f"""
                 <div class="metric-card">
                     <h4>{scenario}</h4>
                     <p><strong>{rec['recommandation']}</strong></p>
                     <p>Changement: {rec['changement_rendement']:+.2f}%</p>
                     <p>Risque: {rec['niveau_risque']}</p>
-                    <p style="color: {confidence_color};">Confiance: {rec['confiance']}</p>
-                    <small>{rec['live_data_quality']}</small>
                 </div>
                 """, unsafe_allow_html=True)
     
@@ -839,7 +726,6 @@ def main():
         with col3:
             st.metric("Rendement Max", f"{pred_scenario['Rendement_Predit'].max():.2f}%")
         with col4:
-            # Compare to June 2025 baseline instead of live data
             baseline_comparison = pred_scenario['Rendement_Predit'].mean() - 1.75
             st.metric("Écart vs Juin 2025", f"{baseline_comparison:+.2f}%")
         
@@ -896,12 +782,11 @@ def main():
         # Export functionality
         if st.button("📥 Télécharger les Prédictions"):
             pred_export = pred_scenario.copy()
-            pred_export['June_2025_Baseline'] = 1.75
-            pred_export['Live_Data_Quality'] = f"{sum(1 for s in live_data['sources'].values() if 'Live' in s)}/4"
+            pred_export['Baseline_Juin_2025'] = 1.75
             
             csv = pred_export.to_csv(index=False)
             st.download_button(
-                label="Télécharger CSV avec contexte",
+                label="Télécharger CSV",
                 data=csv,
                 file_name=f"sofac_predictions_{scenario_selectionne.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
@@ -915,27 +800,27 @@ def main():
         
         if liste_recommandations.count('TAUX VARIABLE') >= 2:
             strategie_globale = "TAUX VARIABLE"
-            raison_globale = f"Majorité des scénarios montrent des taux en baisse depuis juin 2025 (1.75%)"
+            raison_globale = "Majorité des scénarios montrent des taux en baisse depuis juin 2025 (1.75%)"
             couleur_globale = "#28a745"
         elif liste_recommandations.count('TAUX FIXE') >= 2:
             strategie_globale = "TAUX FIXE"
-            raison_globale = f"Majorité des scénarios montrent des taux en hausse depuis juin 2025 (1.75%)"
+            raison_globale = "Majorité des scénarios montrent des taux en hausse depuis juin 2025 (1.75%)"
             couleur_globale = "#dc3545"
         else:
             strategie_globale = "STRATÉGIE FLEXIBLE"
-            raison_globale = f"Signaux mixtes depuis juin 2025 (1.75%) - approche diversifiée recommandée"
+            raison_globale = "Signaux mixtes depuis juin 2025 (1.75%) - approche diversifiée recommandée"
             couleur_globale = "#ffc107"
         
         # Data quality indicator
         quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-        quality_text = "Recommandation basée sur données majoritairement directes" if quality_score >= 2 else "Recommandation basée sur données mixtes" if quality_score >= 1 else "Recommandation basée sur estimations - à valider"
+        quality_text = "Surveillance économique en temps réel active" if quality_score >= 2 else "Surveillance économique limitée"
         
         st.markdown(f"""
         <div class="recommendation-box" style="background: linear-gradient(135deg, {couleur_globale} 0%, {couleur_globale}AA 100%);">
             <h2>🏆 RECOMMANDATION GLOBALE SOFAC</h2>
             <h3>{strategie_globale}</h3>
             <p>{raison_globale}</p>
-            <small>{quality_text} ({quality_score}/4 sources directes)</small>
+            <small>{quality_text}</small>
         </div>
         """, unsafe_allow_html=True)
         
@@ -957,7 +842,6 @@ def main():
                     - Changement attendu: {rec['changement_rendement']:+.2f}%
                     - Volatilité: {rec['volatilite']:.2f}%
                     - Niveau de risque: {rec['niveau_risque']}
-                    - Confiance: {rec['confiance']} ({rec['live_data_quality']})
                     """)
                 
                 with col2:
@@ -1030,7 +914,6 @@ def main():
                 - **Économies annuelles:** {abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
                 - **Économies totales ({duree_emprunt} ans):** {abs(impact_total):,.0f} MAD
                 - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs juin 2025 (1.75%)
-                - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
             else:
                 st.warning(f"""
@@ -1039,7 +922,6 @@ def main():
                 - **Surcoûts évités annuellement:** {changement_cas_base * montant_emprunt * 10_000:,.0f} MAD
                 - **Surcoûts évités totaux ({duree_emprunt} ans):** {impact_total:,.0f} MAD
                 - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs juin 2025 (1.75%)
-                - **Qualité prédiction:** {quality_score}/4 sources directes
                 """)
         else:
             st.info(f"""
@@ -1048,7 +930,6 @@ def main():
             - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs juin 2025 (1.75%)
             - **Impact annuel:** ±{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
             - **Approche flexible recommandée**
-            - **Qualité prédiction:** {quality_score}/4 sources directes
             """)
     
     # Footer
@@ -1059,10 +940,10 @@ def main():
     st.markdown(f"""
     <div style="text-align: center; color: #666; padding: 2rem;">
         <p>🇲🇦 <strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
-        <p>Sources: Bank Al-Maghrib ({live_sources_count > 0 and '🟢' or '🔴'}) | HCP ({live_sources_count > 1 and '🟢' or '🔴'}) | 
-        Dernière mise à jour: {current_time}</p>
-        <p>Baseline: Juin 2025 (1.75%) | Prédictions: Juillet 2025 - Décembre 2026</p>
-        <p><em>Les prédictions sont basées sur les dernières données disponibles et ne constituent pas des conseils financiers.</em></p>
+        <p>Sources historiques: Bank Al-Maghrib, HCP | Surveillance live: {live_sources_count}/4 sources directes</p>
+        <p>Modèle: Régression Linéaire Multiple | Horizon: Juillet 2025 - Décembre 2026</p>
+        <p>Baseline: Juin 2025 (1.75%) | Dernière mise à jour: {current_time}</p>
+        <p><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
     </div>
     """, unsafe_allow_html=True)
 
