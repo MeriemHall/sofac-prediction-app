@@ -269,13 +269,15 @@ def create_monthly_dataset_with_live_data(live_data):
         '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
     }
     
+    # Add current live data as the most recent point
     current_month = datetime.now().strftime('%Y-%m')
     if current_month not in donnees_historiques:
+        # Use live policy rate and inflation, but estimate 52-week yield from model
         donnees_historiques[current_month] = {
             'taux_directeur': live_data['policy_rate'],
             'inflation': live_data['inflation'],
             'pib': live_data['gdp_growth'],
-            'rendement_52s': live_data['yield_52w']
+            'rendement_52s': live_data['policy_rate'] + 0.15  # Temporary, will be replaced by model prediction
         }
     
     def interpolation_lineaire(date_debut, date_fin, valeur_debut, valeur_fin, date_cible):
@@ -364,6 +366,26 @@ def train_prediction_model(df_mensuel):
     mae_vc = -scores_vc.mean()
     
     return modele, r2, mae, rmse, mae_vc
+
+def get_current_model_prediction(modele, live_data):
+    """Get the model's prediction for current conditions"""
+    try:
+        # Use live economic indicators to predict current 52-week yield
+        current_features = pd.DataFrame({
+            'Taux_Directeur': [live_data['policy_rate']],
+            'Inflation': [live_data['inflation']],
+            'Croissance_PIB': [live_data['gdp_growth']]
+        })
+        
+        current_prediction = modele.predict(current_features)[0]
+        
+        # Ensure reasonable bounds
+        current_prediction = max(0.1, min(8.0, current_prediction))
+        
+        return current_prediction
+    except:
+        # Fallback to estimation if model prediction fails
+        return live_data['policy_rate'] + 0.15
 
 @st.cache_data
 def create_economic_scenarios_with_live_base(live_data):
@@ -467,7 +489,8 @@ def create_economic_scenarios_with_live_base(live_data):
 def generate_predictions_with_live_continuity(scenarios, modele, mae_historique, live_data):
     """Generate predictions with smooth continuity from live data"""
     
-    rendement_actuel = live_data['yield_52w']
+    # Use model prediction for current conditions as baseline
+    rendement_actuel = get_current_model_prediction(modele, live_data)
     predictions = {}
     
     for nom_scenario, scenario_df in scenarios.items():
@@ -526,28 +549,11 @@ def generate_predictions_with_live_continuity(scenarios, modele, mae_historique,
     
     return predictions
 
-def get_current_model_prediction(modele, live_data):
-    """Get the model's prediction for current conditions"""
-    try:
-        # Use live economic indicators to predict current 52-week yield
-        current_features = pd.DataFrame({
-            'Taux_Directeur': [live_data['policy_rate']],
-            'Inflation': [live_data['inflation']],
-            'Croissance_PIB': [live_data['gdp_growth']]
-        })
-        
-        current_prediction = modele.predict(current_features)[0]
-        
-        # Ensure reasonable bounds
-        current_prediction = max(0.1, min(8.0, current_prediction))
-        
-        return current_prediction
-    except:
-        # Fallback to estimation if model prediction fails
-        return live_data['policy_rate'] + 0.15
+def generate_recommendations_with_live_context(predictions, live_data, modele):
     """Generate recommendations using live data as baseline"""
     
-    rendement_actuel = live_data['yield_52w']
+    # Get actual model prediction for current conditions
+    rendement_actuel = get_current_model_prediction(modele, live_data)
     recommandations = {}
     
     for nom_scenario, pred_df in predictions.items():
@@ -557,10 +563,10 @@ def get_current_model_prediction(modele, live_data):
         
         if changement_rendement > 0.3:
             recommandation = "TAUX FIXE"
-            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis le niveau actuel."
+            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis le niveau prédit actuel."
         elif changement_rendement < -0.3:
             recommandation = "TAUX VARIABLE"
-            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis le niveau actuel."
+            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis le niveau prédit actuel."
         else:
             recommandation = "STRATÉGIE FLEXIBLE"
             raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%)."
@@ -585,15 +591,13 @@ def get_current_model_prediction(modele, live_data):
             'raison': raison,
             'niveau_risque': niveau_risque,
             'confiance': confiance,
-            'rendement_actuel': rendement_actuel,
+            'rendement_actuel': rendement_actuel,  # Now using model prediction
             'rendement_futur_moyen': rendement_futur_moyen,
             'changement_rendement': changement_rendement,
             'volatilite': volatilite,
             'live_data_quality': f"{live_sources_count}/4 sources directes"
         }
     
-    return recommandations
-
 def main():
     st.markdown("""
     <div class="main-header">
@@ -703,19 +707,18 @@ def main():
                 )
             )
         
-        # Live data point
-        if not df_live.empty:
-            fig_overview.add_trace(
-                go.Scatter(
-                    x=df_live['Date'],
-                    y=df_live['Rendement_52s'],
-                    mode='markers',
-                    name='Données Live',
-                    marker=dict(color='#22C55E', size=12, symbol='star'),
-                    text=['Point de données en direct'],
-                    textposition='top center'
-                )
+        # Current model prediction point
+        fig_overview.add_trace(
+            go.Scatter(
+                x=[datetime.now().strftime('%Y-%m')],
+                y=[rendement_actuel_modele],
+                mode='markers',
+                name='Prédiction Modèle Actuelle',
+                marker=dict(color='#22C55E', size=12, symbol='star'),
+                text=[f'Modèle Actuel: {rendement_actuel_modele:.2f}%'],
+                textposition='top center'
             )
+        )
         
         # Prediction scenarios
         couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
@@ -735,7 +738,7 @@ def main():
             )
         
         fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines avec Données Live",
+            title="Évolution des Rendements 52-Semaines avec Prédictions du Modèle",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
             height=500,
@@ -746,7 +749,7 @@ def main():
         st.plotly_chart(fig_overview, use_container_width=True)
         
         # Quick recommendations
-        st.subheader("🎯 Recommandations Rapides (Basées sur Données Live)")
+        st.subheader("🎯 Recommandations Rapides (Basées sur Prédictions du Modèle)")
         
         col1, col2, col3 = st.columns(3)
         
@@ -836,7 +839,7 @@ def main():
         )
         
         fig_detail.update_layout(
-            title=f"Prédictions Détaillées - {scenario_selectionne} (Continuité depuis données live)",
+            title=f"Prédictions Détaillées - {scenario_selectionne} (Continuité depuis prédiction modèle)",
             xaxis_title="Date",
             yaxis_title="Rendement (%)",
             height=500,
@@ -848,19 +851,19 @@ def main():
         # Export functionality
         if st.button("📥 Télécharger les Prédictions"):
             pred_export = pred_scenario.copy()
-            pred_export['Live_Baseline'] = live_data['yield_52w']
+            pred_export['Model_Current_Prediction'] = get_current_model_prediction(st.session_state.modele, live_data)
             pred_export['Live_Data_Quality'] = f"{sum(1 for s in live_data['sources'].values() if 'Live' in s)}/4"
             
             csv = pred_export.to_csv(index=False)
             st.download_button(
-                label="Télécharger CSV avec contexte live",
+                label="Télécharger CSV avec contexte modèle",
                 data=csv,
                 file_name=f"sofac_predictions_{scenario_selectionne.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
             )
     
     with tab3:
-        st.header("💼 Recommandations Stratégiques (Données Live)")
+        st.header("💼 Recommandations Stratégiques (Basées sur Prédictions du Modèle)")
         
         # Global recommendation
         liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
@@ -1025,4 +1028,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
