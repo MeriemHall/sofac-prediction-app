@@ -684,159 +684,112 @@ def main():
         recommandation_globale = st.session_state.recommandations['Cas_de_Base']['recommandation']
         changement_global = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
         
-        # Create executive summary
+        # Determine current situation
         if today_prediction is not None:
-            # Today's prediction available
+            current_rate = today_prediction
             evolution_vs_baseline = today_prediction - 1.75
-            
-            if evolution_vs_baseline > 0.3:
-                situation_color = "#dc3545"  # Red for high rates
-                situation_text = "TAUX ÉLEVÉS"
-                action_urgente = "🚨 BLOQUER LES TAUX MAINTENANT"
-            elif evolution_vs_baseline < -0.3:
-                situation_color = "#28a745"  # Green for low rates
-                situation_text = "TAUX FAVORABLES"
-                action_urgente = "✅ PROFITER DES TAUX VARIABLES"
-            else:
-                situation_color = "#ffc107"  # Yellow for stable
-                situation_text = "TAUX STABLES"
-                action_urgente = "⚖️ APPROCHE ÉQUILIBRÉE"
-            
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, {situation_color} 0%, {situation_color}CC 100%); 
-                        color: white; padding: 2rem; border-radius: 15px; 
-                        margin: 2rem 0; text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h2>📊 BRIEFING EXÉCUTIF - {today_display}</h2>
-                        <h1 style="font-size: 2.5rem; margin: 0.5rem 0;">{today_prediction:.2f}%</h1>
-                        <p style="font-size: 1.2rem; margin: 0;"><strong>{situation_text}</strong></p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Évolution:</strong> {evolution_vs_baseline:+.2f}%</p>
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Tendance:</strong> {trend_direction.upper() if trend_direction else 'STABLE'}</p>
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Qualité données:</strong> {sum(1 for source in live_data['sources'].values() if 'Live' in source)}/4</p>
-                    </div>
-                </div>
-                
-                <hr style="border-color: rgba(255,255,255,0.3); margin: 1.5rem 0;">
-                
-                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <h3 style="margin: 0 0 0.5rem 0;">🎯 RECOMMANDATION IMMÉDIATE</h3>
-                    <p style="font-size: 1.3rem; margin: 0; font-weight: bold;">{action_urgente}</p>
-                    <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Stratégie: {recommandation_globale}</p>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                    <div>
-                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">Impact financier estimé:</p>
-                        <p style="margin: 0; font-size: 1.1rem;"><strong>{abs(changement_global)*100:,.0f}K MAD/an</strong> (10M MAD)</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">Horizon décision:</p>
-                        <p style="margin: 0; font-size: 1.1rem;"><strong>{"IMMÉDIAT" if abs(evolution_vs_baseline) > 0.3 else "1-3 MOIS"}</strong></p>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
+            is_today = True
         elif closest_prediction is not None:
-            # Future prediction
-            closest_date_display = datetime.strptime(closest_date, '%Y-%m-%d').strftime('%d/%m/%Y')
+            current_rate = closest_prediction
             evolution_vs_baseline = closest_prediction - 1.75
-            
-            if evolution_vs_baseline > 0.3:
-                situation_color = "#dc3545"
-                situation_text = "HAUSSE ATTENDUE"
-                action_urgente = "🚨 PRÉPARER BLOCAGE DES TAUX"
-            elif evolution_vs_baseline < -0.3:
-                situation_color = "#28a745"
-                situation_text = "BAISSE ATTENDUE"
-                action_urgente = "✅ PRÉPARER TAUX VARIABLES"
-            else:
-                situation_color = "#ffc107"
-                situation_text = "STABILITÉ ATTENDUE"
-                action_urgente = "⚖️ SURVEILLER L'ÉVOLUTION"
-            
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, {situation_color} 0%, {situation_color}CC 100%); 
-                        color: white; padding: 2rem; border-radius: 15px; 
-                        margin: 2rem 0; text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h2>📊 BRIEFING EXÉCUTIF - {today_display}</h2>
-                        <h1 style="font-size: 2.5rem; margin: 0.5rem 0;">{closest_prediction:.2f}%</h1>
-                        <p style="font-size: 1.2rem; margin: 0;"><strong>{situation_text}</strong></p>
-                        <p style="font-size: 1rem; margin: 0; opacity: 0.9;">Prévision pour {closest_date_display}</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Évolution:</strong> {evolution_vs_baseline:+.2f}%</p>
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Tendance:</strong> {trend_direction.upper() if trend_direction else 'STABLE'}</p>
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Qualité données:</strong> {sum(1 for source in live_data['sources'].values() if 'Live' in source)}/4</p>
-                    </div>
-                </div>
-                
-                <hr style="border-color: rgba(255,255,255,0.3); margin: 1.5rem 0;">
-                
-                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <h3 style="margin: 0 0 0.5rem 0;">🎯 RECOMMANDATION STRATÉGIQUE</h3>
-                    <p style="font-size: 1.3rem; margin: 0; font-weight: bold;">{action_urgente}</p>
-                    <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Stratégie: {recommandation_globale}</p>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                    <div>
-                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">Impact financier estimé:</p>
-                        <p style="margin: 0; font-size: 1.1rem;"><strong>{abs(changement_global)*100:,.0f}K MAD/an</strong> (10M MAD)</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">Horizon décision:</p>
-                        <p style="margin: 0; font-size: 1.1rem;"><strong>PLANIFICATION</strong></p>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
+            is_today = False
         else:
-            # No predictions yet
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #2196F3 0%, #1976D2CC 100%); 
-                        color: white; padding: 2rem; border-radius: 15px; 
-                        margin: 2rem 0; text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h2>📊 BRIEFING EXÉCUTIF - {today_display}</h2>
-                        <h1 style="font-size: 2.5rem; margin: 0.5rem 0;">1.75%</h1>
-                        <p style="font-size: 1.2rem; margin: 0;"><strong>SITUATION ACTUELLE</strong></p>
-                        <p style="font-size: 1rem; margin: 0; opacity: 0.9;">Baseline historique Juin 2025</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Statut:</strong> RÉFÉRENCE</p>
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Prédictions:</strong> JUILLET 2025</p>
-                        <p style="font-size: 1.1rem; margin: 0.2rem 0;"><strong>Qualité données:</strong> {sum(1 for source in live_data['sources'].values() if 'Live' in source)}/4</p>
-                    </div>
-                </div>
-                
-                <hr style="border-color: rgba(255,255,255,0.3); margin: 1.5rem 0;">
-                
-                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <h3 style="margin: 0 0 0.5rem 0;">🎯 RECOMMANDATION ACTUELLE</h3>
-                    <p style="font-size: 1.3rem; margin: 0; font-weight: bold;">📊 SURVEILLER LES INDICATEURS</p>
-                    <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Préparer les stratégies pour juillet 2025</p>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                    <div>
-                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">Stratégie globale:</p>
-                        <p style="margin: 0; font-size: 1.1rem;"><strong>{recommandation_globale}</strong></p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">Horizon décision:</p>
-                        <p style="margin: 0; font-size: 1.1rem;"><strong>PRÉPARATION</strong></p>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            current_rate = 1.75
+            evolution_vs_baseline = 0
+            is_today = False
+        
+        # Determine situation and action
+        if evolution_vs_baseline > 0.3:
+            situation_emoji = "🔴"
+            situation_text = "TAUX ÉLEVÉS"
+            action_urgente = "BLOQUER LES TAUX MAINTENANT"
+            action_emoji = "🚨"
+            card_color = "#dc3545"
+        elif evolution_vs_baseline < -0.3:
+            situation_emoji = "🟢"
+            situation_text = "TAUX FAVORABLES"
+            action_urgente = "PROFITER DES TAUX VARIABLES"
+            action_emoji = "✅"
+            card_color = "#28a745"
+        else:
+            situation_emoji = "🟡"
+            situation_text = "TAUX STABLES"
+            action_urgente = "APPROCHE ÉQUILIBRÉE"
+            action_emoji = "⚖️"
+            card_color = "#ffc107"
+        
+        # Create executive summary with simpler HTML
+        if is_today and today_prediction is not None:
+            date_header = f"BRIEFING EXÉCUTIF - {today_display}"
+        elif closest_prediction is not None:
+            closest_date_display = datetime.strptime(closest_date, '%Y-%m-%d').strftime('%d/%m/%Y')
+            date_header = f"BRIEFING EXÉCUTIF - Prévision {closest_date_display}"
+        else:
+            date_header = f"BRIEFING EXÉCUTIF - {today_display}"
+        
+        st.markdown(f"""
+        <div style="background: {card_color}; color: white; padding: 2rem; border-radius: 15px; margin: 2rem 0;">
+            <h2 style="margin: 0; text-align: center;">📊 {date_header}</h2>
+            <h1 style="font-size: 3rem; margin: 1rem 0; text-align: center;">{current_rate:.2f}%</h1>
+            <p style="font-size: 1.3rem; margin: 0; text-align: center;"><strong>{situation_emoji} {situation_text}</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Key metrics in columns
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "📈 Évolution",
+                f"{evolution_vs_baseline:+.2f}%",
+                delta="vs Juin 2025"
+            )
+        
+        with col2:
+            st.metric(
+                "📊 Tendance",
+                f"{trend_direction.upper() if trend_direction else 'STABLE'}",
+                delta="7 jours"
+            )
+        
+        with col3:
+            quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+            st.metric(
+                "🎯 Qualité Données",
+                f"{quality_score}/4",
+                delta="sources live"
+            )
+        
+        with col4:
+            horizon = "IMMÉDIAT" if abs(evolution_vs_baseline) > 0.3 else "1-3 MOIS"
+            st.metric(
+                "⏰ Horizon",
+                horizon,
+                delta="décision"
+            )
+        
+        # Action recommendation in a prominent box
+        st.markdown(f"""
+        <div style="background: rgba(0,0,0,0.1); padding: 1.5rem; border-radius: 10px; margin: 1.5rem 0; border-left: 5px solid {card_color};">
+            <h3 style="margin: 0; color: {card_color};">{action_emoji} RECOMMANDATION IMMÉDIATE</h3>
+            <p style="font-size: 1.4rem; margin: 0.5rem 0; font-weight: bold; color: {card_color};">{action_urgente}</p>
+            <p style="margin: 0; opacity: 0.8;">Stratégie globale: {recommandation_globale}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Financial impact
+        impact_financier = abs(changement_global) * 100  # Convert to thousands MAD
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"💰 **Impact Financier Estimé**  \n{impact_financier:,.0f}K MAD/an (sur 10M MAD)")
+        
+        with col2:
+            urgence_color = "🔴" if abs(evolution_vs_baseline) > 0.3 else "🟡"
+            st.info(f"⚡ **Niveau d'Urgence**  \n{urgence_color} {horizon}")
+        
+        # Separator
+        st.markdown("---")
         
         # Key metrics
         col1, col2, col3, col4 = st.columns(4)
