@@ -575,6 +575,56 @@ def main():
         # Display live data panel
         display_live_data_panel(live_data)
         
+        # TODAY'S PREDICTION SECTION
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📅 Prédiction du Jour")
+        
+        # Get today's date and prediction
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
+        
+        # Find today's prediction in the base case scenario
+        if 'predictions' in st.session_state:
+            cas_base_predictions = st.session_state.predictions['Cas_de_Base']
+            
+            # Try to find today's prediction
+            today_prediction = None
+            closest_prediction = None
+            
+            for _, row in cas_base_predictions.iterrows():
+                pred_date = row['Date']
+                if pred_date == today_str:
+                    today_prediction = row['Rendement_Predit']
+                    break
+                elif pred_date > today_str and closest_prediction is None:
+                    closest_prediction = row['Rendement_Predit']
+            
+            # Display today's prediction
+            if today_prediction is not None:
+                st.sidebar.success(f"**{today_display}**")
+                st.sidebar.metric(
+                    "🎯 Rendement Prédit Aujourd'hui",
+                    f"{today_prediction:.2f}%",
+                    delta=f"{(today_prediction - 1.75):+.2f}%",
+                    help="Prédiction pour aujourd'hui vs baseline juin 2025"
+                )
+            elif closest_prediction is not None:
+                st.sidebar.warning(f"**{today_display}**")
+                st.sidebar.metric(
+                    "🎯 Prédiction Prochaine",
+                    f"{closest_prediction:.2f}%",
+                    delta=f"{(closest_prediction - 1.75):+.2f}%",
+                    help="Prochaine prédiction disponible"
+                )
+            else:
+                st.sidebar.info(f"**{today_display}**")
+                st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
+        
+        else:
+            st.sidebar.info(f"**{today_display}**")
+            st.sidebar.write("🎯 **Prédiction:** Modèle en cours de chargement...")
+        
         # Load cached model data
         if 'data_loaded' not in st.session_state:
             with st.spinner("🤖 Calibration du modèle..."):
@@ -600,6 +650,61 @@ def main():
     
     with tab1:
         st.header("📈 Vue d'Ensemble des Prédictions")
+        
+        # TODAY'S PREDICTION HIGHLIGHT
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
+        
+        # Find today's prediction
+        cas_de_base = st.session_state.predictions['Cas_de_Base']
+        today_prediction = None
+        closest_prediction = None
+        closest_date = None
+        
+        for _, row in cas_de_base.iterrows():
+            pred_date = row['Date']
+            if pred_date == today_str:
+                today_prediction = row['Rendement_Predit']
+                break
+            elif pred_date > today_str and closest_prediction is None:
+                closest_prediction = row['Rendement_Predit']
+                closest_date = pred_date
+        
+        # Display today's prediction prominently
+        if today_prediction is not None:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%); 
+                        color: white; padding: 2rem; border-radius: 15px; 
+                        margin: 2rem 0; text-align: center;">
+                <h2>🎯 PRÉDICTION DU JOUR - {today_display}</h2>
+                <h1 style="font-size: 3rem; margin: 1rem 0;">{today_prediction:.2f}%</h1>
+                <p>Rendement 52-semaines prédit pour aujourd'hui</p>
+                <small>Évolution vs Juin 2025: {(today_prediction - 1.75):+.2f}%</small>
+            </div>
+            """, unsafe_allow_html=True)
+        elif closest_prediction is not None:
+            closest_date_display = datetime.strptime(closest_date, '%Y-%m-%d').strftime('%d/%m/%Y')
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%); 
+                        color: white; padding: 2rem; border-radius: 15px; 
+                        margin: 2rem 0; text-align: center;">
+                <h2>🎯 PRÉDICTION PROCHAINE - {closest_date_display}</h2>
+                <h1 style="font-size: 3rem; margin: 1rem 0;">{closest_prediction:.2f}%</h1>
+                <p>Prochaine prédiction disponible</p>
+                <small>Évolution vs Juin 2025: {(closest_prediction - 1.75):+.2f}%</small>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); 
+                        color: white; padding: 2rem; border-radius: 15px; 
+                        margin: 2rem 0; text-align: center;">
+                <h2>📅 AUJOURD'HUI - {today_display}</h2>
+                <h1 style="font-size: 2rem; margin: 1rem 0;">Prédictions en cours...</h1>
+                <p>Les prédictions commencent en juillet 2025</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         # Key metrics
         col1, col2, col3, col4 = st.columns(4)
