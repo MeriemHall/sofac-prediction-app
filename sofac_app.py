@@ -224,11 +224,12 @@ def display_live_data_panel(live_data):
         )
     
     with col2:
-        # Show historical baseline instead of live estimate
+        indicator = "🟡"
         st.metric(
-            "📊 Rendement 52s (Juin 2025)", 
-            "1.75%",
-            help="Valeur historique de référence - Juin 2025"
+            f"{indicator} Rendement 52s", 
+            f"{live_data['yield_52w']:.2f}%",
+            delta=f"+{(live_data['yield_52w'] - live_data['policy_rate']):.2f}%",
+            help=f"Source: {live_data['sources']['yield_52w']}"
         )
         
         st.metric(
@@ -574,6 +575,56 @@ def main():
         # Display live data panel
         display_live_data_panel(live_data)
         
+        # TODAY'S PREDICTION SECTION
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📅 Prédiction du Jour")
+        
+        # Get today's date and prediction
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
+        
+        # Find today's prediction in the base case scenario
+        if 'predictions' in st.session_state:
+            cas_base_predictions = st.session_state.predictions['Cas_de_Base']
+            
+            # Try to find today's prediction
+            today_prediction = None
+            closest_prediction = None
+            
+            for _, row in cas_base_predictions.iterrows():
+                pred_date = row['Date']
+                if pred_date == today_str:
+                    today_prediction = row['Rendement_Predit']
+                    break
+                elif pred_date > today_str and closest_prediction is None:
+                    closest_prediction = row['Rendement_Predit']
+            
+            # Display today's prediction
+            if today_prediction is not None:
+                st.sidebar.success(f"**{today_display}**")
+                st.sidebar.metric(
+                    "🎯 Rendement Prédit Aujourd'hui",
+                    f"{today_prediction:.2f}%",
+                    delta=f"{(today_prediction - 1.75):+.2f}%",
+                    help="Prédiction pour aujourd'hui vs baseline juin 2025"
+                )
+            elif closest_prediction is not None:
+                st.sidebar.warning(f"**{today_display}**")
+                st.sidebar.metric(
+                    "🎯 Prédiction Prochaine",
+                    f"{closest_prediction:.2f}%",
+                    delta=f"{(closest_prediction - 1.75):+.2f}%",
+                    help="Prochaine prédiction disponible"
+                )
+            else:
+                st.sidebar.info(f"**{today_display}**")
+                st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
+        
+        else:
+            st.sidebar.info(f"**{today_display}**")
+            st.sidebar.write("🎯 **Prédiction:** Modèle en cours de chargement...")
+        
         # Load cached model data
         if 'data_loaded' not in st.session_state:
             with st.spinner("🤖 Calibration du modèle..."):
@@ -599,6 +650,146 @@ def main():
     
     with tab1:
         st.header("📈 Vue d'Ensemble des Prédictions")
+        
+        # TODAY'S EXECUTIVE SUMMARY
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
+        
+        # Find today's prediction and context
+        cas_de_base = st.session_state.predictions['Cas_de_Base']
+        today_prediction = None
+        closest_prediction = None
+        closest_date = None
+        trend_direction = None
+        
+        for i, row in cas_de_base.iterrows():
+            pred_date = row['Date']
+            if pred_date == today_str:
+                today_prediction = row['Rendement_Predit']
+                # Get trend by looking at next few days
+                if i < len(cas_de_base) - 7:
+                    future_avg = cas_de_base.iloc[i:i+7]['Rendement_Predit'].mean()
+                    trend_direction = "hausse" if future_avg > today_prediction else "baisse"
+                break
+            elif pred_date > today_str and closest_prediction is None:
+                closest_prediction = row['Rendement_Predit']
+                closest_date = pred_date
+                # Get trend for next week
+                if i < len(cas_de_base) - 7:
+                    future_avg = cas_de_base.iloc[i:i+7]['Rendement_Predit'].mean()
+                    trend_direction = "hausse" if future_avg > closest_prediction else "baisse"
+        
+        # Get global recommendation
+        recommandation_globale = st.session_state.recommandations['Cas_de_Base']['recommandation']
+        changement_global = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
+        
+        # Determine current situation
+        if today_prediction is not None:
+            current_rate = today_prediction
+            evolution_vs_baseline = today_prediction - 1.75
+            is_today = True
+        elif closest_prediction is not None:
+            current_rate = closest_prediction
+            evolution_vs_baseline = closest_prediction - 1.75
+            is_today = False
+        else:
+            current_rate = 1.75
+            evolution_vs_baseline = 0
+            is_today = False
+        
+        # Determine situation and action
+        if evolution_vs_baseline > 0.3:
+            situation_emoji = "🔴"
+            situation_text = "TAUX ÉLEVÉS"
+            action_urgente = "BLOQUER LES TAUX MAINTENANT"
+            action_emoji = "🚨"
+            card_color = "#dc3545"
+        elif evolution_vs_baseline < -0.3:
+            situation_emoji = "🟢"
+            situation_text = "TAUX FAVORABLES"
+            action_urgente = "PROFITER DES TAUX VARIABLES"
+            action_emoji = "✅"
+            card_color = "#28a745"
+        else:
+            situation_emoji = "🟡"
+            situation_text = "TAUX STABLES"
+            action_urgente = "APPROCHE ÉQUILIBRÉE"
+            action_emoji = "⚖️"
+            card_color = "#ffc107"
+        
+        # Create executive summary with simpler HTML
+        if is_today and today_prediction is not None:
+            date_header = f"BRIEFING EXÉCUTIF - {today_display}"
+        elif closest_prediction is not None:
+            closest_date_display = datetime.strptime(closest_date, '%Y-%m-%d').strftime('%d/%m/%Y')
+            date_header = f"BRIEFING EXÉCUTIF - Prévision {closest_date_display}"
+        else:
+            date_header = f"BRIEFING EXÉCUTIF - {today_display}"
+        
+        st.markdown(f"""
+        <div style="background: {card_color}; color: white; padding: 2rem; border-radius: 15px; margin: 2rem 0;">
+            <h2 style="margin: 0; text-align: center;">📊 {date_header}</h2>
+            <h1 style="font-size: 3rem; margin: 1rem 0; text-align: center;">{current_rate:.2f}%</h1>
+            <p style="font-size: 1.3rem; margin: 0; text-align: center;"><strong>{situation_emoji} {situation_text}</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Key metrics in columns
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "📈 Évolution",
+                f"{evolution_vs_baseline:+.2f}%",
+                delta="vs Juin 2025"
+            )
+        
+        with col2:
+            st.metric(
+                "📊 Tendance",
+                f"{trend_direction.upper() if trend_direction else 'STABLE'}",
+                delta="7 jours"
+            )
+        
+        with col3:
+            quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+            st.metric(
+                "🎯 Qualité Données",
+                f"{quality_score}/4",
+                delta="sources live"
+            )
+        
+        with col4:
+            horizon = "IMMÉDIAT" if abs(evolution_vs_baseline) > 0.3 else "1-3 MOIS"
+            st.metric(
+                "⏰ Horizon",
+                horizon,
+                delta="décision"
+            )
+        
+        # Action recommendation in a prominent box
+        st.markdown(f"""
+        <div style="background: rgba(0,0,0,0.1); padding: 1.5rem; border-radius: 10px; margin: 1.5rem 0; border-left: 5px solid {card_color};">
+            <h3 style="margin: 0; color: {card_color};">{action_emoji} RECOMMANDATION IMMÉDIATE</h3>
+            <p style="font-size: 1.4rem; margin: 0.5rem 0; font-weight: bold; color: {card_color};">{action_urgente}</p>
+            <p style="margin: 0; opacity: 0.8;">Stratégie globale: {recommandation_globale}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Financial impact
+        impact_financier = abs(changement_global) * 100  # Convert to thousands MAD
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"💰 **Impact Financier Estimé**  \n{impact_financier:,.0f}K MAD/an (sur 10M MAD)")
+        
+        with col2:
+            urgence_color = "🔴" if abs(evolution_vs_baseline) > 0.3 else "🟡"
+            st.info(f"⚡ **Niveau d'Urgence**  \n{urgence_color} {horizon}")
+        
+        # Separator
+        st.markdown("---")
         
         # Key metrics
         col1, col2, col3, col4 = st.columns(4)
