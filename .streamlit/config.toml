@@ -3,17 +3,12 @@ primaryColor = "#2a5298"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f8f9fa"
 textColor = "#262730"
-font = "sans serif"
 
 [server]
 headless = true
 port = 8501
-maxUploadSize = 10
 enableCORS = false
 enableXsrfProtection = false
 
 [browser]
 gatherUsageStats = false
-
-[global]
-developmentMode = false
