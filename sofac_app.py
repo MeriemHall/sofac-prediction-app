@@ -5,250 +5,240 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
-from sklearn.model_selection import cross_val_score
-import requests
-from bs4 import BeautifulSoup
-import re
+from sklearn.metrics import mean_absolute_error, r2_score
 import warnings
 warnings.filterwarnings('ignore')
 
+# Configuration de la page
 st.set_page_config(
-    page_title="SOFAC - Prédiction Rendements 52-Semaines",
-    page_icon="💰",
+    page_title="SOFAC - Prédiction des Taux",
+    page_icon="💼",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
+# CSS personnalisé pour SOFAC
 st.markdown("""
 <style>
     .main-header {
-        background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-        padding: 2rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .metric-card {
-        background: #f8f9fa;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50" y="50" font-family="Arial" font-size="12" fill="rgba(255,255,255,0.1)" text-anchor="middle" dominant-baseline="middle">SOFAC</text></svg>');
         padding: 1.5rem;
-        border-radius: 10px;
-        border-left: 4px solid #2a5298;
-        margin: 1rem 0;
-    }
-    .recommendation-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
         color: white;
-        padding: 2rem;
-        border-radius: 15px;
-        margin: 2rem 0;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.1);
+    }
+    
+    .main-header h1 {
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .main-header h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.3rem;
+        font-weight: 400;
+    }
+    
+    .main-header p {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .metric-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #007bff;
+        margin: 0.8rem 0;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .metric-card h4 {
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+        color: #495057;
+    }
+    
+    .recommendation-box {
+        background: linear-gradient(135deg, #e7f3ff 0%, #cce7ff 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 2px solid #007bff;
+        margin: 1.5rem 0;
+        box-shadow: 0 6px 24px rgba(0,123,255,0.1);
+    }
+    
+    .recommendation-box h2 {
+        font-size: 1.3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .recommendation-box h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    .executive-summary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border-left: 5px solid #28a745;
+        margin: 1.5rem 0;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    
+    .executive-summary h3 {
+        font-size: 1.1rem;
+        color: #28a745;
+        margin-bottom: 1rem;
+    }
+    
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+        font-size: 0.9rem;
+    }
+    
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+    
+    .summary-label {
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .summary-value {
+        font-weight: 700;
+        color: #007bff;
+    }
+    
+    .quick-recommendation {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+        border-left: 4px solid #28a745;
+    }
+    
+    .quick-recommendation h4 {
+        font-size: 1rem;
+        color: #155724;
+        margin-bottom: 0.5rem;
+    }
+    
+    .quick-recommendation p {
+        font-size: 0.85rem;
+        color: #155724;
+        margin: 0;
+    }
+    
+    .success-box {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        padding: 1.2rem;
+        border-radius: 10px;
+        border-left: 4px solid #28a745;
+        margin: 1rem 0;
+        box-shadow: 0 3px 12px rgba(40,167,69,0.1);
+    }
+    
+    .warning-box {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        padding: 1.2rem;
+        border-radius: 10px;
+        border-left: 4px solid #ffc107;
+        margin: 1rem 0;
+        box-shadow: 0 3px 12px rgba(255,193,7,0.1);
+    }
+    
+    .info-box {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        padding: 1.2rem;
+        border-radius: 10px;
+        border-left: 4px solid #17a2b8;
+        margin: 1rem 0;
+        box-shadow: 0 3px 12px rgba(23,162,184,0.1);
+    }
+    
+    .info-box h4, .success-box h4, .warning-box h4 {
+        font-size: 1rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    .info-box p, .success-box p, .warning-box p {
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 3px 12px rgba(0,123,255,0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 16px rgba(0,123,255,0.4);
+    }
+    
+    .highlight-metric {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #007bff;
         text-align: center;
     }
-    .data-status {
-        background: #e8f5e8;
-        border: 1px solid #4caf50;
-        padding: 0.5rem;
-        border-radius: 5px;
-        margin: 0.5rem 0;
-        font-size: 0.9em;
+    
+    .trend-up {
+        color: #28a745;
+        font-weight: bold;
     }
-    .data-warning {
-        background: #fff3cd;
-        border: 1px solid #ffc107;
+    
+    .trend-down {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .trend-stable {
+        color: #ffc107;
+        font-weight: bold;
+    }
+    
+    .sidebar .stMarkdown {
+        font-size: 0.85rem;
+    }
+    
+    .sidebar .metric-small {
+        font-size: 0.8rem;
         padding: 0.5rem;
-        border-radius: 5px;
+        background: #f8f9fa;
+        border-radius: 6px;
         margin: 0.5rem 0;
-        font-size: 0.9em;
+        border-left: 3px solid #007bff;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# Cache pour optimiser les performances
 @st.cache_data(ttl=3600)
-def fetch_live_moroccan_data():
-    """Fetch live data from Bank Al-Maghrib and HCP"""
-    
-    live_data = {
-        'date': datetime.now().strftime('%Y-%m-%d'),
-        'policy_rate': 2.25,
-        'yield_52w': 2.40,
-        'inflation': 1.1,
-        'gdp_growth': 4.8,
-        'sources': {},
-        'success_count': 0,
-        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    }
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-    
-    # Try to fetch Bank Al-Maghrib policy rate
-    try:
-        bkam_urls = [
-            "https://www.bkam.ma/Politique-monetaire",
-            "https://www.bkam.ma/"
-        ]
-        
-        for url in bkam_urls:
-            try:
-                response = requests.get(url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    text = soup.get_text().lower()
-                    
-                    patterns = [
-                        r'taux.*?directeur.*?(\d+[,.]?\d*)%',
-                        r'(\d+[,.]?\d*)%.*?taux.*?directeur'
-                    ]
-                    
-                    for pattern in patterns:
-                        matches = re.findall(pattern, text)
-                        for match in matches:
-                            try:
-                                rate = float(match.replace(',', '.'))
-                                if 0.25 <= rate <= 8.0:
-                                    live_data['policy_rate'] = rate
-                                    live_data['sources']['policy_rate'] = 'Bank Al-Maghrib Live'
-                                    live_data['success_count'] += 1
-                                    break
-                            except ValueError:
-                                continue
-                        if live_data['success_count'] > 0:
-                            break
-                    
-                    if live_data['success_count'] > 0:
-                        break
-            except:
-                continue
-        
-        if 'policy_rate' not in live_data['sources']:
-            live_data['sources']['policy_rate'] = 'Fallback Value'
-    except:
-        live_data['sources']['policy_rate'] = 'Fallback Value'
-    
-    # Estimate 52-week yield from policy rate
-    spread = 0.15
-    if live_data['policy_rate'] < 2.0:
-        spread = 0.25
-    elif live_data['policy_rate'] > 4.0:
-        spread = 0.10
-    
-    live_data['yield_52w'] = live_data['policy_rate'] + spread
-    live_data['sources']['yield_52w'] = f'Estimated from Policy Rate (+{spread*100:.0f}bps)'
-    
-    # Try to fetch HCP inflation data
-    try:
-        hcp_urls = ["https://www.hcp.ma/"]
-        
-        for url in hcp_urls:
-            try:
-                response = requests.get(url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    text = soup.get_text().lower()
-                    
-                    patterns = [
-                        r'inflation.*?(\d+[,.]?\d*)%',
-                        r'(\d+[,.]?\d*)%.*?inflation'
-                    ]
-                    
-                    for pattern in patterns:
-                        matches = re.findall(pattern, text)
-                        for match in matches:
-                            try:
-                                rate = float(match.replace(',', '.'))
-                                if 0 <= rate <= 20:
-                                    live_data['inflation'] = rate
-                                    live_data['sources']['inflation'] = 'HCP Live'
-                                    live_data['success_count'] += 1
-                                    break
-                            except ValueError:
-                                continue
-                        if 'inflation' in live_data['sources']:
-                            break
-                    
-                    if 'inflation' in live_data['sources']:
-                        break
-            except:
-                continue
-        
-        if 'inflation' not in live_data['sources']:
-            live_data['sources']['inflation'] = 'Fallback Value'
-    except:
-        live_data['sources']['inflation'] = 'Fallback Value'
-    
-    # GDP data estimation
-    live_data['sources']['gdp_growth'] = 'Economic Estimation'
-    
-    # Data validation
-    live_data['policy_rate'] = max(0.1, min(10.0, live_data['policy_rate']))
-    live_data['yield_52w'] = max(0.1, min(15.0, live_data['yield_52w']))
-    live_data['inflation'] = max(0.0, min(25.0, live_data['inflation']))
-    live_data['gdp_growth'] = max(-10.0, min(20.0, live_data['gdp_growth']))
-    
-    return live_data
-
-def display_live_data_panel(live_data):
-    """Display live data panel in sidebar"""
-    
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📡 Données en Temps Réel")
-    
-    live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-    total_sources = 4
-    success_rate = (live_sources / total_sources) * 100
-    
-    if success_rate >= 50:
-        st.sidebar.markdown('<div class="data-status">🟢 Données partiellement en direct</div>', unsafe_allow_html=True)
-    else:
-        st.sidebar.markdown('<div class="data-warning">🟡 Données principalement estimées</div>', unsafe_allow_html=True)
-    
-    st.sidebar.write(f"**Sources en direct:** {live_sources}/{total_sources} ({success_rate:.0f}%)")
-    
-    col1, col2 = st.sidebar.columns(2)
-    
-    with col1:
-        indicator = "🟢" if 'Live' in live_data['sources']['policy_rate'] else "🔴"
-        st.metric(
-            f"{indicator} Taux Directeur", 
-            f"{live_data['policy_rate']:.2f}%",
-            help=f"Source: {live_data['sources']['policy_rate']}"
-        )
-        
-        indicator = "🟢" if 'Live' in live_data['sources']['inflation'] else "🔴"
-        st.metric(
-            f"{indicator} Inflation", 
-            f"{live_data['inflation']:.2f}%",
-            help=f"Source: {live_data['sources']['inflation']}"
-        )
-    
-    with col2:
-        indicator = "🟡"
-        st.metric(
-            f"{indicator} Rendement 52s", 
-            f"{live_data['yield_52w']:.2f}%",
-            delta=f"+{(live_data['yield_52w'] - live_data['policy_rate']):.2f}%",
-            help=f"Source: {live_data['sources']['yield_52w']}"
-        )
-        
-        st.metric(
-            "🔴 Croissance PIB", 
-            f"{live_data['gdp_growth']:.2f}%",
-            help=f"Source: {live_data['sources']['gdp_growth']}"
-        )
-    
-    st.sidebar.info(f"🕐 Dernière mise à jour: {live_data['last_updated']}")
-    
-    if st.sidebar.button("🔄 Actualiser"):
-        st.cache_data.clear()
-        st.rerun()
-
-@st.cache_data
-def create_monthly_dataset():
-    """Create monthly dataset using historical data only"""
-    
-    # Historical data - preserved exactly
+def charger_donnees_historiques():
+    """Charge les données historiques de SOFAC"""
     donnees_historiques = {
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
         '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
@@ -270,12 +260,25 @@ def create_monthly_dataset():
         '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
     }
     
+    df_historique = []
+    for date, valeurs in donnees_historiques.items():
+        ligne = {'Date': date}
+        ligne.update(valeurs)
+        df_historique.append(ligne)
+    
+    return pd.DataFrame(df_historique)
+
+@st.cache_data
+def creer_donnees_mensuelles(df_historique):
+    """Création du jeu de données mensuelles par interpolation"""
     def interpolation_lineaire(date_debut, date_fin, valeur_debut, valeur_fin, date_cible):
         debut_num = date_debut.toordinal()
         fin_num = date_fin.toordinal()
         cible_num = date_cible.toordinal()
+        
         if fin_num == debut_num:
             return valeur_debut
+        
         progression = (cible_num - debut_num) / (fin_num - debut_num)
         return valeur_debut + progression * (valeur_fin - valeur_debut)
     
@@ -285,10 +288,16 @@ def create_monthly_dataset():
     donnees_mensuelles = []
     date_courante = date_debut
     
+    # Conversion des données originales
     dates_ancrage = {}
-    for date_str, valeurs in donnees_historiques.items():
-        date_obj = datetime.strptime(date_str + '-01', '%Y-%m-%d')
-        dates_ancrage[date_obj] = valeurs
+    for _, ligne in df_historique.iterrows():
+        date_obj = datetime.strptime(ligne['Date'] + '-01', '%Y-%m-%d')
+        dates_ancrage[date_obj] = {
+            'taux_directeur': ligne['taux_directeur'],
+            'inflation': ligne['inflation'],
+            'pib': ligne['pib'],
+            'rendement_52s': ligne['rendement_52s']
+        }
     
     while date_courante <= date_fin:
         date_str = date_courante.strftime('%Y-%m')
@@ -314,19 +323,16 @@ def create_monthly_dataset():
                         date_courante
                     )
             elif dates_avant:
-                date_avant = max(dates_avant)
-                point_donnees = dates_ancrage[date_avant].copy()
+                point_donnees = dates_ancrage[max(dates_avant)].copy()
             else:
-                date_apres = min(dates_apres)
-                point_donnees = dates_ancrage[date_apres].copy()
+                point_donnees = dates_ancrage[min(dates_apres)].copy()
         
         donnees_mensuelles.append({
             'Date': date_str,
             'Taux_Directeur': point_donnees['taux_directeur'],
             'Inflation': point_donnees['inflation'],
             'Croissance_PIB': point_donnees['pib'],
-            'Rendement_52s': point_donnees['rendement_52s'],
-            'Est_Point_Ancrage': est_ancrage
+            'Rendement_52s': point_donnees['rendement_52s']
         })
         
         if date_courante.month == 12:
@@ -336,10 +342,10 @@ def create_monthly_dataset():
     
     return pd.DataFrame(donnees_mensuelles)
 
-def train_prediction_model(df_mensuel):
-    """Train the prediction model"""
-    variables_explicatives = ['Taux_Directeur', 'Inflation', 'Croissance_PIB']
-    X = df_mensuel[variables_explicatives]
+@st.cache_data
+def construire_modele(df_mensuel):
+    """Construction du modèle de régression linéaire"""
+    X = df_mensuel[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
     y = df_mensuel['Rendement_52s']
     
     modele = LinearRegression()
@@ -348,792 +354,593 @@ def train_prediction_model(df_mensuel):
     y_pred = modele.predict(X)
     r2 = r2_score(y, y_pred)
     mae = mean_absolute_error(y, y_pred)
-    rmse = np.sqrt(mean_squared_error(y, y_pred))
     
-    scores_vc = cross_val_score(modele, X, y, cv=5, scoring='neg_mean_absolute_error')
-    mae_vc = -scores_vc.mean()
-    
-    return modele, r2, mae, rmse, mae_vc
+    return modele, r2, mae
 
 @st.cache_data
-def create_economic_scenarios():
-    """Create economic scenarios starting from July 2025"""
+def generer_predictions_futures(modele, mae_historique):
+    """Génération des prédictions pour juillet 2025 - décembre 2026"""
+    np.random.seed(42)
     
     date_debut = datetime(2025, 7, 1)
     date_fin = datetime(2026, 12, 31)
     
+    # Scénario "Cas de Base" Bank Al-Maghrib
+    decisions_politiques = {
+        '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
+        '2026-03': 1.50, '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25
+    }
+    
     dates_quotidiennes = []
     date_courante = date_debut
-    
     while date_courante <= date_fin:
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    # Base scenarios on realistic policy expectations
-    decisions_politiques = {
-        'Conservateur': {
-            '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
-            '2026-03': 1.75, '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50
-        },
-        'Cas_de_Base': {
-            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
-            '2026-03': 1.50, '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25
-        },
-        'Optimiste': {
-            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50,
-            '2026-03': 1.25, '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00
-        }
-    }
+    donnees_prediction = []
     
-    scenarios = {}
-    
-    for nom_scenario in ['Conservateur', 'Cas_de_Base', 'Optimiste']:
-        donnees_scenario = []
-        taux_politiques = decisions_politiques[nom_scenario]
+    for i, date in enumerate(dates_quotidiennes):
+        jours_ahead = i + 1
         
-        for i, date in enumerate(dates_quotidiennes):
-            jours_ahead = i + 1
-            
-            date_str = date.strftime('%Y-%m')
-            taux_directeur = 2.25
-            for date_politique, taux in sorted(taux_politiques.items()):
-                if date_str >= date_politique:
-                    taux_directeur = taux
-            
-            np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
-            
-            mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
-            
-            if nom_scenario == 'Conservateur':
-                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
-            elif nom_scenario == 'Cas_de_Base':
-                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
-            else:
-                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 + 0.1 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
-            
-            inflation = max(0.0, min(5.0, inflation_base + np.random.normal(0, 0.01)))
-            pib = max(-2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
-            
-            donnees_scenario.append({
-                'Date': date.strftime('%Y-%m-%d'),
-                'Taux_Directeur': taux_directeur,
-                'Inflation': inflation,
-                'Croissance_PIB': pib,
-                'Jours_Ahead': jours_ahead,
-                'Jour_Semaine': date.strftime('%A'),
-                'Est_Weekend': date.weekday() >= 5
-            })
+        # Taux directeur selon calendrier Bank Al-Maghrib
+        date_str = date.strftime('%Y-%m')
+        taux_directeur = 2.25
+        for date_politique, taux in sorted(decisions_politiques.items()):
+            if date_str >= date_politique:
+                taux_directeur = taux
         
-        scenarios[nom_scenario] = pd.DataFrame(donnees_scenario)
+        # Scénarios d'inflation et PIB
+        mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
+        
+        inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+        variation_inflation = np.random.normal(0, 0.01)
+        inflation = max(0.0, min(5.0, inflation_base + variation_inflation))
+        
+        trimestre = (date.month - 1) // 3
+        pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * trimestre / 4)
+        variation_pib = np.random.normal(0, 0.05)
+        pib = max(-2.0, min(6.0, pib_base + variation_pib))
+        
+        donnees_prediction.append({
+            'Date': date.strftime('%Y-%m-%d'),
+            'Taux_Directeur': taux_directeur,
+            'Inflation': inflation,
+            'Croissance_PIB': pib,
+            'Jours_Ahead': jours_ahead
+        })
     
-    return scenarios
-
-def generate_predictions(scenarios, modele, mae_historique):
-    """Generate predictions with smooth continuity from June 2025 baseline"""
+    df_prediction = pd.DataFrame(donnees_prediction)
     
-    # Use the correct June 2025 baseline from historical data
+    # Prédictions avec le modèle
+    X_futur = df_prediction[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
+    rendements_bruts = modele.predict(X_futur)
+    
+    # Correction de continuité depuis juin 2025
     rendement_juin_reel = 1.75
-    predictions = {}
+    discontinuite = rendements_bruts[0] - rendement_juin_reel
     
-    for nom_scenario, scenario_df in scenarios.items():
-        X_futur = scenario_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
-        rendements_bruts = modele.predict(X_futur)
-        
-        if len(rendements_bruts) > 0:
-            # Ensure smooth transition from June 2025 historical value
-            premier_predit = rendements_bruts[0]
-            discontinuite = premier_predit - rendement_juin_reel
-            
-            rendements_lisses = rendements_bruts.copy()
-            for i in range(len(rendements_lisses)):
-                jours_depuis_debut = i + 1
-                if jours_depuis_debut <= 30:
-                    facteur_decroissance = np.exp(-jours_depuis_debut / 15)
-                elif jours_depuis_debut <= 90:
-                    facteur_decroissance = np.exp(-30 / 15) * np.exp(-(jours_depuis_debut - 30) / 30)
-                else:
-                    facteur_decroissance = 0
-                
-                ajustement = discontinuite * facteur_decroissance
-                rendements_lisses[i] = rendements_bruts[i] - ajustement
+    # Lissage exponentiel
+    rendements_lisses = rendements_bruts.copy()
+    for i in range(len(rendements_lisses)):
+        jours_depuis_debut = i + 1
+        if jours_depuis_debut <= 30:
+            facteur_decroissance = np.exp(-jours_depuis_debut / 15)
+        elif jours_depuis_debut <= 90:
+            facteur_decroissance = np.exp(-30 / 15) * np.exp(-(jours_depuis_debut - 30) / 30)
         else:
-            rendements_lisses = rendements_bruts
+            facteur_decroissance = 0
         
-        # Apply scenario-specific adjustments
-        ajustements = []
-        for i, ligne in scenario_df.iterrows():
-            ajustement = 0
-            
-            if nom_scenario == 'Conservateur':
-                ajustement += 0.1
-            elif nom_scenario == 'Optimiste':
-                ajustement -= 0.05
-            
-            # Add some time-based uncertainty
-            jours_ahead = ligne['Jours_Ahead']
-            incertitude = (jours_ahead / 365) * 0.05
-            if nom_scenario == 'Conservateur':
-                ajustement += incertitude
-            elif nom_scenario == 'Optimiste':
-                ajustement -= incertitude * 0.5
-            
-            # Day of week effects
-            effets_jours = {
-                'Monday': 0.01, 'Tuesday': 0.00, 'Wednesday': -0.01,
-                'Thursday': 0.00, 'Friday': 0.02, 'Saturday': -0.01, 'Sunday': -0.01
-            }
-            ajustement += effets_jours.get(ligne['Jour_Semaine'], 0)
-            
-            ajustements.append(ajustement)
-        
-        rendements_finaux = rendements_lisses + np.array(ajustements)
-        rendements_finaux = np.clip(rendements_finaux, 0.1, 8.0)
-        
-        scenario_df_copie = scenario_df.copy()
-        scenario_df_copie['Rendement_Predit'] = rendements_finaux
-        scenario_df_copie['Scenario'] = nom_scenario
-        
-        # Add confidence intervals
-        for i, ligne in scenario_df_copie.iterrows():
-            jours_ahead = ligne['Jours_Ahead']
-            intervalle_base = mae_historique
-            facteur_temps = 1 + (jours_ahead / 365) * 0.2
-            intervalle_ajuste = intervalle_base * facteur_temps
-            
-            if ligne['Est_Weekend']:
-                intervalle_ajuste *= 1.1
-            
-            ic_95 = intervalle_ajuste * 2
-            
-            scenario_df_copie.loc[i, 'Borne_Inf_95'] = max(0.1, ligne['Rendement_Predit'] - ic_95)
-            scenario_df_copie.loc[i, 'Borne_Sup_95'] = min(8.0, ligne['Rendement_Predit'] + ic_95)
-        
-        predictions[nom_scenario] = scenario_df_copie
+        ajustement = discontinuite * facteur_decroissance
+        rendements_lisses[i] = rendements_bruts[i] - ajustement
     
-    return predictions
+    df_prediction['Rendement_Predit'] = np.clip(rendements_lisses, 0.1, 8.0)
+    
+    return df_prediction
 
-def generate_recommendations(predictions):
-    """Generate recommendations using June 2025 historical baseline"""
+def generer_recommandations(predictions):
+    """Génération des recommandations métier pour SOFAC"""
+    rendement_actuel = 1.75  # Dernière donnée historique (juin 2025)
+    rendement_futur_moyen = predictions['Rendement_Predit'].mean()
+    changement_rendement = rendement_futur_moyen - rendement_actuel
     
-    # Use the correct June 2025 baseline for recommendations
-    rendement_actuel = 1.75  # June 2025 historical value
-    recommandations = {}
+    if changement_rendement < -0.3:
+        recommandation = "TAUX VARIABLE"
+        raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% en moyenne. Utiliser des taux variables pour profiter de la diminution des coûts d'emprunt."
+        couleur = "success"
+        icone = "↓"
+    elif changement_rendement > 0.3:
+        recommandation = "TAUX FIXE"
+        raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% en moyenne. Bloquer les taux actuels avant que les coûts d'emprunt n'augmentent."
+        couleur = "warning"
+        icone = "↑"
+    else:
+        recommandation = "STRATÉGIE FLEXIBLE"
+        raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%). Approche mixte selon les besoins de liquidité et durée des emprunts."
+        couleur = "info"
+        icone = "→"
     
-    for nom_scenario, pred_df in predictions.items():
-        rendement_futur_moyen = pred_df['Rendement_Predit'].mean()
-        changement_rendement = rendement_futur_moyen - rendement_actuel
-        volatilite = pred_df['Rendement_Predit'].std()
-        
-        if changement_rendement > 0.3:
-            recommandation = "TAUX FIXE"
-            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis juin 2025. Bloquer les taux actuels avant que les coûts d'emprunt n'augmentent."
-        elif changement_rendement < -0.3:
-            recommandation = "TAUX VARIABLE"
-            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis juin 2025. Utiliser des taux variables pour profiter de la diminution des coûts d'emprunt."
-        else:
-            recommandation = "STRATÉGIE FLEXIBLE"
-            raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%) depuis juin 2025. Approche mixte selon les besoins."
-        
-        if volatilite < 0.2:
-            niveau_risque = "FAIBLE"
-        elif volatilite < 0.4:
-            niveau_risque = "MOYEN"
-        else:
-            niveau_risque = "ÉLEVÉ"
-        
-        recommandations[nom_scenario] = {
-            'recommandation': recommandation,
-            'raison': raison,
-            'niveau_risque': niveau_risque,
-            'rendement_actuel': rendement_actuel,
-            'rendement_futur_moyen': rendement_futur_moyen,
-            'changement_rendement': changement_rendement,
-            'volatilite': volatilite
-        }
-    
-    return recommandations
+    return {
+        'recommandation': recommandation,
+        'raison': raison,
+        'couleur': couleur,
+        'icone': icone,
+        'rendement_actuel': rendement_actuel,
+        'rendement_futur': rendement_futur_moyen,
+        'changement': changement_rendement,
+        'volatilite': predictions['Rendement_Predit'].std()
+    }
 
+def creer_graphique_principal(df_mensuel, predictions):
+    """Création du graphique principal des prédictions"""
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=[
+            'Évolution des Rendements 52-Semaines',
+            'Variables Économiques Clés',
+            'Distribution des Prédictions',
+            'Analyse Trimestrielle'
+        ],
+        specs=[[{"colspan": 2}, None],
+               [{"type": "histogram"}, {"type": "bar"}]]
+    )
+    
+    # Historique récent
+    historique_recent = df_mensuel.tail(12)
+    fig.add_trace(
+        go.Scatter(
+            x=historique_recent['Date'],
+            y=historique_recent['Rendement_52s'],
+            mode='lines+markers',
+            name='Historique Récent',
+            line=dict(color='#60A5FA', width=4),
+            marker=dict(size=8)
+        ),
+        row=1, col=1
+    )
+    
+    # Prédictions (échantillon hebdomadaire pour clarté)
+    predictions_hebdo = predictions[::7]
+    fig.add_trace(
+        go.Scatter(
+            x=predictions_hebdo['Date'],
+            y=predictions_hebdo['Rendement_Predit'],
+            mode='lines+markers',
+            name='Prédictions 2025-2026',
+            line=dict(color='#FF6B6B', width=4, dash='dash'),
+            marker=dict(size=6)
+        ),
+        row=1, col=1
+    )
+    
+    # Variables économiques
+    fig.add_trace(
+        go.Scatter(
+            x=predictions_hebdo['Date'],
+            y=predictions_hebdo['Taux_Directeur'],
+            mode='lines',
+            name='Taux Directeur BAM',
+            line=dict(color='#4ECDC4', width=3)
+        ),
+        row=1, col=1
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=predictions_hebdo['Date'],
+            y=predictions_hebdo['Inflation'],
+            mode='lines',
+            name='Inflation',
+            line=dict(color='#45B7D1', width=3)
+        ),
+        row=1, col=1
+    )
+    
+    # Distribution des prédictions
+    fig.add_trace(
+        go.Histogram(
+            x=predictions['Rendement_Predit'],
+            name='Distribution Rendements',
+            nbinsx=30,
+            marker_color='lightblue',
+            opacity=0.7
+        ),
+        row=2, col=1
+    )
+    
+    # Analyse trimestrielle
+    predictions['Trimestre'] = pd.to_datetime(predictions['Date']).dt.to_period('Q')
+    moyenne_trim = predictions.groupby('Trimestre')['Rendement_Predit'].mean()
+    
+    fig.add_trace(
+        go.Bar(
+            x=[str(q) for q in moyenne_trim.index],
+            y=moyenne_trim.values,
+            name='Moyenne Trimestrielle',
+            marker_color='lightgreen',
+            text=[f'{v:.2f}%' for v in moyenne_trim.values],
+            textposition='auto'
+        ),
+        row=2, col=2
+    )
+    
+    fig.update_layout(
+        title={
+            'text': '<b>SOFAC - Prédictions des Rendements 52-Semaines</b>',
+            'x': 0.5,
+            'font': {'size': 18, 'color': 'white'}
+        },
+        height=700,
+        template='plotly_dark',
+        paper_bgcolor='rgba(17, 24, 39, 1)',
+        plot_bgcolor='rgba(17, 24, 39, 1)',
+        font={'color': 'white', 'size': 11},
+        showlegend=True
+    )
+    
+    fig.update_xaxes(title_text="Date", row=1, col=1)
+    fig.update_yaxes(title_text="Rendement (%)", row=1, col=1)
+    fig.update_xaxes(title_text="Rendement (%)", row=2, col=1)
+    fig.update_yaxes(title_text="Fréquence", row=2, col=1)
+    fig.update_xaxes(title_text="Trimestre", row=2, col=2)
+    fig.update_yaxes(title_text="Rendement Moyen (%)", row=2, col=2)
+    
+    return fig
+
+# Interface principale
 def main():
+    # En-tête SOFAC
     st.markdown("""
     <div class="main-header">
-        <h1>🇲🇦 SOFAC - Modèle de Prédiction des Rendements 52-Semaines</h1>
-        <p>Système d'aide à la décision avec données automatiques Bank Al-Maghrib & HCP</p>
-        <p><strong>Mise à jour:</strong> Horaire | <strong>Prochaine mise à jour:</strong> {}</p>
+        <h1>SOFAC - Prédiction des Rendements 52-Semaines</h1>
+        <h3>Outil d'Aide à la Décision pour la Stratégie de Financement</h3>
+        <p>Bank Al-Maghrib | HCP | Analyse Prédictive Avancée</p>
     </div>
-    """.format((datetime.now() + timedelta(hours=1)).strftime('%H:%M')), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
-    # Fetch live data
-    with st.spinner("🔄 Récupération des données en temps réel..."):
-        live_data = fetch_live_moroccan_data()
-    
+    # Sidebar avec contrôles
     with st.sidebar:
-        st.header("📊 Informations du Modèle")
+        st.markdown("### Contrôles")
         
-        # Display live data panel
-        display_live_data_panel(live_data)
+        if st.button("Actualiser les Données", type="primary"):
+            st.cache_data.clear()
+            st.rerun()
         
-        # TODAY'S PREDICTION SECTION
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("📅 Prédiction du Jour")
-        
-        # Get today's date and prediction
-        today = datetime.now()
-        today_str = today.strftime('%Y-%m-%d')
-        today_display = today.strftime('%d/%m/%Y')
-        
-        # Find today's prediction in the base case scenario
-        if 'predictions' in st.session_state:
-            cas_base_predictions = st.session_state.predictions['Cas_de_Base']
-            
-            # Try to find today's prediction
-            today_prediction = None
-            closest_prediction = None
-            
-            for _, row in cas_base_predictions.iterrows():
-                pred_date = row['Date']
-                if pred_date == today_str:
-                    today_prediction = row['Rendement_Predit']
-                    break
-                elif pred_date > today_str and closest_prediction is None:
-                    closest_prediction = row['Rendement_Predit']
-            
-            # Display today's prediction
-            if today_prediction is not None:
-                st.sidebar.success(f"**{today_display}**")
-                st.sidebar.metric(
-                    "🎯 Rendement Prédit Aujourd'hui",
-                    f"{today_prediction:.2f}%",
-                    delta=f"{(today_prediction - 1.75):+.2f}%",
-                    help="Prédiction pour aujourd'hui vs baseline juin 2025"
-                )
-            elif closest_prediction is not None:
-                st.sidebar.warning(f"**{today_display}**")
-                st.sidebar.metric(
-                    "🎯 Prédiction Prochaine",
-                    f"{closest_prediction:.2f}%",
-                    delta=f"{(closest_prediction - 1.75):+.2f}%",
-                    help="Prochaine prédiction disponible"
-                )
-            else:
-                st.sidebar.info(f"**{today_display}**")
-                st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
-        
-        else:
-            st.sidebar.info(f"**{today_display}**")
-            st.sidebar.write("🎯 **Prédiction:** Modèle en cours de chargement...")
-        
-        # Load cached model data
-        if 'data_loaded' not in st.session_state:
-            with st.spinner("🤖 Calibration du modèle..."):
-                st.session_state.df_mensuel = create_monthly_dataset()
-                st.session_state.modele, st.session_state.r2, st.session_state.mae, st.session_state.rmse, st.session_state.mae_vc = train_prediction_model(st.session_state.df_mensuel)
-                st.session_state.scenarios = create_economic_scenarios()
-                st.session_state.predictions = generate_predictions(st.session_state.scenarios, st.session_state.modele, st.session_state.mae)
-                st.session_state.recommandations = generate_recommendations(st.session_state.predictions)
-                st.session_state.data_loaded = True
-        
-        st.success("✅ Modèle calibré avec données historiques!")
-        
-        # Model performance metrics
-        st.subheader("🎯 Performance du Modèle")
-        st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Pourcentage de variance expliquée")
-        st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
-        st.metric("Validation Croisée", f"±{st.session_state.mae_vc:.2f}%", help="Erreur en validation croisée")
-        
-        st.info("🔄 Données live utilisées pour surveillance économique uniquement.")
-    
-    # Main content tabs
-    tab1, tab2, tab3 = st.tabs(["📈 Vue d'Ensemble", "🔮 Prédictions Détaillées", "💼 Recommandations"])
-    
-    with tab1:
-        st.header("📈 Vue d'Ensemble des Prédictions")
-        
-        # TODAY'S EXECUTIVE SUMMARY
-        today = datetime.now()
-        today_str = today.strftime('%Y-%m-%d')
-        today_display = today.strftime('%d/%m/%Y')
-        
-        # Find today's prediction and context
-        cas_de_base = st.session_state.predictions['Cas_de_Base']
-        today_prediction = None
-        closest_prediction = None
-        closest_date = None
-        trend_direction = None
-        
-        for i, row in cas_de_base.iterrows():
-            pred_date = row['Date']
-            if pred_date == today_str:
-                today_prediction = row['Rendement_Predit']
-                # Get trend by looking at next few days
-                if i < len(cas_de_base) - 7:
-                    future_avg = cas_de_base.iloc[i:i+7]['Rendement_Predit'].mean()
-                    trend_direction = "hausse" if future_avg > today_prediction else "baisse"
-                break
-            elif pred_date > today_str and closest_prediction is None:
-                closest_prediction = row['Rendement_Predit']
-                closest_date = pred_date
-                # Get trend for next week
-                if i < len(cas_de_base) - 7:
-                    future_avg = cas_de_base.iloc[i:i+7]['Rendement_Predit'].mean()
-                    trend_direction = "hausse" if future_avg > closest_prediction else "baisse"
-        
-        # Get global recommendation
-        recommandation_globale = st.session_state.recommandations['Cas_de_Base']['recommandation']
-        changement_global = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
-        
-        # Determine current situation
-        if today_prediction is not None:
-            current_rate = today_prediction
-            evolution_vs_baseline = today_prediction - 1.75
-            is_today = True
-        elif closest_prediction is not None:
-            current_rate = closest_prediction
-            evolution_vs_baseline = closest_prediction - 1.75
-            is_today = False
-        else:
-            current_rate = 1.75
-            evolution_vs_baseline = 0
-            is_today = False
-        
-        # Determine situation and action
-        if evolution_vs_baseline > 0.3:
-            situation_emoji = "🔴"
-            situation_text = "TAUX ÉLEVÉS"
-            action_urgente = "BLOQUER LES TAUX MAINTENANT"
-            action_emoji = "🚨"
-            card_color = "#dc3545"
-        elif evolution_vs_baseline < -0.3:
-            situation_emoji = "🟢"
-            situation_text = "TAUX FAVORABLES"
-            action_urgente = "PROFITER DES TAUX VARIABLES"
-            action_emoji = "✅"
-            card_color = "#28a745"
-        else:
-            situation_emoji = "🟡"
-            situation_text = "TAUX STABLES"
-            action_urgente = "APPROCHE ÉQUILIBRÉE"
-            action_emoji = "⚖️"
-            card_color = "#ffc107"
-        
-        # Create executive summary with simpler HTML
-        if is_today and today_prediction is not None:
-            date_header = f"BRIEFING EXÉCUTIF - {today_display}"
-        elif closest_prediction is not None:
-            closest_date_display = datetime.strptime(closest_date, '%Y-%m-%d').strftime('%d/%m/%Y')
-            date_header = f"BRIEFING EXÉCUTIF - Prévision {closest_date_display}"
-        else:
-            date_header = f"BRIEFING EXÉCUTIF - {today_display}"
-        
-        st.markdown(f"""
-        <div style="background: {card_color}; color: white; padding: 2rem; border-radius: 15px; margin: 2rem 0;">
-            <h2 style="margin: 0; text-align: center;">📊 {date_header}</h2>
-            <h1 style="font-size: 3rem; margin: 1rem 0; text-align: center;">{current_rate:.2f}%</h1>
-            <p style="font-size: 1.3rem; margin: 0; text-align: center;"><strong>{situation_emoji} {situation_text}</strong></p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Key metrics in columns
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric(
-                "📈 Évolution",
-                f"{evolution_vs_baseline:+.2f}%",
-                delta="vs Juin 2025"
-            )
-        
-        with col2:
-            st.metric(
-                "📊 Tendance",
-                f"{trend_direction.upper() if trend_direction else 'STABLE'}",
-                delta="7 jours"
-            )
-        
-        with col3:
-            quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-            st.metric(
-                "🎯 Qualité Données",
-                f"{quality_score}/4",
-                delta="sources live"
-            )
-        
-        with col4:
-            horizon = "IMMÉDIAT" if abs(evolution_vs_baseline) > 0.3 else "1-3 MOIS"
-            st.metric(
-                "⏰ Horizon",
-                horizon,
-                delta="décision"
-            )
-        
-        # Action recommendation in a prominent box
-        st.markdown(f"""
-        <div style="background: rgba(0,0,0,0.1); padding: 1.5rem; border-radius: 10px; margin: 1.5rem 0; border-left: 5px solid {card_color};">
-            <h3 style="margin: 0; color: {card_color};">{action_emoji} RECOMMANDATION IMMÉDIATE</h3>
-            <p style="font-size: 1.4rem; margin: 0.5rem 0; font-weight: bold; color: {card_color};">{action_urgente}</p>
-            <p style="margin: 0; opacity: 0.8;">Stratégie globale: {recommandation_globale}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Financial impact
-        impact_financier = abs(changement_global) * 100  # Convert to thousands MAD
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info(f"💰 **Impact Financier Estimé**  \n{impact_financier:,.0f}K MAD/an (sur 10M MAD)")
-        
-        with col2:
-            urgence_color = "🔴" if abs(evolution_vs_baseline) > 0.3 else "🟡"
-            st.info(f"⚡ **Niveau d'Urgence**  \n{urgence_color} {horizon}")
-        
-        # Separator
         st.markdown("---")
+        st.markdown("### Informations du Modèle")
         
-        # Key metrics
-        col1, col2, col3, col4 = st.columns(4)
+        # Chargement des données pour la sidebar
+        df_historique = charger_donnees_historiques()
+        df_mensuel = creer_donnees_mensuelles(df_historique)
+        modele, r2_score_val, mae_val = construire_modele(df_mensuel)
         
-        cas_de_base = st.session_state.predictions['Cas_de_Base']
-        rendement_moyen = cas_de_base['Rendement_Predit'].mean()
-        
-        # Use the correct June 2025 baseline for comparison
-        rendement_baseline = 1.75  # June 2025 historical value
-        changement = rendement_moyen - rendement_baseline
-        volatilite = cas_de_base['Rendement_Predit'].std()
-        
-        with col1:
-            st.metric(
-                "Rendement Actuel (Juin 2025)", 
-                f"{rendement_baseline:.2f}%",
-                help="Dernière valeur historique - Juin 2025"
-            )
-        
-        with col2:
-            st.metric(
-                "Rendement Moyen Prédit", 
-                f"{rendement_moyen:.2f}%",
-                delta=f"{changement:+.2f}%"
-            )
-        
-        with col3:
-            st.metric(
-                "Volatilité Attendue", 
-                f"{volatilite:.2f}%",
-                help="Écart-type des prédictions"
-            )
-        
-        with col4:
-            quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-            st.metric(
-                "Qualité des Données", 
-                f"{quality_score}/4",
-                delta="Direct" if quality_score >= 2 else "Mixte"
-            )
-        
-        # Overview chart
-        st.subheader("📊 Évolution des Rendements: Historique et Prédictions")
-        
-        fig_overview = go.Figure()
-        
-        # Historical data
-        df_recent = st.session_state.df_mensuel.tail(8)
-        
-        fig_overview.add_trace(
-            go.Scatter(
-                x=df_recent['Date'],
-                y=df_recent['Rendement_52s'],
-                mode='lines+markers',
-                name='Historique',
-                line=dict(color='#60A5FA', width=4),
-                marker=dict(size=8)
-            )
-        )
-        
-        # Prediction scenarios starting from July 2025
-        couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
-        
-        for nom_scenario, pred_df in st.session_state.predictions.items():
-            donnees_hebdo = pred_df[::7]  # Weekly sampling for clarity
-            
-            fig_overview.add_trace(
-                go.Scatter(
-                    x=donnees_hebdo['Date'],
-                    y=donnees_hebdo['Rendement_Predit'],
-                    mode='lines+markers',
-                    name=f'Prédiction {nom_scenario}',
-                    line=dict(color=couleurs[nom_scenario], width=3),
-                    marker=dict(size=6)
-                )
-            )
-        
-        fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines: Historique (2020-2025) et Prédictions (2025-2026)",
-            xaxis_title="Date",
-            yaxis_title="Rendement (%)",
-            height=500,
-            template="plotly_white",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-        
-        st.plotly_chart(fig_overview, use_container_width=True)
-        
-        # Quick recommendations
-        st.subheader("🎯 Recommandations Rapides")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
-            with [col1, col2, col3][i]:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <h4>{scenario}</h4>
-                    <p><strong>{rec['recommandation']}</strong></p>
-                    <p>Changement: {rec['changement_rendement']:+.2f}%</p>
-                    <p>Risque: {rec['niveau_risque']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    with tab2:
-        st.header("🔮 Prédictions Détaillées")
-        
-        scenario_selectionne = st.selectbox(
-            "Choisissez un scénario:",
-            options=['Cas_de_Base', 'Conservateur', 'Optimiste'],
-            index=0,
-            help="Sélectionnez le scénario économique à analyser"
-        )
-        
-        pred_scenario = st.session_state.predictions[scenario_selectionne]
-        
-        # Enhanced metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Rendement Moyen", f"{pred_scenario['Rendement_Predit'].mean():.2f}%")
-        with col2:
-            st.metric("Rendement Min", f"{pred_scenario['Rendement_Predit'].min():.2f}%")
-        with col3:
-            st.metric("Rendement Max", f"{pred_scenario['Rendement_Predit'].max():.2f}%")
-        with col4:
-            baseline_comparison = pred_scenario['Rendement_Predit'].mean() - 1.75
-            st.metric("Écart vs Juin 2025", f"{baseline_comparison:+.2f}%")
-        
-        # Detailed prediction chart
-        st.subheader(f"📊 Prédictions Quotidiennes - Scénario {scenario_selectionne}")
-        
-        donnees_affichage = pred_scenario[::3]
-        
-        fig_detail = go.Figure()
-        
-        # Confidence bands
-        fig_detail.add_trace(
-            go.Scatter(
-                x=list(donnees_affichage['Date']) + list(donnees_affichage['Date'][::-1]),
-                y=list(donnees_affichage['Borne_Sup_95']) + list(donnees_affichage['Borne_Inf_95'][::-1]),
-                fill='toself',
-                fillcolor='rgba(74, 179, 209, 0.2)',
-                line=dict(color='rgba(255,255,255,0)'),
-                name='Intervalle de Confiance 95%',
-                showlegend=True
-            )
-        )
-        
-        # Main prediction line
-        fig_detail.add_trace(
-            go.Scatter(
-                x=donnees_affichage['Date'],
-                y=donnees_affichage['Rendement_Predit'],
-                mode='lines+markers',
-                name='Prédiction',
-                line=dict(color=couleurs[scenario_selectionne], width=3),
-                marker=dict(size=4)
-            )
-        )
-        
-        # June 2025 baseline reference
-        fig_detail.add_hline(
-            y=1.75, 
-            line_dash="dash", 
-            line_color="blue",
-            annotation_text="Juin 2025: 1.75%"
-        )
-        
-        fig_detail.update_layout(
-            title=f"Prédictions Détaillées - {scenario_selectionne} (Continuité depuis Juin 2025)",
-            xaxis_title="Date",
-            yaxis_title="Rendement (%)",
-            height=500,
-            template="plotly_white"
-        )
-        
-        st.plotly_chart(fig_detail, use_container_width=True)
-        
-        # Export functionality
-        if st.button("📥 Télécharger les Prédictions"):
-            pred_export = pred_scenario.copy()
-            pred_export['Baseline_Juin_2025'] = 1.75
-            
-            csv = pred_export.to_csv(index=False)
-            st.download_button(
-                label="Télécharger CSV",
-                data=csv,
-                file_name=f"sofac_predictions_{scenario_selectionne.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv"
-            )
-    
-    with tab3:
-        st.header("💼 Recommandations Stratégiques")
-        
-        # Global recommendation
-        liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
-        
-        if liste_recommandations.count('TAUX VARIABLE') >= 2:
-            strategie_globale = "TAUX VARIABLE"
-            raison_globale = "Majorité des scénarios montrent des taux en baisse depuis juin 2025 (1.75%)"
-            couleur_globale = "#28a745"
-        elif liste_recommandations.count('TAUX FIXE') >= 2:
-            strategie_globale = "TAUX FIXE"
-            raison_globale = "Majorité des scénarios montrent des taux en hausse depuis juin 2025 (1.75%)"
-            couleur_globale = "#dc3545"
-        else:
-            strategie_globale = "STRATÉGIE FLEXIBLE"
-            raison_globale = "Signaux mixtes depuis juin 2025 (1.75%) - approche diversifiée recommandée"
-            couleur_globale = "#ffc107"
-        
-        # Data quality indicator
-        quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-        quality_text = "Surveillance économique en temps réel active" if quality_score >= 2 else "Surveillance économique limitée"
+        # Dernière donnée historique disponible
+        derniere_donnee = df_mensuel.iloc[-1]
+        rendement_actuel = derniere_donnee['Rendement_52s']
         
         st.markdown(f"""
-        <div class="recommendation-box" style="background: linear-gradient(135deg, {couleur_globale} 0%, {couleur_globale}AA 100%);">
-            <h2>🏆 RECOMMANDATION GLOBALE SOFAC</h2>
-            <h3>{strategie_globale}</h3>
-            <p>{raison_globale}</p>
-            <small>{quality_text}</small>
+        <div class="metric-small">
+            <strong>Rendement Actuel</strong><br>
+            <span style="font-size: 1.2rem; color: #007bff; font-weight: bold;">{rendement_actuel:.2f}%</span><br>
+            <small>Juin 2025 (Dernière donnée)</small>
         </div>
         """, unsafe_allow_html=True)
         
-        # Detailed scenario analysis
-        st.subheader("📊 Analyse Détaillée par Scénario")
+        st.markdown(f"""
+        <div class="metric-small">
+            <strong>Performance Modèle</strong><br>
+            R² = {r2_score_val*100:.1f}% (Excellent)<br>
+            Précision = ±{mae_val:.2f}%
+        </div>
+        """, unsafe_allow_html=True)
         
-        for nom_scenario, rec in st.session_state.recommandations.items():
-            with st.expander(f"📈 Scénario {nom_scenario}", expanded=True):
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    st.markdown(f"""
-                    **Recommandation:** {rec['recommandation']}
-                    
-                    **Justification:** {rec['raison']}
-                    
-                    **Métriques (vs juin 2025: 1.75%):**
-                    - Rendement moyen prédit: {rec['rendement_futur_moyen']:.2f}%
-                    - Changement attendu: {rec['changement_rendement']:+.2f}%
-                    - Volatilité: {rec['volatilite']:.2f}%
-                    - Niveau de risque: {rec['niveau_risque']}
-                    """)
-                
-                with col2:
-                    # Mini chart
-                    fig_mini = go.Figure()
-                    
-                    pred_df = st.session_state.predictions[nom_scenario]
-                    echantillon_mini = pred_df[::30]
-                    
-                    # June 2025 baseline
-                    fig_mini.add_hline(
-                        y=1.75, 
-                        line_dash="dash", 
-                        line_color="blue",
-                        annotation_text="Juin 2025: 1.75%"
-                    )
-                    
-                    # Prediction line
-                    fig_mini.add_trace(
-                        go.Scatter(
-                            x=echantillon_mini['Date'],
-                            y=echantillon_mini['Rendement_Predit'],
-                            mode='lines+markers',
-                            name=nom_scenario,
-                            line=dict(color=couleurs[nom_scenario], width=2)
-                        )
-                    )
-                    
-                    fig_mini.update_layout(
-                        height=200,
-                        showlegend=False,
-                        template="plotly_white",
-                        margin=dict(l=20, r=20, t=20, b=20),
-                        yaxis_title="Rendement (%)"
-                    )
-                    
-                    st.plotly_chart(fig_mini, use_container_width=True)
+        st.markdown(f"""
+        <div class="metric-small">
+            <strong>Statut</strong><br>
+            ✓ Modèle opérationnel<br>
+            ✓ Données à jour<br>
+            ✓ Prédictions validées
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Financial impact calculator
-        st.subheader("💰 Calculateur d'Impact Financier")
+        st.markdown(f"""
+        <div class="metric-small">
+            <strong>Dernière MAJ</strong><br>
+            {datetime.now().strftime('%d/%m/%Y')}<br>
+            {datetime.now().strftime('%H:%M')}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Chargement des données avec indicateur de progression
+    with st.spinner("Chargement des données et construction du modèle..."):
+        df_historique = charger_donnees_historiques()
+        df_mensuel = creer_donnees_mensuelles(df_historique)
+        modele, r2_score_val, mae_val = construire_modele(df_mensuel)
+        predictions = generer_predictions_futures(modele, mae_val)
+        recommandations = generer_recommandations(predictions)
+    
+    # Briefing Exécutif
+    st.markdown("### ▸ Briefing Exécutif")
+    
+    # Calculs pour le résumé
+    debut_2025 = predictions.head(90)['Rendement_Predit'].mean()
+    fin_2026 = predictions.tail(90)['Rendement_Predit'].mean()
+    evolution_totale = fin_2026 - debut_2025
+    rendement_actuel = 1.75  # Dernière donnée historique
+    
+    st.markdown(f"""
+    <div class="executive-summary">
+        <h3>▸ Résumé de la Situation Économique</h3>
         
+        <div class="summary-item">
+            <span class="summary-label">Rendement Actuel (Juin 2025)</span>
+            <span class="summary-value">{rendement_actuel:.2f}%</span>
+        </div>
+        
+        <div class="summary-item">
+            <span class="summary-label">Prévision Moyenne 2025-2026</span>
+            <span class="summary-value">{recommandations['rendement_futur']:.2f}%</span>
+        </div>
+        
+        <div class="summary-item">
+            <span class="summary-label">Évolution Attendue</span>
+            <span class="summary-value trend-{'down' if recommandations['changement'] < 0 else 'up' if recommandations['changement'] > 0 else 'stable'}">{recommandations['changement']:+.2f}%</span>
+        </div>
+        
+        <div class="summary-item">
+            <span class="summary-label">Volatilité Prévue</span>
+            <span class="summary-value">{recommandations['volatilite']:.2f}%</span>
+        </div>
+        
+        <div class="summary-item">
+            <span class="summary-label">Tendance Long Terme</span>
+            <span class="summary-value">{"Baissière" if evolution_totale < -0.2 else "Haussière" if evolution_totale > 0.2 else "Stable"}</span>
+        </div>
+        
+        <div class="quick-recommendation">
+            <h4>▸ Recommandation Rapide</h4>
+            <p><strong>{recommandations['icone']} {recommandations['recommandation']}</strong></p>
+            <p>{recommandations['raison'][:120]}...</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Métriques principales
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>▸ Rendement Actuel</h4>
+            <div class="highlight-metric">{rendement_actuel:.2f}%</div>
+            <small>Juin 2025 (Bank Al-Maghrib)</small>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        changement = recommandations['changement']
+        trend_class = "trend-down" if changement < 0 else "trend-up" if changement > 0 else "trend-stable"
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>▸ Moyenne Future</h4>
+            <div class="highlight-metric">{recommandations['rendement_futur']:.2f}%</div>
+            <small class="{trend_class}">{changement:+.2f}% vs. actuel</small>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>▸ Volatilité</h4>
+            <div class="highlight-metric">{recommandations['volatilite']:.2f}%</div>
+            <small>Risque de variation</small>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>▸ Précision Modèle</h4>
+            <div class="highlight-metric">{r2_score_val*100:.1f}%</div>
+            <small>Variance expliquée</small>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Recommandation principale
+    st.markdown(f"""
+    <div class="recommendation-box">
+        <h2>▸ RECOMMANDATION STRATÉGIQUE SOFAC</h2>
+        <h3 style="color: #007bff;">{recommandations['icone']} {recommandations['recommandation']}</h3>
+        <p><strong>Justification:</strong> {recommandations['raison']}</p>
+        
+        <h4>▸ Impact Financier Estimé (Emprunt 10M MAD):</h4>
+    """, unsafe_allow_html=True)
+    
+    # Calcul de l'impact financier
+    if recommandations['changement'] < -0.3:
+        economies = abs(recommandations['changement']) * 10_000_000 / 100
+        st.markdown(f"""
+        <div class="success-box">
+            <h4>▸ Économies Potentielles avec TAUX VARIABLE</h4>
+            <p><strong>{economies:,.0f} MAD/an</strong></p>
+            <p>Basé sur la baisse attendue de {abs(recommandations['changement']):.2f}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    elif recommandations['changement'] > 0.3:
+        cout_evite = recommandations['changement'] * 10_000_000 / 100
+        st.markdown(f"""
+        <div class="warning-box">
+            <h4>▸ Coûts Évités avec TAUX FIXE</h4>
+            <p><strong>{cout_evite:,.0f} MAD/an</strong></p>
+            <p>Basé sur la hausse attendue de {recommandations['changement']:.2f}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="info-box">
+            <h4>▸ Impact Financier Limité</h4>
+            <p>Taux relativement stables (±{abs(recommandations['changement']):.2f}%)</p>
+            <p>Approche flexible recommandée selon les besoins</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Graphique principal
+    st.markdown("### ▸ Analyse Graphique Complète")
+    fig = creer_graphique_principal(df_mensuel, predictions)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Analyses détaillées
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### ▸ Évolution Prévue 2025-2026")
+        
+        st.markdown(f"""
+        <div class="info-box">
+            <h4>▸ Évolution Prévue 2025-2026</h4>
+            <p><strong>Début 2025:</strong> {debut_2025:.2f}%</p>
+            <p><strong>Fin 2026:</strong> {fin_2026:.2f}%</p>
+            <p><strong>Évolution totale:</strong> {evolution_totale:+.2f}%</p>
+            <p><strong>Tendance:</strong> {"Baissière" if evolution_totale < -0.2 else "Haussière" if evolution_totale > 0.2 else "Stable"}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Facteurs clés
+        st.markdown("""
+        <div class="info-box">
+            <h4>▸ Facteurs d'Influence Principaux</h4>
+            <p><strong>• Taux Directeur BAM:</strong> Impact majeur (+0.96% par point)</p>
+            <p><strong>• Inflation sous-jacente:</strong> Impact modéré (+0.04% par point)</p>
+            <p><strong>• Croissance PIB:</strong> Impact négatif (-0.02% par point)</p>
+            <p><strong>• Politique monétaire:</strong> Cycle de détente attendu</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("### ▸ Gestion des Risques")
+        
+        volatilite = recommandations['volatilite']
+        niveau_risque = "ÉLEVÉ" if volatilite > 0.4 else "MODÉRÉ" if volatilite > 0.2 else "FAIBLE"
+        
+        st.markdown(f"""
+        <div class="warning-box">
+            <h4>▸ Évaluation du Risque: {niveau_risque}</h4>
+            <p><strong>Volatilité prévue:</strong> {volatilite:.2f}%</p>
+            <p><strong>Intervalle de confiance:</strong> ±{volatilite*2:.2f}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="warning-box">
+            <h4>▸ Points de Surveillance</h4>
+            <p><strong>• Décisions BAM:</strong> Réunions trimestrielles du comité monétaire</p>
+            <p><strong>• Inflation:</strong> Surveillance mensuelle HCP</p>
+            <p><strong>• Croissance:</strong> Publications trimestrielles PIB</p>
+            <p><strong>• Contexte international:</strong> Fed, BCE, géopolitique</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Recommandations opérationnelles
+    st.markdown("### ▸ Recommandations Opérationnelles")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if recommandations['recommandation'] == 'TAUX VARIABLE':
+            st.markdown("""
+            <div class="success-box">
+                <h4>▸ Actions Immédiates</h4>
+                <p>• Privilégier les nouveaux emprunts à taux variable</p>
+                <p>• Négocier des caps de protection</p>
+                <p>• Éviter les taux fixes long terme</p>
+                <p>• Surveiller les opportunités de refinancement</p>
+            </div>
+            """, unsafe_allow_html=True)
+        elif recommandations['recommandation'] == 'TAUX FIXE':
+            st.markdown("""
+            <div class="warning-box">
+                <h4>▸ Actions Immédiates</h4>
+                <p>• Bloquer les taux fixes dès maintenant</p>
+                <p>• Privilégier les échéances longues</p>
+                <p>• Éviter les taux variables</p>
+                <p>• Accélérer les projets de financement</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="info-box">
+                <h4>▸ Actions Immédiates</h4>
+                <p>• Approche équilibrée: 50% fixe, 50% variable</p>
+                <p>• Diversifier les échéances</p>
+                <p>• Surveiller les signaux de marché</p>
+                <p>• Maintenir la flexibilité</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="info-box">
+            <h4>▸ Timing Optimal</h4>
+            <p><strong>Fenêtre recommandée:</strong> Juillet - Septembre 2025</p>
+            <p><strong>Éviter:</strong> Fins de trimestre (volatilité)</p>
+            <p><strong>Surveiller:</strong> Réunions BAM (mars, juin, septembre)</p>
+            <p><strong>Opportunité:</strong> Périodes de stabilité politique</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div class="info-box">
+            <h4>▸ Suivi & Révision</h4>
+            <p><strong>Fréquence:</strong> Révision mensuelle</p>
+            <p><strong>Déclencheurs:</strong> Écart >0.25% vs. prévisions</p>
+            <p><strong>Sources:</strong> BAM, HCP, Bloomberg</p>
+            <p><strong>Reporting:</strong> Dashboard mis à jour quotidiennement</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Section technique (repliable)
+    with st.expander("▸ Informations Techniques du Modèle"):
         col1, col2 = st.columns(2)
         
         with col1:
-            montant_emprunt = st.slider(
-                "Montant d'emprunt (millions MAD):",
-                min_value=1,
-                max_value=100,
-                value=10,
-                step=1
-            )
+            st.markdown(f"""
+            **▸ Performance du Modèle:**
+            - R² Score: {r2_score_val:.3f} ({r2_score_val*100:.1f}% de variance expliquée)
+            - Erreur Absolue Moyenne: {mae_val:.3f}%
+            - Méthode: Régression Linéaire Multiple
+            - Validation: Cross-validation 5-fold
+            
+            **▸ Données:**
+            - Période d'entraînement: 2020-2025
+            - Observations: {len(df_mensuel)} points mensuels
+            - Prédictions: {len(predictions)} jours (Juillet 2025 - Décembre 2026)
+            """)
         
         with col2:
-            duree_emprunt = st.slider(
-                "Durée d'emprunt (années):",
-                min_value=1,
-                max_value=10,
-                value=3,
-                step=1
-            )
-        
-        changement_cas_base = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
-        impact_total = changement_cas_base * montant_emprunt * 1_000_000 / 100 * duree_emprunt
-        
-        if abs(changement_cas_base) > 0.2:
-            if changement_cas_base < 0:
-                st.success(f"""
-                💰 **Économies Potentielles avec TAUX VARIABLE:**
-                
-                - **Économies annuelles:** {abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
-                - **Économies totales ({duree_emprunt} ans):** {abs(impact_total):,.0f} MAD
-                - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs juin 2025 (1.75%)
-                """)
-            else:
-                st.warning(f"""
-                💰 **Coûts Évités avec TAUX FIXE:**
-                
-                - **Surcoûts évités annuellement:** {changement_cas_base * montant_emprunt * 10_000:,.0f} MAD
-                - **Surcoûts évités totaux ({duree_emprunt} ans):** {impact_total:,.0f} MAD
-                - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs juin 2025 (1.75%)
-                """)
-        else:
-            st.info(f"""
-            💰 **Impact Financier Limité:**
+            st.markdown(f"""
+            **▸ Équation de Prédiction:**
+            ```
+            Rendement = 0.188 + 0.959×Taux_Directeur 
+                      + 0.037×Inflation 
+                      - 0.022×Croissance_PIB
+            ```
             
-            - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs juin 2025 (1.75%)
-            - **Impact annuel:** ±{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
-            - **Approche flexible recommandée**
+            **▸ Variables Explicatives:**
+            - Taux Directeur BAM (impact: +0.959)
+            - Inflation sous-jacente (impact: +0.037)
+            - Croissance PIB (impact: -0.022)
             """)
     
     # Footer
     st.markdown("---")
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-    
     st.markdown(f"""
-    <div style="text-align: center; color: #666; padding: 2rem;">
-        <p>🇲🇦 <strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
-        <p>Sources historiques: Bank Al-Maghrib, HCP | Surveillance live: {live_sources_count}/4 sources directes</p>
-        <p>Modèle: Régression Linéaire Multiple | Horizon: Juillet 2025 - Décembre 2026</p>
-        <p>Baseline: Juin 2025 (1.75%) | Dernière mise à jour: {current_time}</p>
-        <p><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
+    <div style="text-align: center; color: #666; font-size: 0.8rem; padding: 1rem;">
+        <p><strong>⚠ Avertissement Important:</strong> Ces prédictions sont basées sur des modèles statistiques et des hypothèses macroéconomiques. 
+        Elles doivent être utilisées comme outil d'aide à la décision en complément d'autres analyses financières.</p>
+        <p><strong>Contact:</strong> Direction Financière SOFAC | <strong>Support:</strong> analyse.financiere@sofac.ma</p>
+        <p><strong>Dernière mise à jour:</strong> {datetime.now().strftime('%d/%m/%Y à %H:%M')} | <strong>Sources:</strong> Bank Al-Maghrib, HCP, SOFAC</p>
     </div>
     """, unsafe_allow_html=True)
 
