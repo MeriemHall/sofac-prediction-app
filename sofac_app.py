@@ -28,7 +28,10 @@
                         <span style="font-size: 0.8rem; font-weight: 500; color: #374151;">{rec['niveau_risque']}</span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)import streamlit as st
+                """, unsafe_allow_html=True)
+    
+    with tab2:
+        st.header("🔮 Prédictions Détaillées")import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
