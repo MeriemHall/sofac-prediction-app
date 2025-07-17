@@ -1,4 +1,34 @@
-import streamlit as st
+# Quick recommendations with professional cards
+        st.subheader("Recommandations Rapides")
+        
+        col1, col2, col3 = st.columns(3, gap="medium")
+        
+        for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
+            with [col1, col2, col3][i]:
+                # Determine card color based on recommendation
+                if rec['recommandation'] == 'TAUX VARIABLE':
+                    card_color_rec = '#22c55e'
+                elif rec['recommandation'] == 'TAUX FIXE':
+                    card_color_rec = '#ef4444'
+                else:
+                    card_color_rec = '#f59e0b'
+                
+                st.markdown(f"""
+                <div class="metric-card" style="border-left: 4px solid {card_color_rec};">
+                    <h4 style="color: #374151; font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">{scenario}</h4>
+                    <div style="background: {card_color_rec}; color: white; padding: 0.5rem; border-radius: 6px; margin-bottom: 0.75rem; text-align: center;">
+                        <p style="margin: 0; font-size: 0.9rem; font-weight: 600;">{rec['recommandation']}</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.8rem; color: #6b7280;">Changement:</span>
+                        <span style="font-size: 0.8rem; font-weight: 500; color: #374151;">{rec['changement_rendement']:+.2f}%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="font-size: 0.8rem; color: #6b7280;">Risque:</span>
+                        <span style="font-size: 0.8rem; font-weight: 500; color: #374151;">{rec['niveau_risque']}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -22,93 +52,326 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    /* Import professional font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Global styles */
+    .stApp {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background-color: #f8fafc;
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Custom header */
     .main-header {
-        background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60"><text x="10" y="40" font-family="Arial,sans-serif" font-size="24" font-weight="bold" fill="white">SOFAC</text></svg>');
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><rect x="80" y="10" width="30" height="20" rx="3" fill="white" fill-opacity="0.2"/><text x="85" y="25" font-family="Inter,sans-serif" font-size="12" font-weight="700" fill="white">SOFAC</text></svg>');
         background-repeat: no-repeat;
-        background-position: right 20px center;
-        padding: 1.5rem;
-        border-radius: 8px;
+        background-position: right 24px center;
+        padding: 2rem 2rem 1.5rem 2rem;
+        border-radius: 0;
         color: white;
-        text-align: center;
-        margin-bottom: 1.5rem;
-        font-size: 0.9rem;
+        text-align: left;
+        margin: -1rem -1rem 2rem -1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
+    
+    .main-header h1 {
+        font-size: 1.75rem !important;
+        font-weight: 700 !important;
+        margin: 0 0 0.5rem 0 !important;
+        color: white !important;
+    }
+    
+    .main-header p {
+        font-size: 0.95rem !important;
+        margin: 0 !important;
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-weight: 400 !important;
+    }
+    
+    /* Card styles */
     .metric-card {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #2a5298;
-        margin: 0.8rem 0;
-        font-size: 0.85rem;
-    }
-    .recommendation-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background: white;
         padding: 1.5rem;
         border-radius: 12px;
-        margin: 1.5rem 0;
+        border: 1px solid #e5e7eb;
+        margin: 1rem 0;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
+    }
+    
+    .metric-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transform: translateY(-1px);
+    }
+    
+    .metric-card h4 {
+        color: #374151 !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Professional recommendation box */
+    .recommendation-box {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 16px;
+        margin: 2rem 0;
         text-align: center;
-        font-size: 0.9rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
-    .data-status {
-        background: #e8f5e8;
-        border: 1px solid #4caf50;
-        padding: 0.4rem;
-        border-radius: 4px;
-        margin: 0.4rem 0;
-        font-size: 0.8rem;
+    
+    .recommendation-box h2 {
+        font-weight: 700 !important;
+        margin-bottom: 1rem !important;
     }
-    .data-warning {
-        background: #fff3cd;
-        border: 1px solid #ffc107;
-        padding: 0.4rem;
-        border-radius: 4px;
-        margin: 0.4rem 0;
-        font-size: 0.8rem;
-    }
-    .briefing-section {
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 0.5rem 0;
-        text-align: center;
-    }
-    .small-text {
-        font-size: 0.8rem;
-    }
-    .medium-text {
-        font-size: 0.9rem;
-    }
-    .large-metric {
-        font-size: 2.5rem;
-        font-weight: bold;
-        margin: 0.8rem 0;
-    }
-    /* Reduce overall font sizes */
-    .stMetric label {
-        font-size: 0.8rem !important;
-    }
-    .stMetric div {
-        font-size: 0.9rem !important;
-    }
-    h1 {
+    
+    .recommendation-box h3 {
+        font-weight: 600 !important;
         font-size: 1.5rem !important;
     }
-    h2 {
-        font-size: 1.3rem !important;
+    
+    /* Status indicators */
+    .data-status {
+        background: #f0fdf4;
+        border: 1px solid #22c55e;
+        color: #16a34a;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+        font-size: 0.8rem;
+        font-weight: 500;
     }
-    h3 {
+    
+    .data-warning {
+        background: #fffbeb;
+        border: 1px solid #f59e0b;
+        color: #d97706;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    /* Briefing sections */
+    .briefing-section {
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin: 0.5rem 0;
+        text-align: center;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    /* Executive summary cards */
+    .executive-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    .executive-card h4 {
+        color: #374151 !important;
+        font-weight: 600 !important;
+        margin-bottom: 1rem !important;
+        padding-bottom: 0.5rem !important;
+        border-bottom: 2px solid #e5e7eb !important;
+    }
+    
+    /* Improved metrics */
+    .stMetric {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    .stMetric label {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        color: #6b7280 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.025em !important;
+    }
+    
+    .stMetric [data-testid="metric-value"] {
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+    }
+    
+    /* Sidebar improvements */
+    .css-1d391kg {
+        background-color: #f8fafc;
+        border-right: 1px solid #e5e7eb;
+    }
+    
+    .css-1d391kg .stSubheader {
+        color: #374151 !important;
+        font-weight: 600 !important;
         font-size: 1.1rem !important;
+        margin-bottom: 1rem !important;
     }
+    
+    /* Tab improvements */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #f8fafc;
+        border-radius: 8px;
+        padding: 0.25rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent;
+        border-radius: 6px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        color: #6b7280;
+        border: none;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: white !important;
+        color: #1e40af !important;
+        font-weight: 600 !important;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    /* Button improvements */
+    .stButton > button {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    /* Typography improvements */
+    h1, h2, h3, h4, h5, h6 {
+        color: #111827 !important;
+        font-weight: 600 !important;
+    }
+    
+    h1 {
+        font-size: 1.75rem !important;
+        font-weight: 700 !important;
+    }
+    
+    h2 {
+        font-size: 1.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    h3 {
+        font-size: 1.25rem !important;
+        margin-bottom: 0.75rem !important;
+    }
+    
     h4 {
-        font-size: 1rem !important;
+        font-size: 1.1rem !important;
+        margin-bottom: 0.5rem !important;
     }
+    
     p {
-        font-size: 0.85rem !important;
+        font-size: 0.9rem !important;
+        line-height: 1.6 !important;
+        color: #4b5563 !important;
     }
-    /* Remove problematic flexbox */
-    .stColumn > div {
-        padding: 0.5rem;
+    
+    /* Expander improvements */
+    .streamlit-expanderHeader {
+        background-color: #f8fafc !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+    }
+    
+    .streamlit-expanderContent {
+        background-color: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-top: none !important;
+        border-radius: 0 0 8px 8px !important;
+    }
+    
+    /* Remove extra padding */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+    
+    /* Success/Warning/Info boxes */
+    .stAlert {
+        border-radius: 8px !important;
+        border: 1px solid #e5e7eb !important;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+    }
+    
+    .stAlert > div {
+        font-size: 0.9rem !important;
+        line-height: 1.5 !important;
+    }
+    
+    /* Spinner improvements */
+    .stSpinner {
+        text-align: center;
+        color: #6b7280;
+    }
+    
+    /* Selectbox improvements */
+    .stSelectbox > div > div {
+        background-color: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+    }
+    
+    /* Slider improvements */
+    .stSlider > div > div > div > div {
+        background-color: #3b82f6;
+    }
+    
+    /* Make columns have consistent spacing */
+    .stColumn {
+        padding: 0 0.5rem;
+    }
+    
+    /* Professional footer */
+    .footer {
+        background-color: #f8fafc;
+        border-top: 1px solid #e5e7eb;
+        padding: 2rem 0;
+        margin-top: 3rem;
+        text-align: center;
+        color: #6b7280;
+        font-size: 0.8rem;
+        line-height: 1.6;
+    }
+    
+    .footer strong {
+        color: #374151;
+        font-weight: 600;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -607,11 +870,13 @@ def generate_recommendations(predictions):
 def main():
     st.markdown("""
     <div class="main-header">
-        <h1>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</h1>
-        <p>Système d'aide à la décision avec données automatiques Bank Al-Maghrib & HCP</p>
-        <p><strong>Mise à jour:</strong> Horaire | <strong>Prochaine mise à jour:</strong> {}</p>
+        <h1>SOFAC - Prédiction des Rendements 52-Semaines</h1>
+        <p>Système d'aide à la décision • Données Bank Al-Maghrib & HCP • Mise à jour: {} • Prochaine: {}</p>
     </div>
-    """.format((datetime.now() + timedelta(hours=1)).strftime('%H:%M')), unsafe_allow_html=True)
+    """.format(
+        datetime.now().strftime('%H:%M'), 
+        (datetime.now() + timedelta(hours=1)).strftime('%H:%M')
+    ), unsafe_allow_html=True)
     
     # Fetch live data
     with st.spinner("↻ Récupération des données en temps réel..."):
@@ -775,46 +1040,54 @@ def main():
         # Impact financier estimation
         impact_10m = abs(changement_global) * 10  # Million MAD per year
         
-        # EXECUTIVE BRIEFING CARD - Using Streamlit columns for better compatibility
+        # EXECUTIVE BRIEFING SECTION - More professional design
         st.markdown(f"""
-        <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 12px; margin: 1.5rem 0; text-align: center;">
-            <h2 style="margin: 0 0 1rem 0;">📋 BRIEFING EXÉCUTIF - {today_display}</h2>
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0; margin: 2rem 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+            <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 12px 12px 0 0; text-align: center;">
+                <h2 style="margin: 0; font-size: 1.3rem; font-weight: 600; color: white;">BRIEFING EXÉCUTIF</h2>
+                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: rgba(255,255,255,0.9);">{today_display}</p>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
         # Create three columns for the main briefing content
-        brief_col1, brief_col2, brief_col3 = st.columns([1, 1, 1])
+        brief_col1, brief_col2, brief_col3 = st.columns([1, 1, 1], gap="medium")
         
         with brief_col1:
             st.markdown(f"""
-            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
-                <h4 style="margin: 0; color: white;">SITUATION ACTUELLE</h4>
-                <p style="margin: 0.5rem 0; font-size: 1.1rem; color: white;">{status_emoji} {market_status}</p>
+            <div class="executive-card">
+                <h4 style="color: #6b7280; font-size: 0.8rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.5rem;">SITUATION ACTUELLE</h4>
+                <p style="font-size: 1.1rem; font-weight: 600; color: {card_color}; margin: 0;">{status_emoji} {market_status}</p>
             </div>
             """, unsafe_allow_html=True)
         
         with brief_col2:
             st.markdown(f"""
-            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
-                <h1 style="margin: 0; font-size: 2.5rem; color: white;">{current_prediction:.2f}%</h1>
-                <p style="margin: 0; color: white;">Rendement 52 semaines</p>
+            <div class="executive-card" style="text-align: center;">
+                <h4 style="color: #6b7280; font-size: 0.8rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.5rem;">RENDEMENT ACTUEL</h4>
+                <h1 style="font-size: 2.5rem; font-weight: 700; color: {card_color}; margin: 0; line-height: 1;">{current_prediction:.2f}%</h1>
+                <p style="font-size: 0.8rem; color: #6b7280; margin: 0.5rem 0 0 0;">52 semaines</p>
             </div>
             """, unsafe_allow_html=True)
         
         with brief_col3:
             st.markdown(f"""
-            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
-                <h4 style="margin: 0; color: white;">ÉVOLUTION</h4>
-                <p style="margin: 0.5rem 0; font-size: 1.1rem; color: white;">{evolution_vs_baseline:+.2f}% vs Juin</p>
+            <div class="executive-card">
+                <h4 style="color: #6b7280; font-size: 0.8rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.5rem;">ÉVOLUTION</h4>
+                <p style="font-size: 1.1rem; font-weight: 600; color: {card_color}; margin: 0;">{evolution_vs_baseline:+.2f}%</p>
+                <p style="font-size: 0.8rem; color: #6b7280; margin: 0.25rem 0 0 0;">vs Juin 2025</p>
             </div>
             """, unsafe_allow_html=True)
         
         # Recommendation section
         st.markdown(f"""
-        <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
-            <h3 style="margin: 0 0 0.5rem 0; color: white;">▲ RECOMMANDATION IMMÉDIATE</h3>
-            <p style="margin: 0; font-size: 1.3rem; font-weight: bold; color: white;">{action}</p>
-            <p style="margin: 0.5rem 0 0 0; color: white; font-size: 0.9rem;">Urgence: {urgency} | Tendance 30j: {trend_direction} {trend_strength}</p>
+        <div class="executive-card" style="background: {card_color}; color: white; text-align: center; border: none;">
+            <h3 style="margin: 0 0 0.5rem 0; color: white; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em;">RECOMMANDATION IMMÉDIATE</h3>
+            <p style="margin: 0; font-size: 1.25rem; font-weight: 700; color: white;">{action}</p>
+            <p style="margin: 0.75rem 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.85rem;">
+                <span style="font-weight: 500;">Urgence:</span> {urgency} • 
+                <span style="font-weight: 500;">Tendance 30j:</span> {trend_direction} {trend_strength}
+            </p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1177,17 +1450,24 @@ def main():
             - **Approche flexible recommandée**
             """)
     
-    # Footer
+    # Professional footer
     st.markdown("---")
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
     
     st.markdown(f"""
-    <div style="text-align: center; color: #666; padding: 1.5rem; font-size: 0.8rem;">
-        <p><strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
-        <p>Sources historiques: Bank Al-Maghrib, HCP | Surveillance live: {live_sources_count}/4 sources directes</p>
-        <p>Modèle: Régression Linéaire Multiple | Horizon: Juillet 2025 - Décembre 2026</p>
-        <p>Baseline: Juin 2025 ({last_historical_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+    <div class="footer">
+        <p><strong>SOFAC</strong> - Modèle de Prédiction des Rendements 52-Semaines</p>
+        <p>
+            <strong>Sources:</strong> Bank Al-Maghrib, HCP • 
+            <strong>Surveillance:</strong> {live_sources_count}/4 sources directes • 
+            <strong>Modèle:</strong> Régression Linéaire Multiple
+        </p>
+        <p>
+            <strong>Horizon:</strong> Juillet 2025 - Décembre 2026 • 
+            <strong>Baseline:</strong> Juin 2025 ({last_historical_yield:.2f}%) • 
+            <strong>Dernière mise à jour:</strong> {current_time}
+        </p>
         <p><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
     </div>
     """, unsafe_allow_html=True)
