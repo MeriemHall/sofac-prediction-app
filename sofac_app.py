@@ -67,12 +67,11 @@ st.markdown("""
         margin: 0.4rem 0;
         font-size: 0.8rem;
     }
-    .briefing-card {
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin: 1.5rem 0;
+    .briefing-section {
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
         text-align: center;
-        font-size: 0.95rem;
     }
     .small-text {
         font-size: 0.8rem;
@@ -106,6 +105,10 @@ st.markdown("""
     }
     p {
         font-size: 0.85rem !important;
+    }
+    /* Remove problematic flexbox */
+    .stColumn > div {
+        padding: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -772,31 +775,46 @@ def main():
         # Impact financier estimation
         impact_10m = abs(changement_global) * 10  # Million MAD per year
         
-        # EXECUTIVE BRIEFING CARD
+        # EXECUTIVE BRIEFING CARD - Using Streamlit columns for better compatibility
         st.markdown(f"""
-        <div class="briefing-card" style="background: {card_color}; color: white;">
-            <h2 style="margin: 0 0 1rem 0; text-align: center;">📋 BRIEFING EXÉCUTIF - {today_display}</h2>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin: 1rem 0;">
-                <div style="text-align: left;">
-                    <h3 style="margin: 0; font-size: 1.5rem;">SITUATION ACTUELLE</h3>
-                    <p style="margin: 0; font-size: 1.2rem;">{status_emoji} {market_status}</p>
-                </div>
-                <div style="text-align: center;">
-                    <h1 style="margin: 0; font-size: 3rem; font-weight: bold;">{current_prediction:.2f}%</h1>
-                    <p style="margin: 0; font-size: 1rem;">Rendement 52 semaines</p>
-                </div>
-                <div style="text-align: right;">
-                    <h3 style="margin: 0; font-size: 1.5rem;">ÉVOLUTION</h3>
-                    <p style="margin: 0; font-size: 1.2rem;">{evolution_vs_baseline:+.2f}% vs Juin</p>
-                </div>
+        <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 12px; margin: 1.5rem 0; text-align: center;">
+            <h2 style="margin: 0 0 1rem 0;">📋 BRIEFING EXÉCUTIF - {today_display}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Create three columns for the main briefing content
+        brief_col1, brief_col2, brief_col3 = st.columns([1, 1, 1])
+        
+        with brief_col1:
+            st.markdown(f"""
+            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
+                <h4 style="margin: 0; color: white;">SITUATION ACTUELLE</h4>
+                <p style="margin: 0.5rem 0; font-size: 1.1rem; color: white;">{status_emoji} {market_status}</p>
             </div>
-            
-            <div style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 1rem;">
-                <h3 style="margin: 0 0 0.5rem 0; text-align: center;">🎯 RECOMMANDATION IMMÉDIATE</h3>
-                <p style="margin: 0; font-size: 1.4rem; font-weight: bold; text-align: center;">{action}</p>
-                <p style="margin: 0.5rem 0 0 0; text-align: center; font-size: 0.9rem;">Urgence: {urgency} | Tendance 30j: {trend_direction} {trend_strength}</p>
+            """, unsafe_allow_html=True)
+        
+        with brief_col2:
+            st.markdown(f"""
+            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
+                <h1 style="margin: 0; font-size: 2.5rem; color: white;">{current_prediction:.2f}%</h1>
+                <p style="margin: 0; color: white;">Rendement 52 semaines</p>
             </div>
+            """, unsafe_allow_html=True)
+        
+        with brief_col3:
+            st.markdown(f"""
+            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
+                <h4 style="margin: 0; color: white;">ÉVOLUTION</h4>
+                <p style="margin: 0.5rem 0; font-size: 1.1rem; color: white;">{evolution_vs_baseline:+.2f}% vs Juin</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Recommendation section
+        st.markdown(f"""
+        <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
+            <h3 style="margin: 0 0 0.5rem 0; color: white;">▲ RECOMMANDATION IMMÉDIATE</h3>
+            <p style="margin: 0; font-size: 1.3rem; font-weight: bold; color: white;">{action}</p>
+            <p style="margin: 0.5rem 0 0 0; color: white; font-size: 0.9rem;">Urgence: {urgency} | Tendance 30j: {trend_direction} {trend_strength}</p>
         </div>
         """, unsafe_allow_html=True)
         
