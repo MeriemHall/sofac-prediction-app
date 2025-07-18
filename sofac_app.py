@@ -1,89 +1,4 @@
-scenario_selectionne = st.selectbox(
-            "Sélectionnez un scénario d'analyse:",
-            options=['Cas_de_Base', 'Conservateur', 'Optimiste'],
-            index=0,
-            help="Choisissez le scénario économique pour l'analyse détaillée"
-        )
-        
-        pred_scenario = st.session_state.predictions[scenario_selectionne]
-        
-        # Enhanced metrics with visual indicators
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            avg_val = pred_scenario['Rendement_Predit'].mean()
-            st.metric("Rendement Moyen", f"{avg_val:.2f}%")
-            
-        with col2:
-            min_val = pred_scenario['Rendement_Predit'].min()
-            st.metric("Minimum", f"{min_val:.2f}%")
-            
-        with col3:
-            max_val = pred_scenario['Rendement_Predit'].max()
-            st.metric("Maximum", f"{max_val:.2f}%")
-            
-        with col4:
-            baseline_comparison = avg_val - last_historical_yield
-            st.metric("Écart vs Référence", f"{baseline_comparison:+.2f}%")
-        
-        # Create detailed analysis charts
-        st.subheader(f"Analyse Complète - Scénario {scenario_selectionne}")
-        
-        # Main prediction chart with confidence intervals
-        fig_detail = make_subplots(
-            rows=2, cols=2,
-            subplot_titles=[
-                'Prédictions Quotidiennes avec Intervalles de Confiance',
-                'Distribution des Rendements',
-                'Évolution Mensuelle',
-                'Volatilité dans le Temps'
-            ],
-            specs=[[{"colspan": 2}, None], 
-                   [{"type": "histogram"}, {"type": "scatter"}]]
-        )
-        
-        # Sample data for better performance
-        sample_data = pred_scenario[::3]
-        
-        # Confidence bands
-        fig_detail.add_trace(
-            go.Scatter(
-                x=list(sample_data['Date']) + list(sample_data['Date'][::-1]),
-                y=list(sample_data['Borne_Sup_95']) + list(sample_data['Borne_Inf_95'][::-1]),
-                fill='toself',
-                fillcolor='rgba(59, 130, 246, 0.2)',
-                line=dict(color='rgba(255,255,255,0)'),
-                name='Intervalle 95%',
-                showlegend=True
-            ),
-            row=1, col=1
-        )
-        
-        # Main prediction line
-        colors = {'Conservateur': '#ef4444', 'Cas_de_Base': '#3b82f6', 'Optimiste': '#10b981'}
-        fig_detail.add_trace(
-            go.Scatter(
-                x=sample_data['Date'],
-                y=sample_data['Rendement_Predit'],
-                mode='lines+markers',
-                name='Prédiction',
-                line=dict(color=colors[scenario_selectionne], width=3),
-                marker=dict(size=4)
-            ),
-            row=1, col=1
-        )
-        
-        # Baseline reference
-        fig_detail.add_hline(
-            y=last_historical_yield, 
-            line_dash="dash", 
-            line_color="#6b7280",
-            annotation_text=f"Référence: {last_historical_yield:.2f}%",
-            row=1, col=1
-        )
-        
-        # Distribution histogram
-        fig_detail.add_trace(
+fig_detail.add_trace(
             go.Histogram(
                 x=pred_scenario['Rendement_Predit'],
                 nbinsx=30,
@@ -94,7 +9,6 @@ scenario_selectionne = st.selectbox(
             row=2, col=1
         )
         
-        # Monthly evolution
         pred_scenario['Mois'] = pd.to_datetime(pred_scenario['Date']).dt.to_period('M')
         monthly_avg = pred_scenario.groupby('Mois')['Rendement_Predit'].mean()
         
@@ -126,15 +40,12 @@ scenario_selectionne = st.selectbox(
         
         st.plotly_chart(fig_detail, use_container_width=True)
         
-        # Statistical analysis
         st.subheader("Analyse Statistique")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("""
-            #### 📊 Statistiques Descriptives
-            """)
+            st.markdown("#### 📊 Statistiques Descriptives")
             
             stats_df = pd.DataFrame({
                 'Métrique': ['Moyenne', 'Médiane', 'Écart-type', 'Minimum', 'Maximum', 'Q1', 'Q3'],
@@ -151,11 +62,8 @@ scenario_selectionne = st.selectbox(
             st.dataframe(stats_df, use_container_width=True)
         
         with col2:
-            st.markdown("""
-            #### 🎯 Analyse de Risque
-            """)
+            st.markdown("#### 🎯 Analyse de Risque")
             
-            # Calculate risk metrics
             var_95 = np.percentile(pred_scenario['Rendement_Predit'], 5)
             var_99 = np.percentile(pred_scenario['Rendement_Predit'], 1)
             prob_above_baseline = (pred_scenario['Rendement_Predit'] > last_historical_yield).mean() * 100
@@ -178,7 +86,6 @@ scenario_selectionne = st.selectbox(
             })
             st.dataframe(risk_df, use_container_width=True)
         
-        # Export functionality
         st.subheader("Export des Données")
         
         col1, col2 = st.columns(2)
@@ -200,7 +107,6 @@ scenario_selectionne = st.selectbox(
         
         with col2:
             if st.button("📊 Télécharger Analyse Statistique", use_container_width=True):
-                # Create comprehensive analysis
                 analysis_data = {
                     'Scenario': [scenario_selectionne],
                     'Periode_Analyse': [f"{pred_scenario['Date'].iloc[0]} à {pred_scenario['Date'].iloc[-1]}"],
@@ -225,7 +131,6 @@ scenario_selectionne = st.selectbox(
     with tab3:
         st.header("Recommandations Stratégiques Complètes")
         
-        # Global strategy recommendation
         liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
         
         if liste_recommandations.count('TAUX VARIABLE') >= 2:
@@ -244,7 +149,6 @@ scenario_selectionne = st.selectbox(
             couleur_globale = "#f59e0b"
             icone_globale = "⚖️"
         
-        # Data quality assessment
         quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
         quality_text = "Surveillance économique en temps réel active" if quality_score >= 2 else "Surveillance économique limitée"
         
@@ -257,7 +161,6 @@ scenario_selectionne = st.selectbox(
         </div>
         """, unsafe_allow_html=True)
         
-        # Detailed scenario analysis
         st.subheader("📋 Analyse Comparative des Scénarios")
         
         for nom_scenario, rec in st.session_state.recommandations.items():
@@ -265,7 +168,6 @@ scenario_selectionne = st.selectbox(
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
-                    # Color coding based on recommendation
                     if rec['recommandation'] == 'TAUX VARIABLE':
                         rec_color = "#16a34a"
                         rec_icon = "📉"
@@ -305,13 +207,11 @@ scenario_selectionne = st.selectbox(
                     """, unsafe_allow_html=True)
                 
                 with col2:
-                    # Mini prediction chart for each scenario
                     pred_df = st.session_state.predictions[nom_scenario]
-                    sample_mini = pred_df[::20]  # Sample every 20 days
+                    sample_mini = pred_df[::20]
                     
                     fig_mini = go.Figure()
                     
-                    # Baseline reference
                     fig_mini.add_hline(
                         y=last_historical_yield, 
                         line_dash="dash", 
@@ -319,7 +219,6 @@ scenario_selectionne = st.selectbox(
                         annotation_text=f"Référence: {last_historical_yield:.2f}%"
                     )
                     
-                    # Prediction line
                     colors = {'Conservateur': '#ef4444', 'Cas_de_Base': '#3b82f6', 'Optimiste': '#10b981'}
                     fig_mini.add_trace(
                         go.Scatter(
@@ -344,7 +243,6 @@ scenario_selectionne = st.selectbox(
                     
                     st.plotly_chart(fig_mini, use_container_width=True)
         
-        # Financial impact calculator
         st.subheader("💰 Simulateur d'Impact Financier")
         
         col1, col2, col3 = st.columns(3)
@@ -376,12 +274,10 @@ scenario_selectionne = st.selectbox(
                 help="Scénario économique pour l'estimation"
             )
         
-        # Calculate financial impact
         changement_scenario = st.session_state.recommandations[scenario_calcul]['changement_rendement']
         impact_annuel = changement_scenario * montant_emprunt * 1_000_000 / 100
         impact_total = impact_annuel * duree_emprunt
         
-        # Display results with visual indicators
         col1, col2 = st.columns(2)
         
         with col1:
@@ -436,7 +332,6 @@ scenario_selectionne = st.selectbox(
                 """)
         
         with col2:
-            # Create impact visualization
             scenarios_impact = []
             for scenario in ['Conservateur', 'Cas_de_Base', 'Optimiste']:
                 change = st.session_state.recommandations[scenario]['changement_rendement']
@@ -473,7 +368,6 @@ scenario_selectionne = st.selectbox(
             
             st.plotly_chart(fig_impact, use_container_width=True)
     
-    # Professional footer
     st.markdown("---")
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
@@ -497,21 +391,7 @@ scenario_selectionne = st.selectbox(
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()_politique:
-                    taux_directeur = taux
-            
-            np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
-            
-            mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
-            
-            if nom_scenario == 'Conservateur':
-                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
-            elif nom_scenario == 'Cas_de_Base':
-                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
-            else:
-                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+    main() mois_depuis_debut / 12)
                 pib_base = 3.8 + 0.1 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             
             inflation = max(0.0, min(5.0, inflation_base + np.random.normal(0, 0.01)))
@@ -532,9 +412,6 @@ if __name__ == "__main__":
     return scenarios
 
 def generate_predictions(scenarios, modele, mae_historique):
-    """Generate predictions with smooth continuity from June 2025 baseline"""
-    
-    # Use the correct June 2025 baseline from historical data
     rendement_juin_reel = 1.75
     predictions = {}
     
@@ -543,7 +420,6 @@ def generate_predictions(scenarios, modele, mae_historique):
         rendements_bruts = modele.predict(X_futur)
         
         if len(rendements_bruts) > 0:
-            # Ensure smooth transition from June 2025 historical value
             premier_predit = rendements_bruts[0]
             discontinuite = premier_predit - rendement_juin_reel
             
@@ -562,7 +438,6 @@ def generate_predictions(scenarios, modele, mae_historique):
         else:
             rendements_lisses = rendements_bruts
         
-        # Apply scenario-specific adjustments
         ajustements = []
         for i, ligne in scenario_df.iterrows():
             ajustement = 0
@@ -572,7 +447,6 @@ def generate_predictions(scenarios, modele, mae_historique):
             elif nom_scenario == 'Optimiste':
                 ajustement -= 0.05
             
-            # Add some time-based uncertainty
             jours_ahead = ligne['Jours_Ahead']
             incertitude = (jours_ahead / 365) * 0.05
             if nom_scenario == 'Conservateur':
@@ -580,7 +454,6 @@ def generate_predictions(scenarios, modele, mae_historique):
             elif nom_scenario == 'Optimiste':
                 ajustement -= incertitude * 0.5
             
-            # Day of week effects
             effets_jours = {
                 'Monday': 0.01, 'Tuesday': 0.00, 'Wednesday': -0.01,
                 'Thursday': 0.00, 'Friday': 0.02, 'Saturday': -0.01, 'Sunday': -0.01
@@ -596,7 +469,6 @@ def generate_predictions(scenarios, modele, mae_historique):
         scenario_df_copie['Rendement_Predit'] = rendements_finaux
         scenario_df_copie['Scenario'] = nom_scenario
         
-        # Add confidence intervals
         for i, ligne in scenario_df_copie.iterrows():
             jours_ahead = ligne['Jours_Ahead']
             intervalle_base = mae_historique
@@ -616,10 +488,7 @@ def generate_predictions(scenarios, modele, mae_historique):
     return predictions
 
 def generate_recommendations(predictions):
-    """Generate recommendations using June 2025 historical baseline"""
-    
-    # Use the correct June 2025 baseline for recommendations
-    rendement_actuel = 1.75  # June 2025 historical value
+    rendement_actuel = 1.75
     recommandations = {}
     
     for nom_scenario, pred_df in predictions.items():
@@ -657,7 +526,6 @@ def generate_recommendations(predictions):
     return recommandations
 
 def create_gauge_chart(value, min_val, max_val, title, color_ranges):
-    """Create a gauge chart for visual representation"""
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
@@ -687,7 +555,6 @@ def create_gauge_chart(value, min_val, max_val, title, color_ranges):
     return fig
 
 def create_trend_chart(data, title):
-    """Create a trend chart"""
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
@@ -712,7 +579,6 @@ def create_trend_chart(data, title):
     return fig
 
 def main():
-    # Clear professional header
     st.markdown("""
     <div class="main-header">
         <h1>SOFAC</h1>
@@ -724,11 +590,9 @@ def main():
         (datetime.now() + timedelta(hours=1)).strftime('%H:%M')
     ), unsafe_allow_html=True)
     
-    # Fetch live data
     with st.spinner("↻ Récupération des données en temps réel..."):
         live_data = fetch_live_moroccan_data()
     
-    # Load cached model data first to get the last historical yield
     if 'data_loaded' not in st.session_state:
         with st.spinner("⚙ Calibration du modèle..."):
             st.session_state.df_mensuel = create_monthly_dataset()
@@ -738,28 +602,21 @@ def main():
             st.session_state.recommandations = generate_recommendations(st.session_state.predictions)
             st.session_state.data_loaded = True
     
-    # Get the last historical yield value (June 2025)
-    last_historical_yield = st.session_state.df_mensuel.iloc[-1]['Rendement_52s']  # 1.75%
+    last_historical_yield = st.session_state.df_mensuel.iloc[-1]['Rendement_52s']
     
     with st.sidebar:
         st.header("Informations du Modèle")
-        
-        # Display live data panel with smaller fonts
         display_live_data_panel(live_data, last_historical_yield)
         
-        # TODAY'S PREDICTION SECTION
         st.sidebar.markdown("---")
         st.sidebar.subheader("Prédiction du Jour")
         
-        # Get today's date and prediction
         today = datetime.now()
         today_str = today.strftime('%Y-%m-%d')
         today_display = today.strftime('%d/%m/%Y')
         
-        # Find today's prediction in the base case scenario
         cas_base_predictions = st.session_state.predictions['Cas_de_Base']
         
-        # Try to find today's prediction
         today_prediction = None
         closest_prediction = None
         
@@ -771,7 +628,6 @@ def main():
             elif pred_date > today_str and closest_prediction is None:
                 closest_prediction = row['Rendement_Predit']
         
-        # Display today's prediction
         if today_prediction is not None:
             st.sidebar.success(f"**{today_display}**")
             st.sidebar.metric(
@@ -792,7 +648,6 @@ def main():
         
         st.success("✓ Modèle calibré")
         
-        # Model performance metrics with smaller fonts
         st.subheader("Performance Modèle")
         st.metric("R² Score", f"{st.session_state.r2:.1%}")
         st.metric("Précision", f"±{st.session_state.mae:.2f}%")
@@ -800,27 +655,22 @@ def main():
         
         st.info("↻ Surveillance économique active")
     
-    # Main content tabs
     tab1, tab2, tab3 = st.tabs(["📊 Briefing Exécutif", "📈 Analyse Détaillée", "💼 Recommandations"])
     
     with tab1:
-        # COMPREHENSIVE EXECUTIVE BRIEFING
         today = datetime.now()
         today_str = today.strftime('%Y-%m-%d')
         today_display = today.strftime('%d/%m/%Y')
         
-        # Get current situation analysis
         cas_de_base = st.session_state.predictions['Cas_de_Base']
         current_prediction = None
         trend_direction = None
         trend_strength = "STABLE"
         
-        # Find today's or closest prediction
         for i, row in cas_de_base.iterrows():
             pred_date = row['Date']
             if pred_date >= today_str:
                 current_prediction = row['Rendement_Predit']
-                # Analyze trend over next 30 days
                 if i < len(cas_de_base) - 30:
                     future_avg = cas_de_base.iloc[i:i+30]['Rendement_Predit'].mean()
                     change = future_avg - current_prediction
@@ -837,12 +687,10 @@ def main():
         if current_prediction is None:
             current_prediction = last_historical_yield
         
-        # Get market sentiment and recommendations
         recommandation_base = st.session_state.recommandations['Cas_de_Base']
         evolution_vs_baseline = current_prediction - last_historical_yield
         changement_global = recommandation_base['changement_rendement']
         
-        # Determine market condition and urgency
         if evolution_vs_baseline > 0.4 or changement_global > 0.4:
             market_status = "ALERTE ROUGE"
             status_color = "#dc2626"
@@ -869,12 +717,10 @@ def main():
             urgency = "FAIBLE"
             action = "MAINTENIR STRATÉGIE ACTUELLE"
         
-        # Calculate key metrics
         volatilite_globale = cas_de_base['Rendement_Predit'].std()
         data_quality = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-        impact_10m = abs(changement_global) * 10  # Million MAD per year
+        impact_10m = abs(changement_global) * 10
         
-        # COMPREHENSIVE BRIEFING CONTAINER
         st.markdown(f"""
         <div class="briefing-container">
             <div class="briefing-header">
@@ -884,7 +730,6 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # KEY METRICS DASHBOARD
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -926,7 +771,6 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         
-        # MAIN RECOMMENDATION
         st.markdown(f"""
         <div class="recommendation-card">
             <h2 style="margin: 0 0 1rem 0; font-size: 1.5rem;">🎯 RECOMMANDATION IMMÉDIATE</h2>
@@ -937,7 +781,6 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # DETAILED ANALYSIS GRID
         st.markdown("### 📋 Analyse Détaillée")
         
         col1, col2 = st.columns(2)
@@ -954,7 +797,6 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Create gauge chart for current rate
             gauge_colors = [
                 {'range': [0, 1], 'color': "lightgreen"},
                 {'range': [1, 2], 'color': "yellow"},
@@ -981,12 +823,10 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Create trend indicator chart
             recent_predictions = cas_de_base.head(30)['Rendement_Predit']
             fig_trend = create_trend_chart(recent_predictions, "Tendance 30 Prochains Jours")
             st.plotly_chart(fig_trend, use_container_width=True)
         
-        # SCENARIO COMPARISON
         st.markdown("### 📊 Comparaison des Scénarios")
         
         scenario_cols = st.columns(3)
@@ -1016,13 +856,10 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
         
-        # QUICK VISUAL SUMMARY
         st.markdown("### 📈 Évolution Historique et Projections")
         
-        # Create comprehensive overview chart
         fig_overview = go.Figure()
         
-        # Historical data
         df_recent = st.session_state.df_mensuel.tail(12)
         fig_overview.add_trace(
             go.Scatter(
@@ -1035,7 +872,6 @@ def main():
             )
         )
         
-        # Add baseline reference
         fig_overview.add_hline(
             y=last_historical_yield, 
             line_dash="dash", 
@@ -1043,10 +879,9 @@ def main():
             annotation_text=f"Référence Juin 2025: {last_historical_yield:.2f}%"
         )
         
-        # Prediction scenarios
         colors = {'Conservateur': '#ef4444', 'Cas_de_Base': '#3b82f6', 'Optimiste': '#10b981'}
         for nom_scenario, pred_df in st.session_state.predictions.items():
-            sample_data = pred_df[::15]  # Sample every 15 days
+            sample_data = pred_df[::15]
             fig_overview.add_trace(
                 go.Scatter(
                     x=sample_data['Date'],
@@ -1077,7 +912,81 @@ def main():
             "Sélectionnez un scénario d'analyse:",
             options=['Cas_de_Base', 'Conservateur', 'Optimiste'],
             index=0,
-            help="Chimport streamlit as st
+            help="Choisissez le scénario économique pour l'analyse détaillée"
+        )
+        
+        pred_scenario = st.session_state.predictions[scenario_selectionne]
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            avg_val = pred_scenario['Rendement_Predit'].mean()
+            st.metric("Rendement Moyen", f"{avg_val:.2f}%")
+            
+        with col2:
+            min_val = pred_scenario['Rendement_Predit'].min()
+            st.metric("Minimum", f"{min_val:.2f}%")
+            
+        with col3:
+            max_val = pred_scenario['Rendement_Predit'].max()
+            st.metric("Maximum", f"{max_val:.2f}%")
+            
+        with col4:
+            baseline_comparison = avg_val - last_historical_yield
+            st.metric("Écart vs Référence", f"{baseline_comparison:+.2f}%")
+        
+        st.subheader(f"Analyse Complète - Scénario {scenario_selectionne}")
+        
+        fig_detail = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=[
+                'Prédictions Quotidiennes avec Intervalles de Confiance',
+                'Distribution des Rendements',
+                'Évolution Mensuelle',
+                'Volatilité dans le Temps'
+            ],
+            specs=[[{"colspan": 2}, None], 
+                   [{"type": "histogram"}, {"type": "scatter"}]]
+        )
+        
+        sample_data = pred_scenario[::3]
+        
+        fig_detail.add_trace(
+            go.Scatter(
+                x=list(sample_data['Date']) + list(sample_data['Date'][::-1]),
+                y=list(sample_data['Borne_Sup_95']) + list(sample_data['Borne_Inf_95'][::-1]),
+                fill='toself',
+                fillcolor='rgba(59, 130, 246, 0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='Intervalle 95%',
+                showlegend=True
+            ),
+            row=1, col=1
+        )
+        
+        colors = {'Conservateur': '#ef4444', 'Cas_de_Base': '#3b82f6', 'Optimiste': '#10b981'}
+        fig_detail.add_trace(
+            go.Scatter(
+                x=sample_data['Date'],
+                y=sample_data['Rendement_Predit'],
+                mode='lines+markers',
+                name='Prédiction',
+                line=dict(color=colors[scenario_selectionne], width=3),
+                marker=dict(size=4)
+            ),
+            row=1, col=1
+        )
+        
+        fig_detail.add_hline(
+            y=last_historical_yield, 
+            line_dash="dash", 
+            line_color="#6b7280",
+            annotation_text=f"Référence: {last_historical_yield:.2f}%",
+            row=1, col=1
+        )
+        
+        fig_detail.add_trace(
+            go.Histogram(import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -1101,21 +1010,17 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Import professional font */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    /* Global styles */
     .stApp {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         background-color: #f8fafc;
     }
     
-    /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Clear professional header */
     .main-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
         padding: 2rem;
@@ -1148,7 +1053,6 @@ st.markdown("""
         font-weight: 400 !important;
     }
     
-    /* Comprehensive briefing card */
     .briefing-container {
         background: white;
         border-radius: 16px;
@@ -1164,10 +1068,6 @@ st.markdown("""
         padding: 1.5rem 2rem;
         border-radius: 16px 16px 0 0;
         text-align: center;
-    }
-    
-    .briefing-content {
-        padding: 2rem;
     }
     
     .status-card {
@@ -1232,7 +1132,6 @@ st.markdown("""
         border-left: 4px solid #3b82f6;
     }
     
-    /* Smaller sidebar fonts */
     .css-1d391kg {
         background-color: #f8fafc;
         border-right: 1px solid #e5e7eb;
@@ -1276,7 +1175,6 @@ st.markdown("""
         margin: 0.5rem 0 !important;
     }
     
-    /* Status indicators */
     .data-status {
         background: #f0fdf4;
         border: 1px solid #22c55e;
@@ -1299,7 +1197,6 @@ st.markdown("""
         font-weight: 500;
     }
     
-    /* Visual indicators */
     .trend-indicator {
         display: inline-flex;
         align-items: center;
@@ -1325,7 +1222,6 @@ st.markdown("""
         color: #6b7280;
     }
     
-    /* Enhanced tabs */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #f8fafc;
         border-radius: 12px;
@@ -1356,7 +1252,6 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
     
-    /* Professional cards */
     .metric-card {
         background: white;
         padding: 1.5rem;
@@ -1372,7 +1267,6 @@ st.markdown("""
         transform: translateY(-1px);
     }
     
-    /* Improved buttons */
     .stButton > button {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         color: white;
@@ -1389,7 +1283,6 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(30, 58, 138, 0.4);
     }
     
-    /* Typography */
     h1, h2, h3, h4 {
         color: #111827 !important;
         font-weight: 600 !important;
@@ -1406,7 +1299,6 @@ st.markdown("""
         color: #4b5563 !important;
     }
     
-    /* Professional footer */
     .footer {
         background-color: #f8fafc;
         border-top: 2px solid #e5e7eb;
@@ -1422,34 +1314,11 @@ st.markdown("""
         color: #374151;
         font-weight: 600;
     }
-    
-    /* Gauge chart styling */
-    .gauge-container {
-        text-align: center;
-        margin: 1rem 0;
-    }
-    
-    /* Progress bars */
-    .progress-container {
-        background: #f3f4f6;
-        border-radius: 10px;
-        height: 20px;
-        margin: 1rem 0;
-        overflow: hidden;
-    }
-    
-    .progress-bar {
-        height: 100%;
-        border-radius: 10px;
-        transition: width 0.3s ease;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
 def fetch_live_moroccan_data():
-    """Fetch live data from Bank Al-Maghrib and HCP"""
-    
     live_data = {
         'date': datetime.now().strftime('%Y-%m-%d'),
         'policy_rate': 2.25,
@@ -1465,7 +1334,6 @@ def fetch_live_moroccan_data():
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
     
-    # Try to fetch Bank Al-Maghrib policy rate
     try:
         bkam_urls = [
             "https://www.bkam.ma/Politique-monetaire",
@@ -1509,7 +1377,6 @@ def fetch_live_moroccan_data():
     except:
         live_data['sources']['policy_rate'] = 'Fallback Value'
     
-    # Estimate 52-week yield from policy rate
     spread = 0.15
     if live_data['policy_rate'] < 2.0:
         spread = 0.25
@@ -1519,7 +1386,6 @@ def fetch_live_moroccan_data():
     live_data['yield_52w'] = live_data['policy_rate'] + spread
     live_data['sources']['yield_52w'] = f'Estimated from Policy Rate (+{spread*100:.0f}bps)'
     
-    # Try to fetch HCP inflation data
     try:
         hcp_urls = ["https://www.hcp.ma/"]
         
@@ -1560,10 +1426,8 @@ def fetch_live_moroccan_data():
     except:
         live_data['sources']['inflation'] = 'Fallback Value'
     
-    # GDP data estimation
     live_data['sources']['gdp_growth'] = 'Economic Estimation'
     
-    # Data validation
     live_data['policy_rate'] = max(0.1, min(10.0, live_data['policy_rate']))
     live_data['yield_52w'] = max(0.1, min(15.0, live_data['yield_52w']))
     live_data['inflation'] = max(0.0, min(25.0, live_data['inflation']))
@@ -1572,8 +1436,6 @@ def fetch_live_moroccan_data():
     return live_data
 
 def display_live_data_panel(live_data, last_historical_yield):
-    """Display live data panel in sidebar with smaller fonts"""
-    
     st.sidebar.markdown("---")
     st.sidebar.subheader("Données Temps Réel")
     
@@ -1626,9 +1488,6 @@ def display_live_data_panel(live_data, last_historical_yield):
 
 @st.cache_data
 def create_monthly_dataset():
-    """Create monthly dataset using historical data only"""
-    
-    # Historical data - preserved exactly
     donnees_historiques = {
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
         '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
@@ -1717,7 +1576,6 @@ def create_monthly_dataset():
     return pd.DataFrame(donnees_mensuelles)
 
 def train_prediction_model(df_mensuel):
-    """Train the prediction model"""
     variables_explicatives = ['Taux_Directeur', 'Inflation', 'Croissance_PIB']
     X = df_mensuel[variables_explicatives]
     y = df_mensuel['Rendement_52s']
@@ -1737,8 +1595,6 @@ def train_prediction_model(df_mensuel):
 
 @st.cache_data
 def create_economic_scenarios():
-    """Create economic scenarios starting from July 2025"""
-    
     date_debut = datetime(2025, 7, 1)
     date_fin = datetime(2026, 12, 31)
     
@@ -1749,7 +1605,6 @@ def create_economic_scenarios():
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    # Base scenarios on realistic policy expectations
     decisions_politiques = {
         'Conservateur': {
             '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
@@ -1777,4 +1632,18 @@ def create_economic_scenarios():
             date_str = date.strftime('%Y-%m')
             taux_directeur = 2.25
             for date_politique, taux in sorted(taux_politiques.items()):
-                if date_str >= date
+                if date_str >= date_politique:
+                    taux_directeur = taux
+            
+            np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
+            
+            mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
+            
+            if nom_scenario == 'Conservateur':
+                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+            elif nom_scenario == 'Cas_de_Base':
+                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+            else:
+                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi *
