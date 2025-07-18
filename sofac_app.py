@@ -311,18 +311,18 @@ def predict_yields(scenarios, model):
             elif scenario_name == 'Optimiste':
                 ajustement -= 0.05
             
-            # Time-based uncertainty
+            # Time-based uncertainty - make it more gradual
             jours_ahead = ligne['Jours_Ahead']
-            incertitude = (jours_ahead / 365) * 0.05
+            incertitude = (jours_ahead / 365) * 0.02  # Reduced from 0.05 for more stability
             if scenario_name == 'Conservateur':
                 ajustement += incertitude
             elif scenario_name == 'Optimiste':
                 ajustement -= incertitude * 0.5
             
-            # Day of week effects
+            # Day of week effects - reduced for more consistency
             effets_jours = {
-                'Monday': 0.01, 'Tuesday': 0.00, 'Wednesday': -0.01,
-                'Thursday': 0.00, 'Friday': 0.02, 'Saturday': -0.01, 'Sunday': -0.01
+                'Monday': 0.005, 'Tuesday': 0.00, 'Wednesday': -0.005,
+                'Thursday': 0.00, 'Friday': 0.01, 'Saturday': -0.005, 'Sunday': -0.005
             }
             ajustement += effets_jours.get(ligne['Jour_Semaine'], 0)
             
@@ -330,6 +330,13 @@ def predict_yields(scenarios, model):
         
         rendements_finaux = rendements_lisses + np.array(ajustements)
         rendements_finaux = np.clip(rendements_finaux, 0.1, 8.0)
+        
+        # Ensure logical progression - smooth out any erratic jumps
+        for i in range(1, len(rendements_finaux)):
+            # Limit daily changes to ±0.1% for more realistic progression
+            daily_change = rendements_finaux[i] - rendements_finaux[i-1]
+            if abs(daily_change) > 0.1:
+                rendements_finaux[i] = rendements_finaux[i-1] + np.sign(daily_change) * 0.1
         
         scenario_df_copy = scenario_df.copy()
         scenario_df_copy['rendement_predit'] = rendements_finaux
@@ -412,7 +419,55 @@ def main():
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
         
-        if st.button("Actualiser"):
+        # TODAY'S PREDICTION SECTION
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📅 Prédiction du Jour")
+        
+        # Get today's date and prediction
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
+        
+        # Find today's prediction in the base case scenario
+        cas_base_predictions = st.session_state.predictions['Cas_de_Base']
+        
+        # Try to find today's prediction
+        today_prediction = None
+        closest_prediction = None
+        closest_date = None
+        
+        for _, row in cas_base_predictions.iterrows():
+            pred_date = row['Date']
+            if pred_date == today_str:
+                today_prediction = row['rendement_predit']
+                break
+            elif pred_date > today_str and closest_prediction is None:
+                closest_prediction = row['rendement_predit']
+                closest_date = pred_date
+        
+        # Display today's prediction
+        if today_prediction is not None:
+            st.sidebar.success("**" + today_display + "**")
+            st.sidebar.metric(
+                "🎯 Rendement Prédit Aujourd'hui",
+                f"{today_prediction:.2f}%",
+                delta=f"{(today_prediction - baseline_yield):+.2f}%",
+                help="Prédiction pour aujourd'hui vs baseline juin 2025"
+            )
+        elif closest_prediction is not None:
+            closest_date_display = datetime.strptime(closest_date, '%Y-%m-%d').strftime('%d/%m/%Y')
+            st.sidebar.warning("**" + today_display + "**")
+            st.sidebar.metric(
+                "🎯 Prédiction Prochaine",
+                f"{closest_prediction:.2f}%",
+                delta=f"{(closest_prediction - baseline_yield):+.2f}%",
+                help=f"Prédiction pour {closest_date_display}"
+            )
+        else:
+            st.sidebar.info("**" + today_display + "**")
+            st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
+        
+        if st.sidebar.button("Actualiser"):
             st.cache_data.clear()
             st.rerun()
         
@@ -430,16 +485,28 @@ def main():
         st.markdown('<div class="executive-dashboard">', unsafe_allow_html=True)
         st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">Tableau de Bord Exécutif</div>', unsafe_allow_html=True)
         
-        # Current situation - use the same prediction as sidebar
-        today = datetime.now().strftime('%d/%m/%Y')
+        # Current situation - get today's actual prediction
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
         
-        # Get today's prediction (same logic as sidebar for consistency)
-        if hasattr(st.session_state, 'today_prediction'):
-            current_prediction = st.session_state.today_prediction
-        else:
-            # Fallback: get from first prediction or use baseline
-            cas_de_base = st.session_state.predictions['Cas_de_Base']
-            current_prediction = cas_de_base['rendement_predit'].iloc[0] if len(cas_de_base) > 0 else baseline_yield
+        # Find today's prediction in the base case scenario
+        cas_de_base_predictions = st.session_state.predictions['Cas_de_Base']
+        current_prediction = None
+        
+        # Try to find today's prediction
+        for _, row in cas_de_base_predictions.iterrows():
+            pred_date = row['Date']
+            if pred_date == today_str:
+                current_prediction = row['rendement_predit']
+                break
+            elif pred_date > today_str and current_prediction is None:
+                current_prediction = row['rendement_predit']
+                break
+        
+        # If no prediction found, use the first available prediction
+        if current_prediction is None:
+            current_prediction = cas_de_base_predictions['rendement_predit'].iloc[0]
         
         evolution = current_prediction - baseline_yield
         
@@ -563,10 +630,26 @@ def main():
             marker=dict(size=8)
         ))
         
-        # Predictions - use weekly sampling for clarity
+        # Predictions - use weekly sampling for clarity but ensure consistency
         colors = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
         for scenario, pred_df in st.session_state.predictions.items():
-            sample_data = pred_df[::7]  # Weekly sampling
+            # Use every 7th day but include today's date if it exists
+            sample_indices = list(range(0, len(pred_df), 7))
+            
+            # Try to include today's prediction if it exists in the data
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            today_index = None
+            for i, row in pred_df.iterrows():
+                if row['Date'] == today_str:
+                    today_index = i
+                    break
+            
+            if today_index is not None and today_index not in sample_indices:
+                sample_indices.append(today_index)
+                sample_indices.sort()
+            
+            sample_data = pred_df.iloc[sample_indices]
+            
             fig.add_trace(go.Scatter(
                 x=sample_data['Date'],
                 y=sample_data['rendement_predit'],
@@ -574,23 +657,6 @@ def main():
                 name=scenario,
                 line=dict(color=colors[scenario], width=3),
                 marker=dict(size=5)
-            ))
-        
-        # Add today's prediction point if available
-        today_str_chart = datetime.now().strftime('%Y-%m-%d')
-        if hasattr(st.session_state, 'today_prediction'):
-            fig.add_trace(go.Scatter(
-                x=[today_str_chart],
-                y=[st.session_state.today_prediction],
-                mode='markers',
-                name="Aujourd'hui",
-                marker=dict(
-                    size=15,
-                    color='red',
-                    symbol='star',
-                    line=dict(width=2, color='white')
-                ),
-                showlegend=True
             ))
         
         fig.add_hline(y=baseline_yield, line_dash="dash", line_color="gray", 
@@ -605,10 +671,6 @@ def main():
         )
         
         st.plotly_chart(fig, use_container_width=True)
-        
-        # Add consistency note
-        if hasattr(st.session_state, 'today_prediction'):
-            st.info(f"📍 **Note de Cohérence:** La valeur affichée dans la barre latérale ({st.session_state.today_prediction:.3f}%) correspond au point rouge étoilé sur le graphique représentant la prédiction d'aujourd'hui.")
     
     with tab2:
         st.header("Prédictions Détaillées")
