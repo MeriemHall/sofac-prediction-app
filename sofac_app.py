@@ -145,13 +145,13 @@ def generate_recommendations(predictions):
         
         if changement_rendement > 0.3:
             recommandation = "TAUX FIXE"
-            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis juin 2025. Bloquer les taux actuels avant que les coûts d'emprunt n'augmentent."
+            raison = "Rendements attendus en hausse depuis juin 2025. Bloquer les taux actuels avant que les coûts d'emprunt n'augmentent."
         elif changement_rendement < -0.3:
             recommandation = "TAUX VARIABLE"
-            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis juin 2025. Utiliser des taux variables pour profiter de la diminution des coûts d'emprunt."
+            raison = "Rendements attendus en baisse depuis juin 2025. Utiliser des taux variables pour profiter de la diminution des coûts d'emprunt."
         else:
             recommandation = "STRATÉGIE FLEXIBLE"
-            raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%) depuis juin 2025. Approche mixte selon les besoins."
+            raison = "Rendements relativement stables depuis juin 2025. Approche mixte selon les besoins."
         
         if volatilite < 0.2:
             niveau_risque = "FAIBLE"
@@ -176,12 +176,12 @@ def main():
     # Enhanced Professional Header
     next_update = (datetime.now() + timedelta(hours=1)).strftime('%H:%M')
     
-    header_html = f"""
+    header_html = """
     <div class="main-header">
         <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700;">SOFAC - Système de Prédiction des Rendements</h1>
         <h2 style="margin: 0.5rem 0 0 0; font-size: 1.1rem; font-weight: 400; opacity: 0.9;">Modèle d Intelligence Financière 52-Semaines</h2>
         <p style="margin: 0.8rem 0 0 0; font-size: 0.85rem; opacity: 0.8;">
-            Données Bank Al-Maghrib & HCP | Mise à jour: Horaire | Prochaine actualisation: {next_update}
+            Données Bank Al-Maghrib & HCP | Mise à jour: Horaire | Prochaine actualisation: """ + next_update + """
         </p>
     </div>
     """
@@ -236,7 +236,7 @@ def main():
         
         # Display today's prediction
         if today_prediction is not None:
-            st.sidebar.success(f"**{today_display}**")
+            st.sidebar.success("**" + today_display + "**")
             st.sidebar.metric(
                 "🎯 Rendement Prédit Aujourd'hui",
                 f"{today_prediction:.2f}%",
@@ -244,7 +244,7 @@ def main():
                 help="Prédiction pour aujourd'hui vs baseline juin 2025"
             )
         elif closest_prediction is not None:
-            st.sidebar.warning(f"**{today_display}**")
+            st.sidebar.warning("**" + today_display + "**")
             st.sidebar.metric(
                 "🎯 Prédiction Prochaine",
                 f"{closest_prediction:.2f}%",
@@ -252,7 +252,7 @@ def main():
                 help="Prochaine prédiction disponible"
             )
         else:
-            st.sidebar.info(f"**{today_display}**")
+            st.sidebar.info("**" + today_display + "**")
             st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
         
         st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
@@ -266,21 +266,21 @@ def main():
         mae_value = st.session_state.mae
         mae_vc_value = st.session_state.mae_vc
         
-        performance_html = f"""
+        performance_html = """
         <div style="background: white; border-radius: 8px; padding: 1rem; margin: 0.5rem 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
                 <div style="text-align: center; padding: 0.6rem; background: #f8f9fa; border-radius: 6px;">
                     <div style="font-size: 0.7rem; color: #6c757d; font-weight: 600; margin-bottom: 0.3rem;">R² SCORE</div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: #28a745;">{r2_value:.1%}</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #28a745;">""" + f"{r2_value:.1%}" + """</div>
                 </div>
                 <div style="text-align: center; padding: 0.6rem; background: #f8f9fa; border-radius: 6px;">
                     <div style="font-size: 0.7rem; color: #6c757d; font-weight: 600; margin-bottom: 0.3rem;">PRÉCISION</div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: #17a2b8;">±{mae_value:.2f}%</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #17a2b8;">±""" + f"{mae_value:.2f}%" + """</div>
                 </div>
             </div>
             <div style="text-align: center; padding: 0.8rem; margin-top: 0.8rem; background: linear-gradient(135deg, #e3f2fd, #f3e5f5); border-radius: 6px;">
                 <div style="font-size: 0.7rem; color: #6c757d; font-weight: 600; margin-bottom: 0.3rem;">VALIDATION CROISÉE</div>
-                <div style="font-size: 1.1rem; font-weight: 700; color: #7b1fa2;">±{mae_vc_value:.2f}%</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: #7b1fa2;">±""" + f"{mae_vc_value:.2f}%" + """</div>
             </div>
         </div>
         """
@@ -365,20 +365,21 @@ def main():
             action = "MAINTENIR STRATÉGIE ACTUELLE"
         
         # SITUATION SUMMARY CARD
-        summary_html = f"""
-        <div class="status-card {status_class}">
+        evolution_color = "#dc3545" if evolution_vs_baseline > 0 else "#28a745"
+        summary_html = """
+        <div class="status-card """ + status_class + """">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="flex: 1;">
-                    <h3 style="margin: 0; color: #2c3e50;">Situation au {today_display}</h3>
-                    <p style="margin: 0.5rem 0; font-weight: 600; color: #495057;">{market_status}</p>
+                    <h3 style="margin: 0; color: #2c3e50;">Situation au """ + today_display + """</h3>
+                    <p style="margin: 0.5rem 0; font-weight: 600; color: #495057;">""" + market_status + """</p>
                 </div>
                 <div style="text-align: center;">
-                    <div class="metric-value">{current_prediction:.2f}%</div>
+                    <div class="metric-value">""" + f"{current_prediction:.2f}%" + """</div>
                     <div class="metric-label">Rendement Courant</div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 1.2rem; font-weight: 600; color: {'#dc3545' if evolution_vs_baseline > 0 else '#28a745'};">
-                        {evolution_vs_baseline:+.2f}%
+                    <div style="font-size: 1.2rem; font-weight: 600; color: """ + evolution_color + """;">
+                        """ + f"{evolution_vs_baseline:+.2f}%" + """
                     </div>
                     <div class="metric-label">vs Juin 2025</div>
                 </div>
@@ -394,85 +395,103 @@ def main():
         data_quality = sum(1 for source in live_data['sources'].values() if 'Live' in source)
         impact_10m = abs(changement_global) * 10
         
-        metric_boxes = [
-            (f"{last_historical_yield:.2f}%", "Baseline Juin"),
-            (f"{evolution_vs_baseline:+.2f}%", "Évolution", "#dc3545" if evolution_vs_baseline > 0 else "#28a745"),
-            (f"{volatilite_globale:.2f}%", "Volatilité"),
-            (f"{impact_10m:.0f}K/an", "Impact 10M MAD"),
-            ("ÉLEVÉE" if data_quality >= 3 else "MOYENNE" if data_quality >= 2 else "FAIBLE", "Qualité Données", "", f"{data_quality}/4 sources")
-        ]
+        # Metric boxes
+        with col1:
+            metric_html = """
+            <div class="metric-box">
+                <div class="metric-label">Baseline Juin</div>
+                <div class="metric-value">""" + f"{last_historical_yield:.2f}%" + """</div>
+            </div>
+            """
+            st.markdown(metric_html, unsafe_allow_html=True)
         
-        for i, (col, metric_data) in enumerate(zip([col1, col2, col3, col4, col5], metric_boxes)):
-            with col:
-                if len(metric_data) == 2:
-                    value, label = metric_data
-                    color = "#2c3e50"
-                    extra = ""
-                elif len(metric_data) == 3:
-                    value, label, color = metric_data
-                    extra = ""
-                else:
-                    value, label, color, extra = metric_data
-                    color = "#2c3e50"
-                
-                if color == "":
-                    color = "#2c3e50"
-                
-                metric_html = f"""
-                <div class="metric-box">
-                    <div class="metric-label">{label}</div>
-                    <div class="metric-value" style="color: {color};">{value}</div>
-                    {f'<div style="font-size: 0.7rem; color: #6c757d;">{extra}</div>' if extra else ''}
+        with col2:
+            evolution_color = "#dc3545" if evolution_vs_baseline > 0 else "#28a745"
+            metric_html = """
+            <div class="metric-box">
+                <div class="metric-label">Évolution</div>
+                <div class="metric-value" style="color: """ + evolution_color + """;">
+                    """ + f"{evolution_vs_baseline:+.2f}%" + """
                 </div>
-                """
-                st.markdown(metric_html, unsafe_allow_html=True)
+            </div>
+            """
+            st.markdown(metric_html, unsafe_allow_html=True)
+        
+        with col3:
+            metric_html = """
+            <div class="metric-box">
+                <div class="metric-label">Volatilité</div>
+                <div class="metric-value">""" + f"{volatilite_globale:.2f}%" + """</div>
+            </div>
+            """
+            st.markdown(metric_html, unsafe_allow_html=True)
+        
+        with col4:
+            metric_html = """
+            <div class="metric-box">
+                <div class="metric-label">Impact 10M MAD</div>
+                <div class="metric-value">""" + f"{impact_10m:.0f}K/an" + """</div>
+            </div>
+            """
+            st.markdown(metric_html, unsafe_allow_html=True)
+        
+        with col5:
+            quality_text = "ÉLEVÉE" if data_quality >= 3 else "MOYENNE" if data_quality >= 2 else "FAIBLE"
+            metric_html = """
+            <div class="metric-box">
+                <div class="metric-label">Qualité Données</div>
+                <div class="metric-value" style="font-size: 1.2rem;">""" + quality_text + """</div>
+                <div style="font-size: 0.7rem; color: #6c757d;">""" + f"{data_quality}/4 sources" + """</div>
+            </div>
+            """
+            st.markdown(metric_html, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)  # Close executive-dashboard
         
         # RECOMMENDATION PANEL
         strategy = recommandation_base['recommandation']
+        risk_level = recommandation_base['niveau_risque']
+        savings_text = 'Économies potentielles' if changement_global < 0 else 'Surcoûts évités'
         
         # Create the recommendation panel HTML in parts to avoid f-string issues
         panel_header = '<div class="recommendation-panel">'
         panel_title = '<div class="recommendation-title">⚡ Recommandations Stratégiques Immédiates</div>'
         
-        action_item_html = f"""
+        action_item_html = """
             <div class="action-item">
                 <h4 style="margin: 0 0 0.5rem 0; color: white;">🎯 Action Prioritaire</h4>
-                <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">{action}</p>
-                <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">Niveau d urgence: {urgency}</p>
+                <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">""" + action + """</p>
+                <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">Niveau d urgence: """ + urgency + """</p>
             </div>
         """
         
-        risk_level = recommandation_base['niveau_risque']
-        strategy_grid_html = f"""
+        strategy_grid_html = """
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
                 <div class="action-item">
                     <h5 style="margin: 0 0 0.5rem 0; color: white;">📈 Stratégie Globale</h5>
-                    <p style="margin: 0; font-weight: 600;">{strategy}</p>
+                    <p style="margin: 0; font-weight: 600;">""" + strategy + """</p>
                     <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">
-                        Changement prévu: {changement_global:+.2f}% (18 mois)
+                        Changement prévu: """ + f"{changement_global:+.2f}%" + """ (18 mois)
                     </p>
                 </div>
                 <div class="action-item">
                     <h5 style="margin: 0 0 0.5rem 0; color: white;">📊 Tendance Court Terme</h5>
-                    <p style="margin: 0; font-weight: 600;">{trend_direction} {trend_strength}</p>
+                    <p style="margin: 0; font-weight: 600;">""" + str(trend_direction) + " " + str(trend_strength) + """</p>
                     <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">
-                        Horizon: 30 jours | Risque: {risk_level}
+                        Horizon: 30 jours | Risque: """ + risk_level + """
                     </p>
                 </div>
             </div>
         """
         
-        savings_text = 'Économies potentielles' if changement_global < 0 else 'Surcoûts évités'
-        financial_impact_html = f"""
+        financial_impact_html = """
             <div class="action-item" style="margin-top: 1rem; background: rgba(255,255,255,0.2);">
                 <h5 style="margin: 0 0 0.5rem 0; color: white;">💰 Impact Financier Estimé</h5>
                 <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">
-                    {abs(changement_global) * 100:.0f}K MAD/an pour 10M MAD d emprunt
+                    """ + f"{abs(changement_global) * 100:.0f}K MAD/an pour 10M MAD d emprunt" + """
                 </p>
                 <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">
-                    {savings_text} avec stratégie recommandée
+                    """ + savings_text + """ avec stratégie recommandée
                 </p>
             </div>
         """
@@ -515,7 +534,7 @@ def main():
                     x=donnees_hebdo['Date'],
                     y=donnees_hebdo['Rendement_Predit'],
                     mode='lines+markers',
-                    name=f'{nom_scenario}',
+                    name=nom_scenario,
                     line=dict(color=couleurs[nom_scenario], width=3),
                     marker=dict(size=5)
                 )
@@ -526,7 +545,7 @@ def main():
             y=last_historical_yield, 
             line_dash="dash", 
             line_color="gray",
-            annotation_text=f"Baseline Juin 2025: {last_historical_yield:.2f}%"
+            annotation_text="Baseline Juin 2025: " + f"{last_historical_yield:.2f}%"
         )
         
         fig_overview.update_layout(
@@ -543,7 +562,302 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
         
         # SCENARIO COMPARISON CARDS
-        st.markdown('<div class="pro-card">', unsafe_allow_html=True)import streamlit as st
+        st.markdown('<div class="pro-card">', unsafe_allow_html=True)
+        st.markdown('<div class="pro-card-header">📈 Comparaison des Scénarios</div>', unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        scenario_colors = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
+        
+        for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
+            with [col1, col2, col3][i]:
+                color = scenario_colors[scenario]
+                change_color = "#dc3545" if rec['changement_rendement'] > 0 else "#28a745"
+                scenario_name = scenario.replace('_', ' ').upper()
+                
+                card_html = """
+                <div style="border: 2px solid """ + color + """; border-radius: 10px; padding: 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, """ + color + """15, """ + color + """05);">
+                    <h4 style="margin: 0 0 0.8rem 0; color: """ + color + """; text-align: center; font-weight: 700;">
+                        """ + scenario_name + """
+                    </h4>
+                    <div style="text-align: center; margin: 0.8rem 0;">
+                        <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">
+                            """ + f"{rec['rendement_futur_moyen']:.2f}%" + """
+                        </div>
+                        <div style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase;">
+                            Rendement Moyen
+                        </div>
+                    </div>
+                    <div style="padding: 0.8rem; background: white; border-radius: 6px; margin: 0.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
+                            <strong>Stratégie:</strong> """ + rec['recommandation'] + """
+                        </div>
+                        <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
+                            <strong>Changement:</strong> 
+                            <span style="color: """ + change_color + """; font-weight: 600;">
+                                """ + f"{rec['changement_rendement']:+.2f}%" + """
+                            </span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #495057;">
+                            <strong>Risque:</strong> """ + rec['niveau_risque'] + """
+                        </div>
+                    </div>
+                </div>
+                """
+                
+                st.markdown(card_html, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab2:
+        st.header("🔮 Prédictions Détaillées")
+        
+        scenario_selectionne = st.selectbox(
+            "Choisissez un scénario:",
+            options=['Cas_de_Base', 'Conservateur', 'Optimiste'],
+            index=0,
+            help="Sélectionnez le scénario économique à analyser"
+        )
+        
+        pred_scenario = st.session_state.predictions[scenario_selectionne]
+        
+        # Enhanced metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Rendement Moyen", f"{pred_scenario['Rendement_Predit'].mean():.2f}%")
+        with col2:
+            st.metric("Rendement Min", f"{pred_scenario['Rendement_Predit'].min():.2f}%")
+        with col3:
+            st.metric("Rendement Max", f"{pred_scenario['Rendement_Predit'].max():.2f}%")
+        with col4:
+            baseline_comparison = pred_scenario['Rendement_Predit'].mean() - last_historical_yield
+            st.metric("Écart vs Juin 2025", f"{baseline_comparison:+.2f}%")
+        
+        # Detailed prediction chart
+        st.subheader("📊 Prédictions Quotidiennes - Scénario " + scenario_selectionne)
+        
+        donnees_affichage = pred_scenario[::3]
+        
+        fig_detail = go.Figure()
+        
+        # Confidence bands
+        fig_detail.add_trace(
+            go.Scatter(
+                x=list(donnees_affichage['Date']) + list(donnees_affichage['Date'][::-1]),
+                y=list(donnees_affichage['Borne_Sup_95']) + list(donnees_affichage['Borne_Inf_95'][::-1]),
+                fill='toself',
+                fillcolor='rgba(74, 179, 209, 0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='Intervalle de Confiance 95%',
+                showlegend=True
+            )
+        )
+        
+        # Main prediction line
+        couleurs = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
+        fig_detail.add_trace(
+            go.Scatter(
+                x=donnees_affichage['Date'],
+                y=donnees_affichage['Rendement_Predit'],
+                mode='lines+markers',
+                name='Prédiction',
+                line=dict(color=couleurs[scenario_selectionne], width=3),
+                marker=dict(size=4)
+            )
+        )
+        
+        # June 2025 baseline reference
+        fig_detail.add_hline(
+            y=last_historical_yield, 
+            line_dash="dash", 
+            line_color="blue",
+            annotation_text="Juin 2025: " + f"{last_historical_yield:.2f}%"
+        )
+        
+        fig_detail.update_layout(
+            title="Prédictions Détaillées - " + scenario_selectionne + " (Continuité depuis Juin 2025)",
+            xaxis_title="Date",
+            yaxis_title="Rendement (%)",
+            height=500,
+            template="plotly_white"
+        )
+        
+        st.plotly_chart(fig_detail, use_container_width=True)
+        
+        # Export functionality
+        if st.button("⬇ Télécharger les Prédictions"):
+            pred_export = pred_scenario.copy()
+            pred_export['Baseline_Juin_2025'] = last_historical_yield
+            
+            csv = pred_export.to_csv(index=False)
+            st.download_button(
+                label="Télécharger CSV",
+                data=csv,
+                file_name="sofac_predictions_" + scenario_selectionne.lower() + "_" + datetime.now().strftime('%Y%m%d') + ".csv",
+                mime="text/csv"
+            )
+
+    with tab3:
+        st.header("💼 Recommandations Stratégiques")
+        
+        # Global recommendation
+        liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
+        
+        if liste_recommandations.count('TAUX VARIABLE') >= 2:
+            strategie_globale = "TAUX VARIABLE"
+            raison_globale = "Majorité des scénarios montrent des taux en baisse depuis juin 2025 (" + f"{last_historical_yield:.2f}%" + ")"
+            couleur_globale = "#28a745"
+        elif liste_recommandations.count('TAUX FIXE') >= 2:
+            strategie_globale = "TAUX FIXE"
+            raison_globale = "Majorité des scénarios montrent des taux en hausse depuis juin 2025 (" + f"{last_historical_yield:.2f}%" + ")"
+            couleur_globale = "#dc3545"
+        else:
+            strategie_globale = "STRATÉGIE FLEXIBLE"
+            raison_globale = "Signaux mixtes depuis juin 2025 (" + f"{last_historical_yield:.2f}%" + ") - approche diversifiée recommandée"
+            couleur_globale = "#ffc107"
+        
+        # Data quality indicator
+        quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+        quality_text = "Surveillance économique en temps réel active" if quality_score >= 2 else "Surveillance économique limitée"
+        
+        global_rec_html = """
+        <div class="recommendation-panel" style="background: linear-gradient(135deg, """ + couleur_globale + """ 0%, """ + couleur_globale + """AA 100%);">
+            <h2>▲ RECOMMANDATION GLOBALE SOFAC</h2>
+            <h3>""" + strategie_globale + """</h3>
+            <p>""" + raison_globale + """</p>
+            <small>""" + quality_text + """</small>
+        </div>
+        """
+        st.markdown(global_rec_html, unsafe_allow_html=True)
+        
+        # Detailed scenario analysis
+        st.subheader("📊 Analyse Détaillée par Scénario")
+        
+        for nom_scenario, rec in st.session_state.recommandations.items():
+            with st.expander("📈 Scénario " + nom_scenario, expanded=True):
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    st.markdown("""
+                    **Recommandation:** """ + rec['recommandation'] + """
+                    
+                    **Justification:** """ + rec['raison'] + """
+                    
+                    **Métriques (vs juin 2025: """ + f"{last_historical_yield:.2f}%" + """):**
+                    - Rendement moyen prédit: """ + f"{rec['rendement_futur_moyen']:.2f}%" + """
+                    - Changement attendu: """ + f"{rec['changement_rendement']:+.2f}%" + """
+                    - Volatilité: """ + f"{rec['volatilite']:.2f}%" + """
+                    - Niveau de risque: """ + rec['niveau_risque'] + """
+                    """)
+                
+                with col2:
+                    # Mini chart
+                    fig_mini = go.Figure()
+                    
+                    pred_df = st.session_state.predictions[nom_scenario]
+                    echantillon_mini = pred_df[::30]
+                    
+                    # June 2025 baseline
+                    fig_mini.add_hline(
+                        y=last_historical_yield, 
+                        line_dash="dash", 
+                        line_color="blue",
+                        annotation_text="Juin 2025: " + f"{last_historical_yield:.2f}%"
+                    )
+                    
+                    # Prediction line
+                    couleurs = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
+                    fig_mini.add_trace(
+                        go.Scatter(
+                            x=echantillon_mini['Date'],
+                            y=echantillon_mini['Rendement_Predit'],
+                            mode='lines+markers',
+                            name=nom_scenario,
+                            line=dict(color=couleurs[nom_scenario], width=2)
+                        )
+                    )
+                    
+                    fig_mini.update_layout(
+                        height=200,
+                        showlegend=False,
+                        template="plotly_white",
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        yaxis_title="Rendement (%)"
+                    )
+                    
+                    st.plotly_chart(fig_mini, use_container_width=True)
+        
+        # Financial impact calculator
+        st.subheader("💰 Calculateur d'Impact Financier")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            montant_emprunt = st.slider(
+                "Montant d'emprunt (millions MAD):",
+                min_value=1,
+                max_value=100,
+                value=10,
+                step=1
+            )
+        
+        with col2:
+            duree_emprunt = st.slider(
+                "Durée d'emprunt (années):",
+                min_value=1,
+                max_value=10,
+                value=3,
+                step=1
+            )
+        
+        changement_cas_base = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
+        impact_total = changement_cas_base * montant_emprunt * 1_000_000 / 100 * duree_emprunt
+        
+        if abs(changement_cas_base) > 0.2:
+            if changement_cas_base < 0:
+                st.success("""
+                💰 **Économies Potentielles avec TAUX VARIABLE:**
+                
+                - **Économies annuelles:** """ + f"{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f}" + """ MAD
+                - **Économies totales (""" + str(duree_emprunt) + """ ans):** """ + f"{abs(impact_total):,.0f}" + """ MAD
+                - **Basé sur:** Baisse attendue de """ + f"{abs(changement_cas_base):.2f}%" + """ vs juin 2025 (""" + f"{last_historical_yield:.2f}%" + """)
+                """)
+            else:
+                st.warning("""
+                💰 **Coûts Évités avec TAUX FIXE:**
+                
+                - **Surcoûts évités annuellement:** """ + f"{changement_cas_base * montant_emprunt * 10_000:,.0f}" + """ MAD
+                - **Surcoûts évités totaux (""" + str(duree_emprunt) + """ ans):** """ + f"{impact_total:,.0f}" + """ MAD
+                - **Basé sur:** Hausse attendue de """ + f"{changement_cas_base:.2f}%" + """ vs juin 2025 (""" + f"{last_historical_yield:.2f}%" + """)
+                """)
+        else:
+            st.info("""
+            💰 **Impact Financier Limité:**
+            
+            - **Variation attendue:** ±""" + f"{abs(changement_cas_base):.2f}%" + """ vs juin 2025 (""" + f"{last_historical_yield:.2f}%" + """)
+            - **Impact annuel:** ±""" + f"{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f}" + """ MAD
+            - **Approche flexible recommandée**
+            """)
+    
+    # Footer
+    st.markdown("---")
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+    
+    footer_html = """
+    <div style="text-align: center; color: #666; padding: 1.5rem; font-size: 0.8rem;">
+        <p><strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
+        <p>Sources historiques: Bank Al-Maghrib, HCP | Surveillance live: """ + str(live_sources_count) + """/4 sources directes</p>
+        <p>Modèle: Régression Linéaire Multiple | Horizon: Juillet 2025 - Décembre 2026</p>
+        <p>Baseline: Juin 2025 (""" + f"{last_historical_yield:.2f}%" + """) | Dernière mise à jour: """ + current_time + """</p>
+        <p><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
+    </div>
+    """
+    st.markdown(footer_html, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -873,7 +1187,7 @@ def fetch_live_moroccan_data():
         spread = 0.10
     
     live_data['yield_52w'] = live_data['policy_rate'] + spread
-    live_data['sources']['yield_52w'] = f'Estimated from Policy Rate (+{spread*100:.0f}bps)'
+    live_data['sources']['yield_52w'] = 'Estimated from Policy Rate'
     
     try:
         hcp_urls = ["https://www.hcp.ma/"]
@@ -942,15 +1256,15 @@ def display_live_data_panel(live_data, last_historical_yield):
         quality_class = "quality-estimated"
         status_text = "Données principalement estimées"
     
-    status_html = f"""
+    # Build status HTML
+    status_html = """
     <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
         <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-            <span class="quality-indicator {quality_class}"></span>
-            <span style="font-size: 0.8rem; font-weight: 600;">{status_text}</span>
+            <span class="quality-indicator """ + quality_class + """"></span>
+            <span style="font-size: 0.8rem; font-weight: 600;">""" + status_text + """</span>
         </div>
         <div style="font-size: 0.75rem; color: #6c757d;">
-            Sources en direct: {live_sources}/{total_sources} ({success_rate:.0f}%)
-        </div>
+            Sources en direct: """ + str(live_sources) + """/""" + str(total_sources) + """ (""" + str(int(success_rate)) + """%)</div>
     </div>
     """
     st.sidebar.markdown(status_html, unsafe_allow_html=True)
@@ -959,41 +1273,45 @@ def display_live_data_panel(live_data, last_historical_yield):
     
     with col1:
         indicator_class1 = "quality-live" if 'Live' in live_data['sources']['policy_rate'] else "quality-estimated"
-        policy_html = f"""
+        policy_rate = live_data['policy_rate']
+        
+        policy_html = """
         <div style="text-align: center; padding: 0.8rem; background: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 0.3rem;">
-                <span class="quality-indicator {indicator_class1}"></span>
+                <span class="quality-indicator """ + indicator_class1 + """"></span>
                 <span style="font-size: 0.7rem; font-weight: 600; color: #6c757d;">TAUX DIRECTEUR</span>
             </div>
             <div style="font-size: 1.2rem; font-weight: 700; color: #2c3e50;">
-                {live_data['policy_rate']:.2f}%
+                """ + f"{policy_rate:.2f}%" + """
             </div>
         </div>
         """
         st.sidebar.markdown(policy_html, unsafe_allow_html=True)
         
         indicator_class2 = "quality-live" if 'Live' in live_data['sources']['inflation'] else "quality-estimated"
-        inflation_html = f"""
+        inflation_rate = live_data['inflation']
+        
+        inflation_html = """
         <div style="text-align: center; padding: 0.8rem; background: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 0.3rem;">
-                <span class="quality-indicator {indicator_class2}"></span>
+                <span class="quality-indicator """ + indicator_class2 + """"></span>
                 <span style="font-size: 0.7rem; font-weight: 600; color: #6c757d;">INFLATION</span>
             </div>
             <div style="font-size: 1.2rem; font-weight: 700; color: #2c3e50;">
-                {live_data['inflation']:.2f}%
+                """ + f"{inflation_rate:.2f}%" + """
             </div>
         </div>
         """
         st.sidebar.markdown(inflation_html, unsafe_allow_html=True)
     
     with col2:
-        yield_html = f"""
+        yield_html = """
         <div style="text-align: center; padding: 0.8rem; background: linear-gradient(135deg, #2a5298, #1e3c72); color: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(42, 82, 152, 0.3);">
             <div style="font-size: 0.7rem; font-weight: 600; margin-bottom: 0.3rem; opacity: 0.9;">
                 RENDEMENT ACTUEL
             </div>
             <div style="font-size: 1.2rem; font-weight: 700;">
-                {last_historical_yield:.2f}%
+                """ + f"{last_historical_yield:.2f}%" + """
             </div>
             <div style="font-size: 0.65rem; opacity: 0.8; margin-top: 0.2rem;">
                 Baseline Juin 2025
@@ -1002,24 +1320,26 @@ def display_live_data_panel(live_data, last_historical_yield):
         """
         st.sidebar.markdown(yield_html, unsafe_allow_html=True)
         
-        gdp_html = f"""
+        gdp_rate = live_data['gdp_growth']
+        gdp_html = """
         <div style="text-align: center; padding: 0.8rem; background: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 0.3rem;">
                 <span class="quality-indicator quality-estimated"></span>
                 <span style="font-size: 0.7rem; font-weight: 600; color: #6c757d;">CROISSANCE PIB</span>
             </div>
             <div style="font-size: 1.2rem; font-weight: 700; color: #2c3e50;">
-                {live_data['gdp_growth']:.2f}%
+                """ + f"{gdp_rate:.2f}%" + """
             </div>
         </div>
         """
         st.sidebar.markdown(gdp_html, unsafe_allow_html=True)
     
-    update_html = f"""
+    last_updated = live_data['last_updated']
+    update_html = """
     <div style="background: #e9ecef; padding: 0.6rem; border-radius: 4px; margin: 0.8rem 0; text-align: center;">
         <div style="font-size: 0.7rem; color: #495057; font-weight: 600;">DERNIÈRE MISE À JOUR</div>
         <div style="font-size: 0.75rem; color: #6c757d; margin-top: 0.2rem;">
-            {live_data['last_updated']}
+            """ + last_updated + """
         </div>
     </div>
     """
@@ -1160,6 +1480,5 @@ def create_economic_scenarios():
             '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
             '2026-03': 1.75, '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50
         },
-        'Cas_de_Base': {
-            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
-            '2026-03': 1.50, '2026-06': 1.50, '2026-09':
+        'Cas
+            
