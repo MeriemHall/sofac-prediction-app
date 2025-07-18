@@ -14,186 +14,101 @@ import warnings
 warnings.filterwarnings('ignore')
 
 st.set_page_config(
-    page_title="SOFAC Yield Predictor",
+    page_title="SOFAC - Prédiction Rendements 52-Semaines",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Custom CSS for glassmorphism dark theme
 st.markdown("""
 <style>
-    /* Global styles */
-    .stApp {
-        background: linear-gradient(135deg, #1e293b 0%, #1e40af 50%, #1e293b 100%);
-        min-height: 100vh;
-    }
-    
-    /* Hide Streamlit elements */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .stDeployButton {display:none;}
-    
-    /* Glass card styling */
-    .glass-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        color: white;
-    }
-    
-    .glass-card-large {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 2rem;
-        margin-bottom: 2rem;
-        color: white;
-    }
-    
-    /* Header styling */
     .main-header {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 2rem;
-        margin-bottom: 2rem;
+        background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60"><text x="10" y="40" font-family="Arial,sans-serif" font-size="24" font-weight="bold" fill="white">SOFAC</text></svg>');
+        background-repeat: no-repeat;
+        background-position: right 20px center;
+        padding: 1.5rem;
+        border-radius: 8px;
         color: white;
-    }
-    
-    .header-title {
-        font-size: 2rem;
-        font-weight: bold;
-        color: white;
-        margin-bottom: 0.5rem;
-    }
-    
-    .header-subtitle {
-        color: #93c5fd;
-        font-size: 1.1rem;
-        margin-bottom: 1rem;
-    }
-    
-    /* Recommendation card */
-    .recommendation-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 2rem;
-        margin-bottom: 2rem;
-        color: white;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-    
-    .recommendation-title {
-        font-size: 1.3rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-    
-    .recommendation-message {
-        font-size: 1.1rem;
-        margin-bottom: 0.5rem;
-        color: rgba(255, 255, 255, 0.9);
-    }
-    
-    .confidence-level {
-        font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.7);
-    }
-    
-    /* Insight cards */
-    .insight-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 0.5rem;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .insight-title {
-        font-weight: bold;
-        color: white;
-        margin-bottom: 0.5rem;
-        font-size: 1rem;
-    }
-    
-    .insight-text {
-        color: rgba(255, 255, 255, 0.8);
-        font-size: 0.9rem;
-        line-height: 1.4;
-    }
-    
-    /* Note box */
-    .note-box {
-        background: rgba(59, 130, 246, 0.2);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-radius: 0.5rem;
-        padding: 1rem;
-        margin-top: 1.5rem;
-    }
-    
-    .note-text {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 0.9rem;
-        line-height: 1.4;
-    }
-    
-    /* Metrics styling */
-    .metric-container {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 0.5rem;
-        padding: 1rem;
         text-align: center;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
     }
-    
-    .metric-value {
-        font-size: 1.5rem;
-        font-weight: bold;
+    .metric-card {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #2a5298;
+        margin: 0.8rem 0;
+        font-size: 0.85rem;
+    }
+    .recommendation-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        margin-bottom: 0.25rem;
-    }
-    
-    .metric-label {
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin: 1.5rem 0;
+        text-align: center;
         font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.7);
     }
-    
-    /* Text colors */
-    h1, h2, h3, h4, h5, h6 {
-        color: white !important;
+    .data-status {
+        background: #e8f5e8;
+        border: 1px solid #4caf50;
+        padding: 0.4rem;
+        border-radius: 4px;
+        margin: 0.4rem 0;
+        font-size: 0.8rem;
     }
-    
-    p, span, div {
-        color: rgba(255, 255, 255, 0.8);
+    .data-warning {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        padding: 0.4rem;
+        border-radius: 4px;
+        margin: 0.4rem 0;
+        font-size: 0.8rem;
     }
-    
-    /* Last update styling */
-    .last-update {
-        color: rgba(255, 255, 255, 0.8);
+    .briefing-section {
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        text-align: center;
+    }
+    .small-text {
+        font-size: 0.8rem;
+    }
+    .medium-text {
         font-size: 0.9rem;
-        text-align: right;
     }
-    
-    /* Status indicators */
-    .status-up { color: #10b981; }
-    .status-down { color: #ef4444; }
-    .status-stable { color: #f59e0b; }
-    
-    /* Remove default streamlit spacing */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+    .large-metric {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0.8rem 0;
+    }
+    /* Reduce overall font sizes */
+    .stMetric label {
+        font-size: 0.8rem !important;
+    }
+    .stMetric div {
+        font-size: 0.9rem !important;
+    }
+    h1 {
+        font-size: 1.5rem !important;
+    }
+    h2 {
+        font-size: 1.3rem !important;
+    }
+    h3 {
+        font-size: 1.1rem !important;
+    }
+    h4 {
+        font-size: 1rem !important;
+    }
+    p {
+        font-size: 0.85rem !important;
+    }
+    /* Remove problematic flexbox */
+    .stColumn > div {
+        padding: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -322,6 +237,60 @@ def fetch_live_moroccan_data():
     live_data['gdp_growth'] = max(-10.0, min(20.0, live_data['gdp_growth']))
     
     return live_data
+
+def display_live_data_panel(live_data, last_historical_yield):
+    """Display live data panel in sidebar"""
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📡 Données en Temps Réel")
+    
+    live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+    total_sources = 4
+    success_rate = (live_sources / total_sources) * 100
+    
+    if success_rate >= 50:
+        st.sidebar.markdown('<div class="data-status">● Données partiellement en direct</div>', unsafe_allow_html=True)
+    else:
+        st.sidebar.markdown('<div class="data-warning">● Données principalement estimées</div>', unsafe_allow_html=True)
+    
+    st.sidebar.write(f"**Sources en direct:** {live_sources}/{total_sources} ({success_rate:.0f}%)")
+    
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        indicator = "●" if 'Live' in live_data['sources']['policy_rate'] else "○"
+        st.metric(
+            f"{indicator} Taux Directeur", 
+            f"{live_data['policy_rate']:.2f}%",
+            help=f"Source: {live_data['sources']['policy_rate']}"
+        )
+        
+        indicator = "●" if 'Live' in live_data['sources']['inflation'] else "○"
+        st.metric(
+            f"{indicator} Inflation", 
+            f"{live_data['inflation']:.2f}%",
+            help=f"Source: {live_data['sources']['inflation']}"
+        )
+    
+    with col2:
+        # Show the actual historical yield instead of the estimated live yield
+        st.metric(
+            "▲ Rendement Actuel", 
+            f"{last_historical_yield:.2f}%",
+            help="Dernière valeur historique (Juin 2025)"
+        )
+        
+        st.metric(
+            "○ Croissance PIB", 
+            f"{live_data['gdp_growth']:.2f}%",
+            help=f"Source: {live_data['sources']['gdp_growth']}"
+        )
+    
+    st.sidebar.info(f"⏰ Dernière mise à jour: {live_data['last_updated']}")
+    
+    if st.sidebar.button("↻ Actualiser"):
+        st.cache_data.clear()
+        st.rerun()
 
 @st.cache_data
 def create_monthly_dataset():
@@ -607,30 +576,26 @@ def generate_recommendations(predictions):
         volatilite = pred_df['Rendement_Predit'].std()
         
         if changement_rendement > 0.3:
-            recommandation = "FIXED RATE"
-            raison = f"Yields expected to rise by {changement_rendement:.2f}% from June 2025. Lock in current rates before borrowing costs increase."
-            trend = "up"
+            recommandation = "TAUX FIXE"
+            raison = f"Rendements attendus en hausse de {changement_rendement:.2f}% depuis juin 2025. Bloquer les taux actuels avant que les coûts d'emprunt n'augmentent."
         elif changement_rendement < -0.3:
-            recommandation = "VARIABLE RATE"
-            raison = f"Yields expected to fall by {abs(changement_rendement):.2f}% from June 2025. Use variable rates to benefit from decreasing borrowing costs."
-            trend = "down"
+            recommandation = "TAUX VARIABLE"
+            raison = f"Rendements attendus en baisse de {abs(changement_rendement):.2f}% depuis juin 2025. Utiliser des taux variables pour profiter de la diminution des coûts d'emprunt."
         else:
-            recommandation = "EITHER RATE"
-            raison = f"Yields relatively stable (±{abs(changement_rendement):.2f}%) from June 2025. Mixed approach based on needs."
-            trend = "stable"
+            recommandation = "STRATÉGIE FLEXIBLE"
+            raison = f"Rendements relativement stables (±{abs(changement_rendement):.2f}%) depuis juin 2025. Approche mixte selon les besoins."
         
         if volatilite < 0.2:
-            confidence = "High"
+            niveau_risque = "FAIBLE"
         elif volatilite < 0.4:
-            confidence = "Medium"
+            niveau_risque = "MOYEN"
         else:
-            confidence = "Low"
+            niveau_risque = "ÉLEVÉ"
         
         recommandations[nom_scenario] = {
-            'type': recommandation,
-            'message': raison,
-            'trend': trend,
-            'confidence': confidence,
+            'recommandation': recommandation,
+            'raison': raison,
+            'niveau_risque': niveau_risque,
             'rendement_actuel': rendement_actuel,
             'rendement_futur_moyen': rendement_futur_moyen,
             'changement_rendement': changement_rendement,
@@ -640,9 +605,21 @@ def generate_recommendations(predictions):
     return recommandations
 
 def main():
-    # Load data first
+    st.markdown("""
+    <div class="main-header">
+        <h1>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</h1>
+        <p>Système d'aide à la décision avec données automatiques Bank Al-Maghrib & HCP</p>
+        <p><strong>Mise à jour:</strong> Horaire | <strong>Prochaine mise à jour:</strong> {}</p>
+    </div>
+    """.format((datetime.now() + timedelta(hours=1)).strftime('%H:%M')), unsafe_allow_html=True)
+    
+    # Fetch live data
+    with st.spinner("↻ Récupération des données en temps réel..."):
+        live_data = fetch_live_moroccan_data()
+    
+    # Load cached model data first to get the last historical yield
     if 'data_loaded' not in st.session_state:
-        with st.spinner("Loading model..."):
+        with st.spinner("⚙ Calibration du modèle..."):
             st.session_state.df_mensuel = create_monthly_dataset()
             st.session_state.modele, st.session_state.r2, st.session_state.mae, st.session_state.rmse, st.session_state.mae_vc = train_prediction_model(st.session_state.df_mensuel)
             st.session_state.scenarios = create_economic_scenarios()
@@ -650,259 +627,568 @@ def main():
             st.session_state.recommandations = generate_recommendations(st.session_state.predictions)
             st.session_state.data_loaded = True
     
-    # Get current time
-    current_time = datetime.now().strftime('%B %d, %Y at %I:%M %p')
+    # Get the last historical yield value (June 2025)
+    last_historical_yield = st.session_state.df_mensuel.iloc[-1]['Rendement_52s']  # 1.75%
     
-    # Header
-    st.markdown(f"""
-    <div class="main-header">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <div style="font-size: 2rem;">📊</div>
-                <div>
-                    <div class="header-title">SOFAC Yield Predictor</div>
-                    <div class="header-subtitle">52-Week Treasury Yield Prediction Tool</div>
+    with st.sidebar:
+        st.header("📊 Informations du Modèle")
+        
+        # Display live data panel with corrected historical yield
+        display_live_data_panel(live_data, last_historical_yield)
+        
+        # TODAY'S PREDICTION SECTION
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📅 Prédiction du Jour")
+        
+        # Get today's date and prediction
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
+        
+        # Find today's prediction in the base case scenario
+        cas_base_predictions = st.session_state.predictions['Cas_de_Base']
+        
+        # Try to find today's prediction
+        today_prediction = None
+        closest_prediction = None
+        
+        for _, row in cas_base_predictions.iterrows():
+            pred_date = row['Date']
+            if pred_date == today_str:
+                today_prediction = row['Rendement_Predit']
+                break
+            elif pred_date > today_str and closest_prediction is None:
+                closest_prediction = row['Rendement_Predit']
+        
+        # Display today's prediction
+        if today_prediction is not None:
+            st.sidebar.success(f"**{today_display}**")
+            st.sidebar.metric(
+                "🎯 Rendement Prédit Aujourd'hui",
+                f"{today_prediction:.2f}%",
+                delta=f"{(today_prediction - last_historical_yield):+.2f}%",
+                help="Prédiction pour aujourd'hui vs baseline juin 2025"
+            )
+        elif closest_prediction is not None:
+            st.sidebar.warning(f"**{today_display}**")
+            st.sidebar.metric(
+                "🎯 Prédiction Prochaine",
+                f"{closest_prediction:.2f}%",
+                delta=f"{(closest_prediction - last_historical_yield):+.2f}%",
+                help="Prochaine prédiction disponible"
+            )
+        else:
+            st.sidebar.info(f"**{today_display}**")
+            st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
+        
+        st.success("✓ Modèle calibré avec données historiques!")
+        
+        # Model performance metrics
+        st.subheader("🎯 Performance du Modèle")
+        st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Pourcentage de variance expliquée")
+        st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
+        st.metric("Validation Croisée", f"±{st.session_state.mae_vc:.2f}%", help="Erreur en validation croisée")
+        
+        st.info("↻ Données live utilisées pour surveillance économique uniquement.")
+    
+    # Main content tabs
+    tab1, tab2, tab3 = st.tabs(["📈 Vue d'Ensemble", "🔮 Prédictions Détaillées", "💼 Recommandations"])
+    
+    with tab1:
+        st.header("📈 Vue d'Ensemble des Prédictions")
+        
+        # ENHANCED EXECUTIVE BRIEFING
+        today = datetime.now()
+        today_str = today.strftime('%Y-%m-%d')
+        today_display = today.strftime('%d/%m/%Y')
+        
+        # Get current situation analysis
+        cas_de_base = st.session_state.predictions['Cas_de_Base']
+        current_prediction = None
+        trend_direction = None
+        trend_strength = "STABLE"
+        
+        # Find today's or closest prediction
+        for i, row in cas_de_base.iterrows():
+            pred_date = row['Date']
+            if pred_date >= today_str:
+                current_prediction = row['Rendement_Predit']
+                # Analyze trend over next 30 days
+                if i < len(cas_de_base) - 30:
+                    future_avg = cas_de_base.iloc[i:i+30]['Rendement_Predit'].mean()
+                    change = future_avg - current_prediction
+                    if change > 0.1:
+                        trend_direction = "HAUSSE"
+                        trend_strength = "FORTE" if change > 0.3 else "MODÉRÉE"
+                    elif change < -0.1:
+                        trend_direction = "BAISSE"
+                        trend_strength = "FORTE" if change < -0.3 else "MODÉRÉE"
+                    else:
+                        trend_direction = "STABLE"
+                break
+        
+        if current_prediction is None:
+            current_prediction = last_historical_yield
+        
+        # Get market sentiment and recommendations
+        recommandation_base = st.session_state.recommandations['Cas_de_Base']
+        evolution_vs_baseline = current_prediction - last_historical_yield
+        changement_global = recommandation_base['changement_rendement']
+        
+        # Determine market condition and urgency
+        if evolution_vs_baseline > 0.4 or changement_global > 0.4:
+            market_status = "TAUX ÉLEVÉS - DANGER"
+            status_emoji = "🔴"
+            urgency = "IMMÉDIATE"
+            action = "FIXER LES TAUX MAINTENANT"
+            card_color = "#dc3545"
+        elif evolution_vs_baseline > 0.1 or changement_global > 0.1:
+            market_status = "TAUX EN HAUSSE - ATTENTION"
+            status_emoji = "🟠"
+            urgency = "ÉLEVÉE"
+            action = "SURVEILLER ET PRÉPARER"
+            card_color = "#fd7e14"
+        elif evolution_vs_baseline < -0.4 or changement_global < -0.4:
+            market_status = "TAUX FAVORABLES - OPPORTUNITÉ"
+            status_emoji = "🟢"
+            urgency = "MODÉRÉE"
+            action = "UTILISER TAUX VARIABLES"
+            card_color = "#28a745"
+        elif evolution_vs_baseline < -0.1 or changement_global < -0.1:
+            market_status = "TAUX EN BAISSE - FAVORABLE"
+            status_emoji = "🟡"
+            urgency = "NORMALE"
+            action = "CONSIDÉRER TAUX VARIABLES"
+            card_color = "#20c997"
+        else:
+            market_status = "TAUX STABLES - NEUTRE"
+            status_emoji = "⚪"
+            urgency = "FAIBLE"
+            action = "STRATÉGIE ÉQUILIBRÉE"
+            card_color = "#6c757d"
+        
+        # Calculate key metrics for decision makers
+        volatilite_globale = cas_de_base['Rendement_Predit'].std()
+        data_quality = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+        confidence_level = "ÉLEVÉE" if data_quality >= 3 else "MOYENNE" if data_quality >= 2 else "FAIBLE"
+        
+        # Impact financier estimation
+        impact_10m = abs(changement_global) * 10  # Million MAD per year
+        
+        # EXECUTIVE BRIEFING CARD - Using Streamlit columns for better compatibility
+        st.markdown(f"""
+        <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 12px; margin: 1.5rem 0; text-align: center;">
+            <h2 style="margin: 0 0 1rem 0;">📋 BRIEFING EXÉCUTIF - {today_display}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Create three columns for the main briefing content
+        brief_col1, brief_col2, brief_col3 = st.columns([1, 1, 1])
+        
+        with brief_col1:
+            st.markdown(f"""
+            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
+                <h4 style="margin: 0; color: white;">SITUATION ACTUELLE</h4>
+                <p style="margin: 0.5rem 0; font-size: 1.1rem; color: white;">{status_emoji} {market_status}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with brief_col2:
+            st.markdown(f"""
+            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
+                <h1 style="margin: 0; font-size: 2.5rem; color: white;">{current_prediction:.2f}%</h1>
+                <p style="margin: 0; color: white;">Rendement 52 semaines</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with brief_col3:
+            st.markdown(f"""
+            <div style="background: {card_color}; color: white; padding: 1rem; border-radius: 8px; text-align: center;">
+                <h4 style="margin: 0; color: white;">ÉVOLUTION</h4>
+                <p style="margin: 0.5rem 0; font-size: 1.1rem; color: white;">{evolution_vs_baseline:+.2f}% vs Juin</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Recommendation section
+        st.markdown(f"""
+        <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
+            <h3 style="margin: 0 0 0.5rem 0; color: white;">▲ RECOMMANDATION IMMÉDIATE</h3>
+            <p style="margin: 0; font-size: 1.3rem; font-weight: bold; color: white;">{action}</p>
+            <p style="margin: 0.5rem 0 0 0; color: white; font-size: 0.9rem;">Urgence: {urgency} | Tendance 30j: {trend_direction} {trend_strength}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # KEY METRICS DASHBOARD
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            st.metric(
+                "📊 Baseline Juin",
+                f"{last_historical_yield:.2f}%",
+                help="Dernière valeur historique"
+            )
+        
+        with col2:
+            st.metric(
+                "📈 Évolution",
+                f"{evolution_vs_baseline:+.2f}%",
+                delta="vs Baseline"
+            )
+        
+        with col3:
+            st.metric(
+                "⚡ Volatilité",
+                f"{volatilite_globale:.2f}%",
+                help="Risque de fluctuation"
+            )
+        
+        with col4:
+            st.metric(
+                "💰 Impact 10M MAD",
+                f"{impact_10m:.0f}K/an",
+                help="Impact financier estimé"
+            )
+        
+        with col5:
+            st.metric(
+                "🎯 Confiance",
+                confidence_level,
+                delta=f"{data_quality}/4 sources"
+            )
+        
+        # QUICK ACTION SUMMARY
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown(f"""
+            <div style="background: rgba(0,0,0,0.05); padding: 1rem; border-radius: 8px; border-left: 4px solid {card_color};">
+                <h4 style="margin: 0 0 0.5rem 0; color: {card_color};">📋 RÉSUMÉ SITUATION</h4>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Rendement actuel:</strong> {current_prediction:.2f}%</p>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Changement prévu:</strong> {changement_global:+.2f}% (18 mois)</p>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Tendance court terme:</strong> {trend_direction} {trend_strength}</p>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Niveau de risque:</strong> {recommandation_base['niveau_risque']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            strategy = recommandation_base['recommandation']
+            st.markdown(f"""
+            <div style="background: rgba(0,0,0,0.05); padding: 1rem; border-radius: 8px; border-left: 4px solid {card_color};">
+                <h4 style="margin: 0 0 0.5rem 0; color: {card_color};">⚡ ACTIONS IMMÉDIATES</h4>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Stratégie:</strong> {strategy}</p>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Horizon décision:</strong> {"Immédiat" if urgency in ["IMMÉDIATE", "ÉLEVÉE"] else "1-3 mois"}</p>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Impact financier:</strong> {impact_10m:.0f}K MAD/an (10M MAD)</p>
+                <p style="margin: 0; font-size: 0.85rem;"><strong>Recommandation:</strong> {action}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Separator
+        st.markdown("---")
+        
+        # Overview chart
+        st.subheader("📊 Évolution des Rendements: Historique et Prédictions")
+        
+        fig_overview = go.Figure()
+        
+        # Historical data
+        df_recent = st.session_state.df_mensuel.tail(8)
+        
+        fig_overview.add_trace(
+            go.Scatter(
+                x=df_recent['Date'],
+                y=df_recent['Rendement_52s'],
+                mode='lines+markers',
+                name='Historique',
+                line=dict(color='#60A5FA', width=4),
+                marker=dict(size=8)
+            )
+        )
+        
+        # Prediction scenarios starting from July 2025
+        couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
+        
+        for nom_scenario, pred_df in st.session_state.predictions.items():
+            donnees_hebdo = pred_df[::7]  # Weekly sampling for clarity
+            
+            fig_overview.add_trace(
+                go.Scatter(
+                    x=donnees_hebdo['Date'],
+                    y=donnees_hebdo['Rendement_Predit'],
+                    mode='lines+markers',
+                    name=f'Prédiction {nom_scenario}',
+                    line=dict(color=couleurs[nom_scenario], width=3),
+                    marker=dict(size=6)
+                )
+            )
+        
+        fig_overview.update_layout(
+            title="Évolution des Rendements 52-Semaines: Historique (2020-2025) et Prédictions (2025-2026)",
+            xaxis_title="Date",
+            yaxis_title="Rendement (%)",
+            height=500,
+            template="plotly_white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        st.plotly_chart(fig_overview, use_container_width=True)
+        
+        # Quick recommendations
+        st.subheader("🎯 Recommandations Rapides")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
+            with [col1, col2, col3][i]:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h4>{scenario}</h4>
+                    <p><strong>{rec['recommandation']}</strong></p>
+                    <p>Changement: {rec['changement_rendement']:+.2f}%</p>
+                    <p>Risque: {rec['niveau_risque']}</p>
                 </div>
-            </div>
-            <div class="last-update">
-                📅 Last Update: {current_time}
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
     
-    # Get recommendation for base case
-    base_recommendation = st.session_state.recommandations['Cas_de_Base']
-    
-    # Recommendation Card
-    trend_icon = "📈" if base_recommendation['trend'] == 'up' else "📉" if base_recommendation['trend'] == 'down' else "⚖️"
-    trend_class = "status-up" if base_recommendation['trend'] == 'up' else "status-down" if base_recommendation['trend'] == 'down' else "status-stable"
-    
-    st.markdown(f"""
-    <div class="recommendation-card">
-        <div style="font-size: 2rem;" class="{trend_class}">{trend_icon}</div>
-        <div style="flex: 1;">
-            <div class="recommendation-title">Financial Decision Recommendation</div>
-            <div class="recommendation-message">{base_recommendation['message']}</div>
-            <div class="confidence-level">Confidence Level: {base_recommendation['confidence']}</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Main Chart
-    st.markdown('<div class="glass-card-large">', unsafe_allow_html=True)
-    st.markdown('<h3 style="color: white; margin-bottom: 1rem;">52-Week Yield Prediction Chart</h3>', unsafe_allow_html=True)
-    
-    # Prepare data for chart
-    df_historical = st.session_state.df_mensuel
-    cas_de_base = st.session_state.predictions['Cas_de_Base']
-    
-    # Create chart
-    fig = go.Figure()
-    
-    # Historical data
-    fig.add_trace(
-        go.Scatter(
-            x=df_historical['Date'],
-            y=df_historical['Rendement_52s'],
-            mode='lines+markers',
-            name='52-Week Yield (Historical)',
-            line=dict(color='#60A5FA', width=3),
-            marker=dict(size=6)
+    with tab2:
+        st.header("🔮 Prédictions Détaillées")
+        
+        scenario_selectionne = st.selectbox(
+            "Choisissez un scénario:",
+            options=['Cas_de_Base', 'Conservateur', 'Optimiste'],
+            index=0,
+            help="Sélectionnez le scénario économique à analyser"
         )
-    )
-    
-    # Fixed rate (historical)
-    fig.add_trace(
-        go.Scatter(
-            x=df_historical['Date'],
-            y=df_historical['Taux_Directeur'],
-            mode='lines+markers',
-            name='Fixed Rate',
-            line=dict(color='#F59E0B', width=2, dash='dash'),
-            marker=dict(size=4)
+        
+        pred_scenario = st.session_state.predictions[scenario_selectionne]
+        
+        # Enhanced metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Rendement Moyen", f"{pred_scenario['Rendement_Predit'].mean():.2f}%")
+        with col2:
+            st.metric("Rendement Min", f"{pred_scenario['Rendement_Predit'].min():.2f}%")
+        with col3:
+            st.metric("Rendement Max", f"{pred_scenario['Rendement_Predit'].max():.2f}%")
+        with col4:
+            baseline_comparison = pred_scenario['Rendement_Predit'].mean() - last_historical_yield
+            st.metric("Écart vs Juin 2025", f"{baseline_comparison:+.2f}%")
+        
+        # Detailed prediction chart
+        st.subheader(f"📊 Prédictions Quotidiennes - Scénario {scenario_selectionne}")
+        
+        donnees_affichage = pred_scenario[::3]
+        
+        fig_detail = go.Figure()
+        
+        # Confidence bands
+        fig_detail.add_trace(
+            go.Scatter(
+                x=list(donnees_affichage['Date']) + list(donnees_affichage['Date'][::-1]),
+                y=list(donnees_affichage['Borne_Sup_95']) + list(donnees_affichage['Borne_Inf_95'][::-1]),
+                fill='toself',
+                fillcolor='rgba(74, 179, 209, 0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='Intervalle de Confiance 95%',
+                showlegend=True
+            )
         )
-    )
-    
-    # Inflation (historical)
-    fig.add_trace(
-        go.Scatter(
-            x=df_historical['Date'],
-            y=df_historical['Inflation'],
-            mode='lines+markers',
-            name='Inflation',
-            line=dict(color='#EF4444', width=2, dash='dot'),
-            marker=dict(size=4)
+        
+        # Main prediction line
+        fig_detail.add_trace(
+            go.Scatter(
+                x=donnees_affichage['Date'],
+                y=donnees_affichage['Rendement_Predit'],
+                mode='lines+markers',
+                name='Prédiction',
+                line=dict(color=couleurs[scenario_selectionne], width=3),
+                marker=dict(size=4)
+            )
         )
-    )
-    
-    # Predictions (sample every 7 days for clarity)
-    pred_sample = cas_de_base[::7]
-    fig.add_trace(
-        go.Scatter(
-            x=pred_sample['Date'],
-            y=pred_sample['Rendement_Predit'],
-            mode='lines+markers',
-            name='52-Week Yield (Predicted)',
-            line=dict(color='#10B981', width=3),
-            marker=dict(size=6)
+        
+        # June 2025 baseline reference
+        fig_detail.add_hline(
+            y=last_historical_yield, 
+            line_dash="dash", 
+            line_color="blue",
+            annotation_text=f"Juin 2025: {last_historical_yield:.2f}%"
         )
-    )
-    
-    # Confidence interval
-    fig.add_trace(
-        go.Scatter(
-            x=list(pred_sample['Date']) + list(pred_sample['Date'][::-1]),
-            y=list(pred_sample['Borne_Sup_95']) + list(pred_sample['Borne_Inf_95'][::-1]),
-            fill='toself',
-            fillcolor='rgba(16, 185, 129, 0.2)',
-            line=dict(color='rgba(255,255,255,0)'),
-            name='Confidence Interval (95%)',
-            showlegend=True
+        
+        fig_detail.update_layout(
+            title=f"Prédictions Détaillées - {scenario_selectionne} (Continuité depuis Juin 2025)",
+            xaxis_title="Date",
+            yaxis_title="Rendement (%)",
+            height=500,
+            template="plotly_white"
         )
-    )
+        
+        st.plotly_chart(fig_detail, use_container_width=True)
+        
+        # Export functionality
+        if st.button("⬇ Télécharger les Prédictions"):
+            pred_export = pred_scenario.copy()
+            pred_export['Baseline_Juin_2025'] = last_historical_yield
+            
+            csv = pred_export.to_csv(index=False)
+            st.download_button(
+                label="Télécharger CSV",
+                data=csv,
+                file_name=f"sofac_predictions_{scenario_selectionne.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
     
-    fig.update_layout(
-        height=400,
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white'),
-        xaxis=dict(
-            title='Date',
-            gridcolor='rgba(255,255,255,0.1)',
-            color='rgba(255,255,255,0.7)'
-        ),
-        yaxis=dict(
-            title='Percentage (%)',
-            gridcolor='rgba(255,255,255,0.1)',
-            color='rgba(255,255,255,0.7)'
-        ),
-        legend=dict(
-            bgcolor='rgba(0,0,0,0.5)',
-            bordercolor='rgba(255,255,255,0.2)',
-            borderwidth=1,
-            font=dict(color='white')
-        ),
-        margin=dict(l=0, r=0, t=20, b=0)
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Key Insights
-    st.markdown("""
-    <div class="glass-card">
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-            <div style="font-size: 1.5rem;">💡</div>
-            <h3 style="color: white; margin: 0;">Key Insights for SOFAC</h3>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Create three columns for insights
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        current_yield = 1.75  # June 2025 baseline
-        current_fixed_rate = 2.25
-        current_inflation = 1.4
-        current_gdp = 3.8
+    with tab3:
+        st.header("💼 Recommandations Stratégiques")
+        
+        # Global recommendation
+        liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
+        
+        if liste_recommandations.count('TAUX VARIABLE') >= 2:
+            strategie_globale = "TAUX VARIABLE"
+            raison_globale = f"Majorité des scénarios montrent des taux en baisse depuis juin 2025 ({last_historical_yield:.2f}%)"
+            couleur_globale = "#28a745"
+        elif liste_recommandations.count('TAUX FIXE') >= 2:
+            strategie_globale = "TAUX FIXE"
+            raison_globale = f"Majorité des scénarios montrent des taux en hausse depuis juin 2025 ({last_historical_yield:.2f}%)"
+            couleur_globale = "#dc3545"
+        else:
+            strategie_globale = "STRATÉGIE FLEXIBLE"
+            raison_globale = f"Signaux mixtes depuis juin 2025 ({last_historical_yield:.2f}%) - approche diversifiée recommandée"
+            couleur_globale = "#ffc107"
+        
+        # Data quality indicator
+        quality_score = sum(1 for source in live_data['sources'].values() if 'Live' in source)
+        quality_text = "Surveillance économique en temps réel active" if quality_score >= 2 else "Surveillance économique limitée"
         
         st.markdown(f"""
-        <div class="insight-card">
-            <div class="insight-title">Current Situation</div>
-            <div class="insight-text">
-                52-week yield is at {current_yield:.2f}%, while the fixed rate is {current_fixed_rate:.2f}%. 
-                Inflation is low at {current_inflation:.1f}%, and GDP growth is healthy at {current_gdp:.1f}%.
-            </div>
+        <div class="recommendation-box" style="background: linear-gradient(135deg, {couleur_globale} 0%, {couleur_globale}AA 100%);">
+            <h2>▲ RECOMMANDATION GLOBALE SOFAC</h2>
+            <h3>{strategie_globale}</h3>
+            <p>{raison_globale}</p>
+            <small>{quality_text}</small>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Detailed scenario analysis
+        st.subheader("📊 Analyse Détaillée par Scénario")
+        
+        for nom_scenario, rec in st.session_state.recommandations.items():
+            with st.expander(f"📈 Scénario {nom_scenario}", expanded=True):
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    st.markdown(f"""
+                    **Recommandation:** {rec['recommandation']}
+                    
+                    **Justification:** {rec['raison']}
+                    
+                    **Métriques (vs juin 2025: {last_historical_yield:.2f}%):**
+                    - Rendement moyen prédit: {rec['rendement_futur_moyen']:.2f}%
+                    - Changement attendu: {rec['changement_rendement']:+.2f}%
+                    - Volatilité: {rec['volatilite']:.2f}%
+                    - Niveau de risque: {rec['niveau_risque']}
+                    """)
+                
+                with col2:
+                    # Mini chart
+                    fig_mini = go.Figure()
+                    
+                    pred_df = st.session_state.predictions[nom_scenario]
+                    echantillon_mini = pred_df[::30]
+                    
+                    # June 2025 baseline
+                    fig_mini.add_hline(
+                        y=last_historical_yield, 
+                        line_dash="dash", 
+                        line_color="blue",
+                        annotation_text=f"Juin 2025: {last_historical_yield:.2f}%"
+                    )
+                    
+                    # Prediction line
+                    fig_mini.add_trace(
+                        go.Scatter(
+                            x=echantillon_mini['Date'],
+                            y=echantillon_mini['Rendement_Predit'],
+                            mode='lines+markers',
+                            name=nom_scenario,
+                            line=dict(color=couleurs[nom_scenario], width=2)
+                        )
+                    )
+                    
+                    fig_mini.update_layout(
+                        height=200,
+                        showlegend=False,
+                        template="plotly_white",
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        yaxis_title="Rendement (%)"
+                    )
+                    
+                    st.plotly_chart(fig_mini, use_container_width=True)
+        
+        # Financial impact calculator
+        st.subheader("💰 Calculateur d'Impact Financier")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            montant_emprunt = st.slider(
+                "Montant d'emprunt (millions MAD):",
+                min_value=1,
+                max_value=100,
+                value=10,
+                step=1
+            )
+        
+        with col2:
+            duree_emprunt = st.slider(
+                "Durée d'emprunt (années):",
+                min_value=1,
+                max_value=10,
+                value=3,
+                step=1
+            )
+        
+        changement_cas_base = st.session_state.recommandations['Cas_de_Base']['changement_rendement']
+        impact_total = changement_cas_base * montant_emprunt * 1_000_000 / 100 * duree_emprunt
+        
+        if abs(changement_cas_base) > 0.2:
+            if changement_cas_base < 0:
+                st.success(f"""
+                💰 **Économies Potentielles avec TAUX VARIABLE:**
+                
+                - **Économies annuelles:** {abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
+                - **Économies totales ({duree_emprunt} ans):** {abs(impact_total):,.0f} MAD
+                - **Basé sur:** Baisse attendue de {abs(changement_cas_base):.2f}% vs juin 2025 ({last_historical_yield:.2f}%)
+                """)
+            else:
+                st.warning(f"""
+                💰 **Coûts Évités avec TAUX FIXE:**
+                
+                - **Surcoûts évités annuellement:** {changement_cas_base * montant_emprunt * 10_000:,.0f} MAD
+                - **Surcoûts évités totaux ({duree_emprunt} ans):** {impact_total:,.0f} MAD
+                - **Basé sur:** Hausse attendue de {changement_cas_base:.2f}% vs juin 2025 ({last_historical_yield:.2f}%)
+                """)
+        else:
+            st.info(f"""
+            💰 **Impact Financier Limité:**
+            
+            - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs juin 2025 ({last_historical_yield:.2f}%)
+            - **Impact annuel:** ±{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
+            - **Approche flexible recommandée**
+            """)
     
-    with col2:
-        future_avg = st.session_state.predictions['Cas_de_Base']['Rendement_Predit'].mean()
-        st.markdown(f"""
-        <div class="insight-card">
-            <div class="insight-title">Prediction Summary</div>
-            <div class="insight-text">
-                Model predicts yields will {"increase" if future_avg > current_yield else "decrease"} to an average of {future_avg:.2f}% 
-                through 2025-2026 as inflation remains controlled and fixed rates are expected to {"rise" if future_avg > current_yield else "fall"}.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Footer
+    st.markdown("---")
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    live_sources_count = sum(1 for source in live_data['sources'].values() if 'Live' in source)
     
-    with col3:
-        volatility = st.session_state.predictions['Cas_de_Base']['Rendement_Predit'].std()
-        st.markdown(f"""
-        <div class="insight-card">
-            <div class="insight-title">Risk Factors</div>
-            <div class="insight-text">
-                Predicted volatility is {volatility:.2f}%. Monitor inflation closely. If it rises above 2%, yields could 
-                change faster than predicted. GDP volatility could also impact results.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Metrics row
-    st.markdown('<div style="margin: 2rem 0;">', unsafe_allow_html=True)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="metric-container">
-            <div class="metric-value">{current_yield:.2f}%</div>
-            <div class="metric-label">Current Yield</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        avg_predicted = st.session_state.predictions['Cas_de_Base']['Rendement_Predit'].mean()
-        change = avg_predicted - current_yield
-        st.markdown(f"""
-        <div class="metric-container">
-            <div class="metric-value">{avg_predicted:.2f}%</div>
-            <div class="metric-label">Predicted Average</div>
-            <div style="font-size: 0.8rem; color: {'#10b981' if change < 0 else '#ef4444'};">
-                {change:+.2f}% change
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        confidence_score = "High" if volatility < 0.2 else "Medium" if volatility < 0.4 else "Low"
-        st.markdown(f"""
-        <div class="metric-container">
-            <div class="metric-value">{confidence_score}</div>
-            <div class="metric-label">Confidence Level</div>
-            <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7);">
-                ±{volatility:.2f}% volatility
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        model_accuracy = st.session_state.r2
-        st.markdown(f"""
-        <div class="metric-container">
-            <div class="metric-value">{model_accuracy:.1%}</div>
-            <div class="metric-label">Model Accuracy</div>
-            <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7);">
-                R² Score
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Note Box
     st.markdown(f"""
-    <div class="note-box">
-        <div class="note-text">
-            <strong>Note:</strong> This is a predictive model for financial analysis purposes. 
-            Real financial decisions should always involve additional analysis and professional consultation.
-            The model updates daily and uses the relationship between fixed rates, inflation, 
-            and GDP to predict 52-week yields. Current baseline is June 2025 at {current_yield:.2f}%.
-        </div>
+    <div style="text-align: center; color: #666; padding: 1.5rem; font-size: 0.8rem;">
+        <p><strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
+        <p>Sources historiques: Bank Al-Maghrib, HCP | Surveillance live: {live_sources_count}/4 sources directes</p>
+        <p>Modèle: Régression Linéaire Multiple | Horizon: Juillet 2025 - Décembre 2026</p>
+        <p>Baseline: Juin 2025 ({last_historical_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+        <p><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
     </div>
     """, unsafe_allow_html=True)
 
