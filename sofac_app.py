@@ -430,9 +430,17 @@ def main():
         st.markdown('<div class="executive-dashboard">', unsafe_allow_html=True)
         st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">Tableau de Bord Exécutif</div>', unsafe_allow_html=True)
         
-        # Current situation
+        # Current situation - use the same prediction as sidebar
         today = datetime.now().strftime('%d/%m/%Y')
-        current_prediction = st.session_state.predictions['Cas_de_Base']['rendement_predit'].iloc[0]
+        
+        # Get today's prediction (same logic as sidebar for consistency)
+        if hasattr(st.session_state, 'today_prediction'):
+            current_prediction = st.session_state.today_prediction
+        else:
+            # Fallback: get from first prediction or use baseline
+            cas_de_base = st.session_state.predictions['Cas_de_Base']
+            current_prediction = cas_de_base['rendement_predit'].iloc[0] if len(cas_de_base) > 0 else baseline_yield
+        
         evolution = current_prediction - baseline_yield
         
         # Status determination
@@ -568,6 +576,23 @@ def main():
                 marker=dict(size=5)
             ))
         
+        # Add today's prediction point if available
+        today_str_chart = datetime.now().strftime('%Y-%m-%d')
+        if hasattr(st.session_state, 'today_prediction'):
+            fig.add_trace(go.Scatter(
+                x=[today_str_chart],
+                y=[st.session_state.today_prediction],
+                mode='markers',
+                name="Aujourd'hui",
+                marker=dict(
+                    size=15,
+                    color='red',
+                    symbol='star',
+                    line=dict(width=2, color='white')
+                ),
+                showlegend=True
+            ))
+        
         fig.add_hline(y=baseline_yield, line_dash="dash", line_color="gray", 
                      annotation_text=f"Baseline Juin 2025: {baseline_yield:.2f}%")
         
@@ -580,6 +605,10 @@ def main():
         )
         
         st.plotly_chart(fig, use_container_width=True)
+        
+        # Add consistency note
+        if hasattr(st.session_state, 'today_prediction'):
+            st.info(f"📍 **Note de Cohérence:** La valeur affichée dans la barre latérale ({st.session_state.today_prediction:.3f}%) correspond au point rouge étoilé sur le graphique représentant la prédiction d'aujourd'hui.")
     
     with tab2:
         st.header("Prédictions Détaillées")
