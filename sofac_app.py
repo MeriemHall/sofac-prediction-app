@@ -827,7 +827,7 @@ def main():
     st.markdown(f"""
     <div class="main-header">
         <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700;">SOFAC - Système de Prédiction des Rendements</h1>
-        <h2 style="margin: 0.5rem 0 0 0; font-size: 1.1rem; font-weight: 400; opacity: 0.9;">Modèle d'Intelligence Financière 52-Semaines</h2>
+        <h2 style="margin: 0.5rem 0 0 0; font-size: 1.1rem; font-weight: 400; opacity: 0.9;">Modèle d Intelligence Financière 52-Semaines</h2>
         <p style="margin: 0.8rem 0 0 0; font-size: 0.85rem; opacity: 0.8;">
             Données Bank Al-Maghrib & HCP • Mise à jour: Horaire • Prochaine actualisation: {(datetime.now() + timedelta(hours=1)).strftime('%H:%M')}
         </p>
