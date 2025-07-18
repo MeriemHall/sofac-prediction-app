@@ -83,30 +83,103 @@ def fetch_live_data():
 
 @st.cache_data
 def create_dataset():
-    """Create historical dataset"""
-    data = {
+    """Create complete historical dataset with interpolation"""
+    # Complete historical data
+    donnees_historiques = {
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
         '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
+        '2020-09': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -7.2, 'rendement_52s': 1.68},
+        '2020-12': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -4.8, 'rendement_52s': 1.93},
         '2021-03': {'taux_directeur': 1.50, 'inflation': 0.6, 'pib': 0.3, 'rendement_52s': 1.53},
+        '2021-06': {'taux_directeur': 1.50, 'inflation': 1.1, 'pib': 13.9, 'rendement_52s': 1.52},
+        '2021-12': {'taux_directeur': 1.50, 'inflation': 3.6, 'pib': 7.8, 'rendement_52s': 1.56},
         '2022-03': {'taux_directeur': 1.50, 'inflation': 4.8, 'pib': 2.1, 'rendement_52s': 1.61},
+        '2022-06': {'taux_directeur': 1.50, 'inflation': 7.5, 'pib': 4.3, 'rendement_52s': 1.79},
+        '2022-09': {'taux_directeur': 2.00, 'inflation': 7.4, 'pib': 3.7, 'rendement_52s': 2.18},
         '2023-03': {'taux_directeur': 3.00, 'inflation': 7.9, 'pib': 4.1, 'rendement_52s': 3.41},
+        '2023-06': {'taux_directeur': 3.00, 'inflation': 5.3, 'pib': 2.6, 'rendement_52s': 3.34},
+        '2023-09': {'taux_directeur': 3.00, 'inflation': 4.4, 'pib': 3.2, 'rendement_52s': 3.24},
         '2024-03': {'taux_directeur': 3.00, 'inflation': 2.1, 'pib': 3.5, 'rendement_52s': 2.94},
+        '2024-09': {'taux_directeur': 2.75, 'inflation': 2.2, 'pib': 5.4, 'rendement_52s': 2.69},
+        '2024-12': {'taux_directeur': 2.50, 'inflation': 2.3, 'pib': 4.6, 'rendement_52s': 2.53},
         '2025-03': {'taux_directeur': 2.25, 'inflation': 1.4, 'pib': 3.8, 'rendement_52s': 2.54},
         '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
     }
     
-    df_list = []
-    for date_str, values in data.items():
-        row = {'Date': date_str}
-        row.update(values)
-        df_list.append(row)
+    def interpolation_lineaire(date_debut, date_fin, valeur_debut, valeur_fin, date_cible):
+        debut_num = date_debut.toordinal()
+        fin_num = date_fin.toordinal()
+        cible_num = date_cible.toordinal()
+        if fin_num == debut_num:
+            return valeur_debut
+        progression = (cible_num - debut_num) / (fin_num - debut_num)
+        return valeur_debut + progression * (valeur_fin - valeur_debut)
     
-    return pd.DataFrame(df_list)
+    # Generate monthly data from 2020 to June 2025
+    date_debut = datetime(2020, 1, 1)
+    date_fin = datetime(2025, 6, 30)
+    
+    donnees_mensuelles = []
+    date_courante = date_debut
+    
+    # Convert to datetime objects
+    dates_ancrage = {}
+    for date_str, valeurs in donnees_historiques.items():
+        date_obj = datetime.strptime(date_str + '-01', '%Y-%m-%d')
+        dates_ancrage[date_obj] = valeurs
+    
+    while date_courante <= date_fin:
+        date_str = date_courante.strftime('%Y-%m')
+        est_ancrage = date_courante in dates_ancrage
+        
+        if est_ancrage:
+            point_donnees = dates_ancrage[date_courante]
+        else:
+            # Find surrounding anchor points for interpolation
+            dates_avant = [d for d in dates_ancrage.keys() if d <= date_courante]
+            dates_apres = [d for d in dates_ancrage.keys() if d > date_courante]
+            
+            if dates_avant and dates_apres:
+                date_avant = max(dates_avant)
+                date_apres = min(dates_apres)
+                donnees_avant = dates_ancrage[date_avant]
+                donnees_apres = dates_ancrage[date_apres]
+                
+                point_donnees = {}
+                for variable in ['taux_directeur', 'inflation', 'pib', 'rendement_52s']:
+                    point_donnees[variable] = interpolation_lineaire(
+                        date_avant, date_apres,
+                        donnees_avant[variable], donnees_apres[variable],
+                        date_courante
+                    )
+            elif dates_avant:
+                date_avant = max(dates_avant)
+                point_donnees = dates_ancrage[date_avant].copy()
+            else:
+                date_apres = min(dates_apres)
+                point_donnees = dates_ancrage[date_apres].copy()
+        
+        donnees_mensuelles.append({
+            'Date': date_str,
+            'Taux_Directeur': point_donnees['taux_directeur'],
+            'Inflation': point_donnees['inflation'],
+            'Croissance_PIB': point_donnees['pib'],
+            'Rendement_52s': point_donnees['rendement_52s'],
+            'Est_Point_Ancrage': est_ancrage
+        })
+        
+        # Move to next month
+        if date_courante.month == 12:
+            date_courante = date_courante.replace(year=date_courante.year + 1, month=1)
+        else:
+            date_courante = date_courante.replace(month=date_courante.month + 1)
+    
+    return pd.DataFrame(donnees_mensuelles)
 
 def train_model(df):
-    """Train prediction model"""
-    X = df[['taux_directeur', 'inflation', 'pib']]
-    y = df['rendement_52s']
+    """Train prediction model with proper variable names"""
+    X = df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
+    y = df['Rendement_52s']
     
     model = LinearRegression()
     model.fit(X, y)
@@ -115,57 +188,154 @@ def train_model(df):
     r2 = r2_score(y, y_pred)
     mae = mean_absolute_error(y, y_pred)
     
-    return model, r2, mae
+    # Cross-validation
+    scores_cv = cross_val_score(model, X, y, cv=5, scoring='neg_mean_absolute_error')
+    mae_cv = -scores_cv.mean()
+    
+    return model, r2, mae, mae_cv
 
 def generate_scenarios():
-    """Generate future scenarios"""
-    dates = pd.date_range('2025-07-01', '2026-12-31', freq='D')
+    """Generate realistic economic scenarios"""
+    date_debut = datetime(2025, 7, 1)
+    date_fin = datetime(2026, 12, 31)
+    
+    dates_quotidiennes = []
+    date_courante = date_debut
+    
+    while date_courante <= date_fin:
+        dates_quotidiennes.append(date_courante)
+        date_courante += timedelta(days=1)
+    
+    # Realistic monetary policy decisions
+    decisions_politiques = {
+        'Conservateur': {
+            '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00,
+            '2026-03': 1.75, '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50
+        },
+        'Cas_de_Base': {
+            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75,
+            '2026-03': 1.50, '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25
+        },
+        'Optimiste': {
+            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50,
+            '2026-03': 1.25, '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00
+        }
+    }
     
     scenarios = {}
-    for scenario_name in ['Conservateur', 'Cas_de_Base', 'Optimiste']:
-        data = []
-        for i, date in enumerate(dates):
-            if scenario_name == 'Conservateur':
-                taux = 2.0 if date < pd.Timestamp('2026-01-01') else 1.8
-                inflation = 1.5
-                pib = 3.5
-            elif scenario_name == 'Cas_de_Base':
-                taux = 1.8 if date < pd.Timestamp('2026-01-01') else 1.5
-                inflation = 1.3
-                pib = 3.8
-            else:  # Optimiste
-                taux = 1.5 if date < pd.Timestamp('2026-01-01') else 1.2
-                inflation = 1.1
-                pib = 4.2
+    
+    for nom_scenario in ['Conservateur', 'Cas_de_Base', 'Optimiste']:
+        donnees_scenario = []
+        taux_politiques = decisions_politiques[nom_scenario]
+        
+        for i, date in enumerate(dates_quotidiennes):
+            jours_ahead = i + 1
             
-            data.append({
+            # Determine policy rate based on calendar
+            date_str = date.strftime('%Y-%m')
+            taux_directeur = 2.25  # Default
+            for date_politique, taux in sorted(taux_politiques.items()):
+                if date_str >= date_politique:
+                    taux_directeur = taux
+            
+            # Add realistic economic projections with seasonality
+            np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
+            
+            mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
+            
+            # Scenario-specific economic projections
+            if nom_scenario == 'Conservateur':
+                inflation_base = 1.4 + 0.5 * np.exp(-mois_depuis_debut / 18) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.5 * (mois_depuis_debut / 18) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+            elif nom_scenario == 'Cas_de_Base':
+                inflation_base = 1.4 + 0.3 * np.exp(-mois_depuis_debut / 12) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 - 0.2 * (mois_depuis_debut / 18) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+            else:  # Optimiste
+                inflation_base = 1.4 - 0.2 * (mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 + 0.1 * (mois_depuis_debut / 18) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+            
+            # Add realistic noise
+            inflation = max(0.0, min(5.0, inflation_base + np.random.normal(0, 0.01)))
+            pib = max(-2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
+            
+            donnees_scenario.append({
                 'Date': date.strftime('%Y-%m-%d'),
-                'taux_directeur': taux,
-                'inflation': inflation,
-                'pib': pib
+                'Taux_Directeur': taux_directeur,
+                'Inflation': inflation,
+                'Croissance_PIB': pib,
+                'Jours_Ahead': jours_ahead,
+                'Jour_Semaine': date.strftime('%A'),
+                'Est_Weekend': date.weekday() >= 5
             })
         
-        scenarios[scenario_name] = pd.DataFrame(data)
+        scenarios[nom_scenario] = pd.DataFrame(donnees_scenario)
     
     return scenarios
 
 def predict_yields(scenarios, model):
-    """Generate yield predictions"""
-    predictions = {}
+    """Generate yield predictions with proper continuity"""
     baseline = 1.75  # June 2025 baseline
+    predictions = {}
     
     for scenario_name, scenario_df in scenarios.items():
-        X_future = scenario_df[['taux_directeur', 'inflation', 'pib']]
-        yields = model.predict(X_future)
+        X_future = scenario_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
+        rendements_bruts = model.predict(X_future)
         
-        # Smooth transition from baseline
-        for i in range(len(yields)):
-            if i < 30:  # First 30 days
-                factor = np.exp(-i / 15)
-                yields[i] = baseline + (yields[i] - baseline) * (1 - factor)
+        # Ensure smooth transition from June 2025 baseline
+        if len(rendements_bruts) > 0:
+            premier_predit = rendements_bruts[0]
+            discontinuite = premier_predit - baseline
+            
+            rendements_lisses = rendements_bruts.copy()
+            for i in range(len(rendements_lisses)):
+                jours_depuis_debut = i + 1
+                if jours_depuis_debut <= 30:
+                    facteur_decroissance = np.exp(-jours_depuis_debut / 15)
+                elif jours_depuis_debut <= 90:
+                    facteur_decroissance = np.exp(-30 / 15) * np.exp(-(jours_depuis_debut - 30) / 30)
+                else:
+                    facteur_decroissance = 0
+                
+                ajustement = discontinuite * facteur_decroissance
+                rendements_lisses[i] = rendements_bruts[i] - ajustement
+        else:
+            rendements_lisses = rendements_bruts
         
-        scenario_df['rendement_predit'] = yields
-        predictions[scenario_name] = scenario_df
+        # Apply scenario-specific adjustments
+        ajustements = []
+        for i, ligne in scenario_df.iterrows():
+            ajustement = 0
+            
+            if scenario_name == 'Conservateur':
+                ajustement += 0.1
+            elif scenario_name == 'Optimiste':
+                ajustement -= 0.05
+            
+            # Time-based uncertainty
+            jours_ahead = ligne['Jours_Ahead']
+            incertitude = (jours_ahead / 365) * 0.05
+            if scenario_name == 'Conservateur':
+                ajustement += incertitude
+            elif scenario_name == 'Optimiste':
+                ajustement -= incertitude * 0.5
+            
+            # Day of week effects
+            effets_jours = {
+                'Monday': 0.01, 'Tuesday': 0.00, 'Wednesday': -0.01,
+                'Thursday': 0.00, 'Friday': 0.02, 'Saturday': -0.01, 'Sunday': -0.01
+            }
+            ajustement += effets_jours.get(ligne['Jour_Semaine'], 0)
+            
+            ajustements.append(ajustement)
+        
+        rendements_finaux = rendements_lisses + np.array(ajustements)
+        rendements_finaux = np.clip(rendements_finaux, 0.1, 8.0)
+        
+        scenario_df_copy = scenario_df.copy()
+        scenario_df_copy['rendement_predit'] = rendements_finaux
+        scenario_df_copy['scenario'] = scenario_name
+        
+        predictions[scenario_name] = scenario_df_copy
     
     return predictions
 
@@ -216,7 +386,7 @@ def main():
     if 'data_loaded' not in st.session_state:
         with st.spinner("Chargement du modèle..."):
             st.session_state.df = create_dataset()
-            st.session_state.model, st.session_state.r2, st.session_state.mae = train_model(st.session_state.df)
+            st.session_state.model, st.session_state.r2, st.session_state.mae, st.session_state.mae_cv = train_model(st.session_state.df)
             st.session_state.scenarios = generate_scenarios()
             st.session_state.predictions = predict_yields(st.session_state.scenarios, st.session_state.model)
             st.session_state.recommendations = generate_recommendations(st.session_state.predictions)
@@ -249,6 +419,7 @@ def main():
         st.markdown("### Performance du Modèle")
         st.metric("R² Score", f"{st.session_state.r2:.1%}")
         st.metric("Précision", f"±{st.session_state.mae:.2f}%")
+        st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%")
         st.success("Modèle calibré avec succès")
     
     # Main tabs
@@ -373,26 +544,28 @@ def main():
         
         fig = go.Figure()
         
-        # Historical data
-        df_hist = st.session_state.df.tail(4)
+        # Historical data - use last 8 points for better visualization
+        df_hist = st.session_state.df.tail(8)
         fig.add_trace(go.Scatter(
             x=df_hist['Date'],
-            y=df_hist['rendement_52s'],
+            y=df_hist['Rendement_52s'],
             mode='lines+markers',
             name='Historique',
-            line=dict(color='#2a5298', width=4)
+            line=dict(color='#2a5298', width=4),
+            marker=dict(size=8)
         ))
         
-        # Predictions
+        # Predictions - use weekly sampling for clarity
         colors = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
         for scenario, pred_df in st.session_state.predictions.items():
-            sample_data = pred_df[::30]  # Monthly sampling
+            sample_data = pred_df[::7]  # Weekly sampling
             fig.add_trace(go.Scatter(
                 x=sample_data['Date'],
                 y=sample_data['rendement_predit'],
                 mode='lines+markers',
                 name=scenario,
-                line=dict(color=colors[scenario], width=3)
+                line=dict(color=colors[scenario], width=3),
+                marker=dict(size=5)
             ))
         
         fig.add_hline(y=baseline_yield, line_dash="dash", line_color="gray", 
@@ -401,6 +574,8 @@ def main():
         fig.update_layout(
             height=450,
             template="plotly_white",
+            xaxis_title="Période",
+            yaxis_title="Rendement (%)",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
         )
         
