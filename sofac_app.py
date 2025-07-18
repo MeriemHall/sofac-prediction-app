@@ -22,94 +22,261 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    /* Professional Header */
     .main-header {
-        background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60"><text x="10" y="40" font-family="Arial,sans-serif" font-size="24" font-weight="bold" fill="white">SOFAC</text></svg>');
-        background-repeat: no-repeat;
-        background-position: right 20px center;
-        padding: 1.5rem;
-        border-radius: 8px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3d5aa3 100%);
+        background-image: 
+            url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><text x="5" y="28" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="white">SOFAC</text></svg>'),
+            linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%);
+        background-repeat: no-repeat, repeat;
+        background-position: right 30px center, 0 0;
+        background-size: auto, 20px 20px;
+        padding: 2rem;
+        border-radius: 12px;
         color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    /* Executive Dashboard */
+    .executive-dashboard {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #dee2e6;
+        border-radius: 16px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .executive-dashboard::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #1e3c72, #2a5298, #3d5aa3);
+    }
+    
+    .dashboard-title {
+        text-align: center;
+        color: #2c3e50;
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-bottom: 2rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Status Cards */
+    .status-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 0.8rem 0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border-left: 4px solid;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .status-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    
+    .status-card.success { border-left-color: #28a745; }
+    .status-card.warning { border-left-color: #ffc107; }
+    .status-card.danger { border-left-color: #dc3545; }
+    .status-card.info { border-left-color: #17a2b8; }
+    
+    /* Metrics Grid */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+    
+    .metric-box {
+        background: white;
+        border-radius: 10px;
+        padding: 1.2rem;
+        text-align: center;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+        border-top: 3px solid #2a5298;
+    }
+    
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin: 0.5rem 0;
+    }
+    
+    .metric-label {
+        color: #6c757d;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Recommendation Panel */
+    .recommendation-panel {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        color: white;
+        margin: 2rem 0;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .recommendation-panel::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 100px;
+        height: 100px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        transform: rotate(45deg);
+    }
+    
+    .recommendation-title {
+        font-size: 1.3rem;
+        font-weight: 700;
         text-align: center;
         margin-bottom: 1.5rem;
-        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
-    .metric-card {
-        background: #f8f9fa;
-        padding: 1rem;
+    
+    .action-item {
+        background: rgba(255,255,255,0.15);
         border-radius: 8px;
-        border-left: 4px solid #2a5298;
+        padding: 1rem;
         margin: 0.8rem 0;
-        font-size: 0.85rem;
+        border-left: 4px solid rgba(255,255,255,0.8);
+        backdrop-filter: blur(10px);
     }
-    .recommendation-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1.5rem;
+    
+    /* Professional Cards */
+    .pro-card {
+        background: white;
         border-radius: 12px;
-        margin: 1.5rem 0;
-        text-align: center;
-        font-size: 0.9rem;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+        border: 1px solid rgba(0,0,0,0.05);
     }
-    .data-status {
-        background: #e8f5e8;
-        border: 1px solid #4caf50;
-        padding: 0.4rem;
-        border-radius: 4px;
-        margin: 0.4rem 0;
-        font-size: 0.8rem;
+    
+    .pro-card-header {
+        color: #2c3e50;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
     }
-    .data-warning {
-        background: #fff3cd;
-        border: 1px solid #ffc107;
-        padding: 0.4rem;
-        border-radius: 4px;
-        margin: 0.4rem 0;
-        font-size: 0.8rem;
+    
+    /* Data Quality Indicators */
+    .quality-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
     }
-    .briefing-section {
-        padding: 1rem;
+    
+    .quality-live { background: #28a745; }
+    .quality-estimated { background: #ffc107; }
+    .quality-offline { background: #dc3545; }
+    
+    /* Sidebar Enhancements */
+    .sidebar-section {
+        background: white;
         border-radius: 8px;
-        margin: 0.5rem 0;
-        text-align: center;
-    }
-    .small-text {
-        font-size: 0.8rem;
-    }
-    .medium-text {
-        font-size: 0.9rem;
-    }
-    .large-metric {
-        font-size: 2.5rem;
-        font-weight: bold;
+        padding: 1rem;
         margin: 0.8rem 0;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border-left: 3px solid #2a5298;
     }
-    /* Reduce overall font sizes */
+    
+    /* Reduce overall font sizes while maintaining hierarchy */
     .stMetric label {
-        font-size: 0.8rem !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
     }
-    .stMetric div {
+    .stMetric div[data-testid="metric-container"] > div {
         font-size: 0.9rem !important;
     }
     h1 {
-        font-size: 1.5rem !important;
+        font-size: 1.4rem !important;
+        font-weight: 700 !important;
     }
     h2 {
-        font-size: 1.3rem !important;
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
     }
     h3 {
-        font-size: 1.1rem !important;
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
     }
     h4 {
-        font-size: 1rem !important;
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
     }
     p {
-        font-size: 0.85rem !important;
+        font-size: 0.82rem !important;
+        line-height: 1.4 !important;
     }
-    /* Remove problematic flexbox */
+    
+    /* Remove problematic flexbox and improve spacing */
     .stColumn > div {
-        padding: 0.5rem;
+        padding: 0.3rem;
     }
+    
+    /* Professional buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(42, 82, 152, 0.3);
+    }
+    
+    /* Enhanced tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
 </style>
 """, unsafe_allow_html=True)
 
@@ -239,58 +406,109 @@ def fetch_live_moroccan_data():
     return live_data
 
 def display_live_data_panel(live_data, last_historical_yield):
-    """Display live data panel in sidebar"""
+    """Display live data panel in sidebar with professional styling"""
     
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📡 Données en Temps Réel")
+    st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+    st.sidebar.subheader("📡 Surveillance Économique")
     
     live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
     total_sources = 4
     success_rate = (live_sources / total_sources) * 100
     
     if success_rate >= 50:
-        st.sidebar.markdown('<div class="data-status">● Données partiellement en direct</div>', unsafe_allow_html=True)
+        quality_class = "quality-live"
+        status_text = "Données partiellement en direct"
     else:
-        st.sidebar.markdown('<div class="data-warning">● Données principalement estimées</div>', unsafe_allow_html=True)
+        quality_class = "quality-estimated"
+        status_text = "Données principalement estimées"
     
-    st.sidebar.write(f"**Sources en direct:** {live_sources}/{total_sources} ({success_rate:.0f}%)")
+    st.sidebar.markdown(f'''
+    <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+            <span class="quality-indicator {quality_class}"></span>
+            <span style="font-size: 0.8rem; font-weight: 600;">{status_text}</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #6c757d;">
+            Sources en direct: {live_sources}/{total_sources} ({success_rate:.0f}%)
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
     
     col1, col2 = st.sidebar.columns(2)
     
     with col1:
-        indicator = "●" if 'Live' in live_data['sources']['policy_rate'] else "○"
-        st.metric(
-            f"{indicator} Taux Directeur", 
-            f"{live_data['policy_rate']:.2f}%",
-            help=f"Source: {live_data['sources']['policy_rate']}"
-        )
+        # Policy rate indicator
+        indicator_class = "quality-live" if 'Live' in live_data['sources']['policy_rate'] else "quality-estimated"
+        st.sidebar.markdown(f'''
+        <div style="text-align: center; padding: 0.8rem; background: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 0.3rem;">
+                <span class="quality-indicator {indicator_class}"></span>
+                <span style="font-size: 0.7rem; font-weight: 600; color: #6c757d;">TAUX DIRECTEUR</span>
+            </div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #2c3e50;">
+                {live_data['policy_rate']:.2f}%
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
         
-        indicator = "●" if 'Live' in live_data['sources']['inflation'] else "○"
-        st.metric(
-            f"{indicator} Inflation", 
-            f"{live_data['inflation']:.2f}%",
-            help=f"Source: {live_data['sources']['inflation']}"
-        )
+        # Inflation indicator
+        indicator_class = "quality-live" if 'Live' in live_data['sources']['inflation'] else "quality-estimated"
+        st.sidebar.markdown(f'''
+        <div style="text-align: center; padding: 0.8rem; background: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 0.3rem;">
+                <span class="quality-indicator {indicator_class}"></span>
+                <span style="font-size: 0.7rem; font-weight: 600; color: #6c757d;">INFLATION</span>
+            </div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #2c3e50;">
+                {live_data['inflation']:.2f}%
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
     
     with col2:
-        # Show the actual historical yield instead of the estimated live yield
-        st.metric(
-            "▲ Rendement Actuel", 
-            f"{last_historical_yield:.2f}%",
-            help="Dernière valeur historique (Juin 2025)"
-        )
+        # Current yield (historical baseline)
+        st.sidebar.markdown(f'''
+        <div style="text-align: center; padding: 0.8rem; background: linear-gradient(135deg, #2a5298, #1e3c72); color: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(42, 82, 152, 0.3);">
+            <div style="font-size: 0.7rem; font-weight: 600; margin-bottom: 0.3rem; opacity: 0.9;">
+                RENDEMENT ACTUEL
+            </div>
+            <div style="font-size: 1.2rem; font-weight: 700;">
+                {last_historical_yield:.2f}%
+            </div>
+            <div style="font-size: 0.65rem; opacity: 0.8; margin-top: 0.2rem;">
+                Baseline Juin 2025
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
         
-        st.metric(
-            "○ Croissance PIB", 
-            f"{live_data['gdp_growth']:.2f}%",
-            help=f"Source: {live_data['sources']['gdp_growth']}"
-        )
+        # GDP Growth
+        st.sidebar.markdown(f'''
+        <div style="text-align: center; padding: 0.8rem; background: white; border-radius: 6px; margin: 0.3rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 0.3rem;">
+                <span class="quality-indicator quality-estimated"></span>
+                <span style="font-size: 0.7rem; font-weight: 600; color: #6c757d;">CROISSANCE PIB</span>
+            </div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #2c3e50;">
+                {live_data['gdp_growth']:.2f}%
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
     
-    st.sidebar.info(f"⏰ Dernière mise à jour: {live_data['last_updated']}")
+    st.sidebar.markdown(f'''
+    <div style="background: #e9ecef; padding: 0.6rem; border-radius: 4px; margin: 0.8rem 0; text-align: center;">
+        <div style="font-size: 0.7rem; color: #495057; font-weight: 600;">DERNIÈRE MISE À JOUR</div>
+        <div style="font-size: 0.75rem; color: #6c757d; margin-top: 0.2rem;">
+            {live_data['last_updated']}
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
     
-    if st.sidebar.button("↻ Actualiser"):
+    if st.sidebar.button("↻ Actualiser les Données", key="refresh_data"):
         st.cache_data.clear()
         st.rerun()
+    
+    st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 @st.cache_data
 def create_monthly_dataset():
@@ -605,13 +823,16 @@ def generate_recommendations(predictions):
     return recommandations
 
 def main():
-    st.markdown("""
+    # Enhanced Professional Header
+    st.markdown(f"""
     <div class="main-header">
-        <h1>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</h1>
-        <p>Système d'aide à la décision avec données automatiques Bank Al-Maghrib & HCP</p>
-        <p><strong>Mise à jour:</strong> Horaire | <strong>Prochaine mise à jour:</strong> {}</p>
+        <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700;">SOFAC - Système de Prédiction des Rendements</h1>
+        <h2 style="margin: 0.5rem 0 0 0; font-size: 1.1rem; font-weight: 400; opacity: 0.9;">Modèle d'Intelligence Financière 52-Semaines</h2>
+        <p style="margin: 0.8rem 0 0 0; font-size: 0.85rem; opacity: 0.8;">
+            Données Bank Al-Maghrib & HCP • Mise à jour: Horaire • Prochaine actualisation: {(datetime.now() + timedelta(hours=1)).strftime('%H:%M')}
+        </p>
     </div>
-    """.format((datetime.now() + timedelta(hours=1)).strftime('%H:%M')), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
     # Fetch live data
     with st.spinner("↻ Récupération des données en temps réel..."):
@@ -695,14 +916,15 @@ def main():
     tab1, tab2, tab3 = st.tabs(["📈 Vue d'Ensemble", "🔮 Prédictions Détaillées", "💼 Recommandations"])
     
     with tab1:
-        st.header("📈 Vue d'Ensemble des Prédictions")
+        # PROFESSIONAL EXECUTIVE DASHBOARD
+        st.markdown('<div class="executive-dashboard">', unsafe_allow_html=True)
+        st.markdown('<div class="dashboard-title">📊 Tableau de Bord Exécutif</div>', unsafe_allow_html=True)
         
-        # ENHANCED EXECUTIVE BRIEFING
+        # Get current situation analysis
         today = datetime.now()
         today_str = today.strftime('%Y-%m-%d')
         today_display = today.strftime('%d/%m/%Y')
         
-        # Get current situation analysis
         cas_de_base = st.session_state.predictions['Cas_de_Base']
         current_prediction = None
         trend_direction = None
@@ -735,50 +957,148 @@ def main():
         evolution_vs_baseline = current_prediction - last_historical_yield
         changement_global = recommandation_base['changement_rendement']
         
-        # Determine market condition and urgency
+        # Determine market condition and card styling
         if evolution_vs_baseline > 0.4 or changement_global > 0.4:
-            market_status = "TAUX ÉLEVÉS - DANGER"
-            status_emoji = "🔴"
+            market_status = "TAUX ÉLEVÉS - SITUATION CRITIQUE"
+            status_class = "danger"
             urgency = "IMMÉDIATE"
-            action = "FIXER LES TAUX MAINTENANT"
-            card_color = "#dc3545"
+            action = "BLOQUER LES TAUX MAINTENANT"
         elif evolution_vs_baseline > 0.1 or changement_global > 0.1:
-            market_status = "TAUX EN HAUSSE - ATTENTION"
-            status_emoji = "🟠"
+            market_status = "TAUX EN HAUSSE - VIGILANCE REQUISE"
+            status_class = "warning"
             urgency = "ÉLEVÉE"
-            action = "SURVEILLER ET PRÉPARER"
-            card_color = "#fd7e14"
+            action = "PRÉPARER STRATÉGIE DE COUVERTURE"
         elif evolution_vs_baseline < -0.4 or changement_global < -0.4:
-            market_status = "TAUX FAVORABLES - OPPORTUNITÉ"
-            status_emoji = "🟢"
+            market_status = "OPPORTUNITÉ MAJEURE - TAUX FAVORABLES"
+            status_class = "success"
             urgency = "MODÉRÉE"
-            action = "UTILISER TAUX VARIABLES"
-            card_color = "#28a745"
+            action = "MAXIMISER TAUX VARIABLES"
         elif evolution_vs_baseline < -0.1 or changement_global < -0.1:
-            market_status = "TAUX EN BAISSE - FAVORABLE"
-            status_emoji = "🟡"
+            market_status = "CONTEXTE FAVORABLE - TAUX EN BAISSE"
+            status_class = "success"
             urgency = "NORMALE"
             action = "CONSIDÉRER TAUX VARIABLES"
-            card_color = "#20c997"
         else:
-            market_status = "TAUX STABLES - NEUTRE"
-            status_emoji = "⚪"
+            market_status = "MARCHÉ STABLE - SITUATION ÉQUILIBRÉE"
+            status_class = "info"
             urgency = "FAIBLE"
-            action = "STRATÉGIE ÉQUILIBRÉE"
-            card_color = "#6c757d"
+            action = "MAINTENIR STRATÉGIE ACTUELLE"
         
-        # Calculate key metrics for decision makers
+        # SITUATION SUMMARY CARD
+        st.markdown(f'''
+        <div class="status-card {status_class}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1;">
+                    <h3 style="margin: 0; color: #2c3e50;">Situation au {today_display}</h3>
+                    <p style="margin: 0.5rem 0; font-weight: 600; color: #495057;">{market_status}</p>
+                </div>
+                <div style="text-align: center;">
+                    <div class="metric-value">{current_prediction:.2f}%</div>
+                    <div class="metric-label">Rendement Courant</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 1.2rem; font-weight: 600; color: {'#dc3545' if evolution_vs_baseline > 0 else '#28a745'};">
+                        {evolution_vs_baseline:+.2f}%
+                    </div>
+                    <div class="metric-label">vs Juin 2025</div>
+                </div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # METRICS GRID
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
         volatilite_globale = cas_de_base['Rendement_Predit'].std()
         data_quality = sum(1 for source in live_data['sources'].values() if 'Live' in source)
-        confidence_level = "ÉLEVÉE" if data_quality >= 3 else "MOYENNE" if data_quality >= 2 else "FAIBLE"
+        impact_10m = abs(changement_global) * 10
         
-        # Impact financier estimation
-        impact_10m = abs(changement_global) * 10  # Million MAD per year
+        with col1:
+            st.markdown(f'''
+            <div class="metric-box">
+                <div class="metric-label">Baseline Juin</div>
+                <div class="metric-value">{last_historical_yield:.2f}%</div>
+            </div>
+            ''', unsafe_allow_html=True)
         
-        # EXECUTIVE BRIEFING CARD - Using Streamlit columns for better compatibility
-        st.markdown(f"""
-        <div style="background: {card_color}; color: white; padding: 1.5rem; border-radius: 12px; margin: 1.5rem 0; text-align: center;">
-            <h2 style="margin: 0 0 1rem 0;">📋 BRIEFING EXÉCUTIF - {today_display}</h2>
+        with col2:
+            st.markdown(f'''
+            <div class="metric-box">
+                <div class="metric-label">Évolution</div>
+                <div class="metric-value" style="color: {'#dc3545' if evolution_vs_baseline > 0 else '#28a745'};">
+                    {evolution_vs_baseline:+.2f}%
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f'''
+            <div class="metric-box">
+                <div class="metric-label">Volatilité</div>
+                <div class="metric-value">{volatilite_globale:.2f}%</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f'''
+            <div class="metric-box">
+                <div class="metric-label">Impact 10M MAD</div>
+                <div class="metric-value">{impact_10m:.0f}K/an</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col5:
+            quality_text = "ÉLEVÉE" if data_quality >= 3 else "MOYENNE" if data_quality >= 2 else "FAIBLE"
+            st.markdown(f'''
+            <div class="metric-box">
+                <div class="metric-label">Qualité Données</div>
+                <div class="metric-value" style="font-size: 1.2rem;">{quality_text}</div>
+                <div style="font-size: 0.7rem; color: #6c757d;">{data_quality}/4 sources</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)  # Close executive-dashboard
+        
+        # RECOMMENDATION PANEL
+        strategy = recommandation_base['recommandation']
+        st.markdown(f'''
+        <div class="recommendation-panel">
+            <div class="recommendation-title">⚡ Recommandations Stratégiques Immédiates</div>
+            
+            <div class="action-item">
+                <h4 style="margin: 0 0 0.5rem 0; color: white;">🎯 Action Prioritaire</h4>
+                <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">{action}</p>
+                <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">Niveau d'urgence: {urgency}</p>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
+                <div class="action-item">
+                    <h5 style="margin: 0 0 0.5rem 0; color: white;">📈 Stratégie Globale</h5>
+                    <p style="margin: 0; font-weight: 600;">{strategy}</p>
+                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">
+                        Changement prévu: {changement_global:+.2f}% (18 mois)
+                    </p>
+                </div>
+                <div class="action-item">
+                    <h5 style="margin: 0 0 0.5rem 0; color: white;">📊 Tendance Court Terme</h5>
+                    <p style="margin: 0; font-weight: 600;">{trend_direction} {trend_strength}</p>
+                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">
+                        Horizon: 30 jours | Risque: {recommandation_base['niveau_risque']}
+                    </p>
+                </div>
+            </div>
+            
+            <div class="action-item" style="margin-top: 1rem; background: rgba(255,255,255,0.2);">
+                <h5 style="margin: 0 0 0.5rem 0; color: white;">💰 Impact Financier Estimé</h5>
+                <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">
+                    {abs(changement_global) * 100:.0f}K MAD/an pour 10M MAD d'emprunt
+                </p>
+                <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">
+                    {'Économies potentielles' if changement_global < 0 else 'Surcoûts évités'} avec stratégie recommandée
+                </p>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)IF - {today_display}</h2>
         </div>
         """, unsafe_allow_html=True)
         
@@ -883,11 +1203,9 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         
-        # Separator
-        st.markdown("---")
-        
-        # Overview chart
-        st.subheader("📊 Évolution des Rendements: Historique et Prédictions")
+        # HISTORICAL vs PREDICTIONS CHART
+        st.markdown('<div class="pro-card">', unsafe_allow_html=True)
+        st.markdown('<div class="pro-card-header">📊 Évolution Historique et Prédictions</div>', unsafe_allow_html=True)
         
         fig_overview = go.Figure()
         
@@ -900,13 +1218,13 @@ def main():
                 y=df_recent['Rendement_52s'],
                 mode='lines+markers',
                 name='Historique',
-                line=dict(color='#60A5FA', width=4),
-                marker=dict(size=8)
+                line=dict(color='#2a5298', width=4),
+                marker=dict(size=8, color='#2a5298')
             )
         )
         
         # Prediction scenarios starting from July 2025
-        couleurs = {'Conservateur': '#FF6B6B', 'Cas_de_Base': '#4ECDC4', 'Optimiste': '#45B7D1'}
+        couleurs = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
         
         for nom_scenario, pred_df in st.session_state.predictions.items():
             donnees_hebdo = pred_df[::7]  # Weekly sampling for clarity
@@ -916,38 +1234,75 @@ def main():
                     x=donnees_hebdo['Date'],
                     y=donnees_hebdo['Rendement_Predit'],
                     mode='lines+markers',
-                    name=f'Prédiction {nom_scenario}',
+                    name=f'{nom_scenario}',
                     line=dict(color=couleurs[nom_scenario], width=3),
-                    marker=dict(size=6)
+                    marker=dict(size=5)
                 )
             )
         
+        # Add baseline reference
+        fig_overview.add_hline(
+            y=last_historical_yield, 
+            line_dash="dash", 
+            line_color="gray",
+            annotation_text=f"Baseline Juin 2025: {last_historical_yield:.2f}%"
+        )
+        
         fig_overview.update_layout(
-            title="Évolution des Rendements 52-Semaines: Historique (2020-2025) et Prédictions (2025-2026)",
-            xaxis_title="Date",
+            title="",
+            xaxis_title="Période",
             yaxis_title="Rendement (%)",
-            height=500,
+            height=450,
             template="plotly_white",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+            margin=dict(l=50, r=50, t=20, b=50)
         )
         
         st.plotly_chart(fig_overview, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        # Quick recommendations
-        st.subheader("🎯 Recommandations Rapides")
+        # SCENARIO COMPARISON CARDS
+        st.markdown('<div class="pro-card">', unsafe_allow_html=True)
+        st.markdown('<div class="pro-card-header">📈 Comparaison des Scénarios</div>', unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
         
+        scenario_colors = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
+        
         for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
             with [col1, col2, col3][i]:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <h4>{scenario}</h4>
-                    <p><strong>{rec['recommandation']}</strong></p>
-                    <p>Changement: {rec['changement_rendement']:+.2f}%</p>
-                    <p>Risque: {rec['niveau_risque']}</p>
+                color = scenario_colors[scenario]
+                st.markdown(f'''
+                <div style="border: 2px solid {color}; border-radius: 10px; padding: 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, {color}15, {color}05);">
+                    <h4 style="margin: 0 0 0.8rem 0; color: {color}; text-align: center; font-weight: 700;">
+                        {scenario.replace('_', ' ').upper()}
+                    </h4>
+                    <div style="text-align: center; margin: 0.8rem 0;">
+                        <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">
+                            {rec['rendement_futur_moyen']:.2f}%
+                        </div>
+                        <div style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase;">
+                            Rendement Moyen
+                        </div>
+                    </div>
+                    <div style="padding: 0.8rem; background: white; border-radius: 6px; margin: 0.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
+                            <strong>Stratégie:</strong> {rec['recommandation']}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
+                            <strong>Changement:</strong> 
+                            <span style="color: {'#dc3545' if rec['changement_rendement'] > 0 else '#28a745'}; font-weight: 600;">
+                                {rec['changement_rendement']:+.2f}%
+                            </span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #495057;">
+                            <strong>Risque:</strong> {rec['niveau_risque']}
+                        </div>
+                    </div>
                 </div>
-                """, unsafe_allow_html=True)
+                ''', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with tab2:
         st.header("🔮 Prédictions Détaillées")
