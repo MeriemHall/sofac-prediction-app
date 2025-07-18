@@ -1272,6 +1272,8 @@ def main():
         for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
             with [col1, col2, col3][i]:
                 color = scenario_colors[scenario]
+                change_color = "#dc3545" if rec['changement_rendement'] > 0 else "#28a745"
+                
                 st.markdown(f"""
                 <div style="border: 2px solid {color}; border-radius: 10px; padding: 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, {color}15, {color}05);">
                     <h4 style="margin: 0 0 0.8rem 0; color: {color}; text-align: center; font-weight: 700;">
@@ -1291,7 +1293,7 @@ def main():
                         </div>
                         <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
                             <strong>Changement:</strong> 
-                            <span style="color: #dc3545 if {rec['changement_rendement']} > 0 else #28a745; font-weight: 600;">
+                            <span style="color: {change_color}; font-weight: 600;">
                                 {rec['changement_rendement']:+.2f}%
                             </span>
                         </div>
