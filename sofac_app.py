@@ -1061,16 +1061,20 @@ def main():
         
         # RECOMMENDATION PANEL
         strategy = recommandation_base['recommandation']
-        st.markdown(f'''
-        <div class="recommendation-panel">
-            <div class="recommendation-title">⚡ Recommandations Stratégiques Immédiates</div>
-            
+        
+        # Create the recommendation panel HTML in parts to avoid f-string issues
+        panel_header = f'<div class="recommendation-panel">'
+        panel_title = '<div class="recommendation-title">⚡ Recommandations Stratégiques Immédiates</div>'
+        
+        action_item_html = f'''
             <div class="action-item">
                 <h4 style="margin: 0 0 0.5rem 0; color: white;">🎯 Action Prioritaire</h4>
                 <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">{action}</p>
-                <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">Niveau d'urgence: {urgency}</p>
+                <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">Niveau d urgence: {urgency}</p>
             </div>
-            
+        '''
+        
+        strategy_grid_html = f'''
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
                 <div class="action-item">
                     <h5 style="margin: 0 0 0.5rem 0; color: white;">📈 Stratégie Globale</h5>
@@ -1087,18 +1091,26 @@ def main():
                     </p>
                 </div>
             </div>
-            
+        '''
+        
+        financial_impact_html = f'''
             <div class="action-item" style="margin-top: 1rem; background: rgba(255,255,255,0.2);">
                 <h5 style="margin: 0 0 0.5rem 0; color: white;">💰 Impact Financier Estimé</h5>
                 <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">
-                    {abs(changement_global) * 100:.0f}K MAD/an pour 10M MAD d'emprunt
+                    {abs(changement_global) * 100:.0f}K MAD/an pour 10M MAD d emprunt
                 </p>
                 <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">
                     {'Économies potentielles' if changement_global < 0 else 'Surcoûts évités'} avec stratégie recommandée
                 </p>
             </div>
-        </div>
-        ''', unsafe_allow_html=True)IF - {today_display}</h2>
+        '''
+        
+        panel_footer = '</div>'
+        
+        # Combine all parts
+        complete_panel = panel_header + panel_title + action_item_html + strategy_grid_html + financial_impact_html + panel_footer
+        
+        st.markdown(complete_panel, unsafe_allow_html=True)IF - {today_display}</h2>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1273,11 +1285,12 @@ def main():
             with [col1, col2, col3][i]:
                 color = scenario_colors[scenario]
                 change_color = "#dc3545" if rec['changement_rendement'] > 0 else "#28a745"
+                scenario_name = scenario.replace('_', ' ').upper()
                 
-                st.markdown(f"""
+                card_html = f'''
                 <div style="border: 2px solid {color}; border-radius: 10px; padding: 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, {color}15, {color}05);">
                     <h4 style="margin: 0 0 0.8rem 0; color: {color}; text-align: center; font-weight: 700;">
-                        {scenario.replace('_', ' ').upper()}
+                        {scenario_name}
                     </h4>
                     <div style="text-align: center; margin: 0.8rem 0;">
                         <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">
@@ -1302,7 +1315,9 @@ def main():
                         </div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                '''
+                
+                st.markdown(card_html, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
     
