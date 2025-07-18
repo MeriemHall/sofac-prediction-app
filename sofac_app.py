@@ -1272,35 +1272,35 @@ def main():
         for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
             with [col1, col2, col3][i]:
                 color = scenario_colors[scenario]
-                st.markdown(f'''
-                <div style="border: 2px solid {color}; border-radius: 10px; padding: 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, {color}15, {color}05);">
-                    <h4 style="margin: 0 0 0.8rem 0; color: {color}; text-align: center; font-weight: 700;">
-                        {scenario.replace('_', ' ').upper()}
-                    </h4>
-                    <div style="text-align: center; margin: 0.8rem 0;">
-                        <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">
-                            {rec['rendement_futur_moyen']:.2f}%
-                        </div>
-                        <div style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase;">
-                            Rendement Moyen
-                        </div>
-                    </div>
-                    <div style="padding: 0.8rem; background: white; border-radius: 6px; margin: 0.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                        <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
-                            <strong>Stratégie:</strong> {rec['recommandation']}
-                        </div>
-                        <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
-                            <strong>Changement:</strong> 
-                            <span style="color: {'#dc3545' if rec['changement_rendement'] > 0 else '#28a745'}; font-weight: 600;">
-                                {rec['changement_rendement']:+.2f}%
-                            </span>
-                        </div>
-                        <div style="font-size: 0.8rem; color: #495057;">
-                            <strong>Risque:</strong> {rec['niveau_risque']}
-                        </div>
-                    </div>
+        st.markdown(f'''
+        <div style="border: 2px solid {color}; border-radius: 10px; padding: 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, {color}15, {color}05);">
+            <h4 style="margin: 0 0 0.8rem 0; color: {color}; text-align: center; font-weight: 700;">
+                {scenario.replace('_', ' ').upper()}
+            </h4>
+            <div style="text-align: center; margin: 0.8rem 0;">
+                <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">
+                    {rec['rendement_futur_moyen']:.2f}%
                 </div>
-                ''', unsafe_allow_html=True)
+                <div style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase;">
+                    Rendement Moyen
+                </div>
+            </div>
+            <div style="padding: 0.8rem; background: white; border-radius: 6px; margin: 0.5rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
+                    <strong>Stratégie:</strong> {rec['recommandation']}
+                </div>
+                <div style="font-size: 0.8rem; color: #495057; margin-bottom: 0.3rem;">
+                    <strong>Changement:</strong> 
+                    <span style="color: {'#dc3545' if rec['changement_rendement'] > 0 else '#28a745'}; font-weight: 600;">
+                        {rec['changement_rendement']:+.2f}%
+                    </span>
+                </div>
+                <div style="font-size: 0.8rem; color: #495057;">
+                    <strong>Risque:</strong> {rec['niveau_risque']}
+                </div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
     
