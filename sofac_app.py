@@ -1,37 +1,4 @@
-# Quick recommendations with professional cards
-        st.subheader("Recommandations Rapides")
-        
-        col1, col2, col3 = st.columns(3, gap="medium")
-        
-        for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
-            with [col1, col2, col3][i]:
-                # Determine card color based on recommendation
-                if rec['recommandation'] == 'TAUX VARIABLE':
-                    card_color_rec = '#22c55e'
-                elif rec['recommandation'] == 'TAUX FIXE':
-                    card_color_rec = '#ef4444'
-                else:
-                    card_color_rec = '#f59e0b'
-                
-                st.markdown(f"""
-                <div class="metric-card" style="border-left: 4px solid {card_color_rec};">
-                    <h4 style="color: #374151; font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">{scenario}</h4>
-                    <div style="background: {card_color_rec}; color: white; padding: 0.5rem; border-radius: 6px; margin-bottom: 0.75rem; text-align: center;">
-                        <p style="margin: 0; font-size: 0.9rem; font-weight: 600;">{rec['recommandation']}</p>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                        <span style="font-size: 0.8rem; color: #6b7280;">Changement:</span>
-                        <span style="font-size: 0.8rem; font-weight: 500; color: #374151;">{rec['changement_rendement']:+.2f}%</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-size: 0.8rem; color: #6b7280;">Risque:</span>
-                        <span style="font-size: 0.8rem; font-weight: 500; color: #374151;">{rec['niveau_risque']}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    with tab2:
-        st.header("🔮 Prédictions Détaillées")import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -508,7 +475,7 @@ def display_live_data_panel(live_data, last_historical_yield):
     """Display live data panel in sidebar"""
     
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📡 Données en Temps Réel")
+    st.sidebar.subheader("Données en Temps Réel")
     
     live_sources = sum(1 for source in live_data['sources'].values() if 'Live' in source)
     total_sources = 4
@@ -899,14 +866,14 @@ def main():
     last_historical_yield = st.session_state.df_mensuel.iloc[-1]['Rendement_52s']  # 1.75%
     
     with st.sidebar:
-        st.header("📊 Informations du Modèle")
+        st.header("Informations du Modèle")
         
         # Display live data panel with corrected historical yield
         display_live_data_panel(live_data, last_historical_yield)
         
         # TODAY'S PREDICTION SECTION
         st.sidebar.markdown("---")
-        st.sidebar.subheader("📅 Prédiction du Jour")
+        st.sidebar.subheader("Prédiction du Jour")
         
         # Get today's date and prediction
         today = datetime.now()
@@ -932,7 +899,7 @@ def main():
         if today_prediction is not None:
             st.sidebar.success(f"**{today_display}**")
             st.sidebar.metric(
-                "🎯 Rendement Prédit Aujourd'hui",
+                "Rendement Prédit Aujourd'hui",
                 f"{today_prediction:.2f}%",
                 delta=f"{(today_prediction - last_historical_yield):+.2f}%",
                 help="Prédiction pour aujourd'hui vs baseline juin 2025"
@@ -940,19 +907,19 @@ def main():
         elif closest_prediction is not None:
             st.sidebar.warning(f"**{today_display}**")
             st.sidebar.metric(
-                "🎯 Prédiction Prochaine",
+                "Prédiction Prochaine",
                 f"{closest_prediction:.2f}%",
                 delta=f"{(closest_prediction - last_historical_yield):+.2f}%",
                 help="Prochaine prédiction disponible"
             )
         else:
             st.sidebar.info(f"**{today_display}**")
-            st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
+            st.sidebar.write("**Prédiction:** Données en cours de traitement")
         
         st.success("✓ Modèle calibré avec données historiques!")
         
         # Model performance metrics
-        st.subheader("🎯 Performance du Modèle")
+        st.subheader("Performance du Modèle")
         st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Pourcentage de variance expliquée")
         st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
         st.metric("Validation Croisée", f"±{st.session_state.mae_vc:.2f}%", help="Erreur en validation croisée")
@@ -960,10 +927,10 @@ def main():
         st.info("↻ Données live utilisées pour surveillance économique uniquement.")
     
     # Main content tabs
-    tab1, tab2, tab3 = st.tabs(["📈 Vue d'Ensemble", "🔮 Prédictions Détaillées", "💼 Recommandations"])
+    tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
     
     with tab1:
-        st.header("📈 Vue d'Ensemble des Prédictions")
+        st.header("Vue d'Ensemble des Prédictions")
         
         # ENHANCED EXECUTIVE BRIEFING
         today = datetime.now()
@@ -1006,31 +973,31 @@ def main():
         # Determine market condition and urgency
         if evolution_vs_baseline > 0.4 or changement_global > 0.4:
             market_status = "TAUX ÉLEVÉS - DANGER"
-            status_emoji = "🔴"
+            status_emoji = "●"
             urgency = "IMMÉDIATE"
             action = "FIXER LES TAUX MAINTENANT"
             card_color = "#dc3545"
         elif evolution_vs_baseline > 0.1 or changement_global > 0.1:
             market_status = "TAUX EN HAUSSE - ATTENTION"
-            status_emoji = "🟠"
+            status_emoji = "●"
             urgency = "ÉLEVÉE"
             action = "SURVEILLER ET PRÉPARER"
             card_color = "#fd7e14"
         elif evolution_vs_baseline < -0.4 or changement_global < -0.4:
             market_status = "TAUX FAVORABLES - OPPORTUNITÉ"
-            status_emoji = "🟢"
+            status_emoji = "●"
             urgency = "MODÉRÉE"
             action = "UTILISER TAUX VARIABLES"
             card_color = "#28a745"
         elif evolution_vs_baseline < -0.1 or changement_global < -0.1:
             market_status = "TAUX EN BAISSE - FAVORABLE"
-            status_emoji = "🟡"
+            status_emoji = "●"
             urgency = "NORMALE"
             action = "CONSIDÉRER TAUX VARIABLES"
             card_color = "#20c997"
         else:
             market_status = "TAUX STABLES - NEUTRE"
-            status_emoji = "⚪"
+            status_emoji = "○"
             urgency = "FAIBLE"
             action = "STRATÉGIE ÉQUILIBRÉE"
             card_color = "#6c757d"
@@ -1099,35 +1066,35 @@ def main():
         
         with col1:
             st.metric(
-                "📊 Baseline Juin",
+                "Baseline Juin",
                 f"{last_historical_yield:.2f}%",
                 help="Dernière valeur historique"
             )
         
         with col2:
             st.metric(
-                "📈 Évolution",
+                "Évolution",
                 f"{evolution_vs_baseline:+.2f}%",
                 delta="vs Baseline"
             )
         
         with col3:
             st.metric(
-                "⚡ Volatilité",
+                "Volatilité",
                 f"{volatilite_globale:.2f}%",
                 help="Risque de fluctuation"
             )
         
         with col4:
             st.metric(
-                "💰 Impact 10M MAD",
+                "Impact 10M MAD",
                 f"{impact_10m:.0f}K/an",
                 help="Impact financier estimé"
             )
         
         with col5:
             st.metric(
-                "🎯 Confiance",
+                "Confiance",
                 confidence_level,
                 delta=f"{data_quality}/4 sources"
             )
@@ -1139,7 +1106,7 @@ def main():
         with col1:
             st.markdown(f"""
             <div style="background: rgba(0,0,0,0.05); padding: 1rem; border-radius: 8px; border-left: 4px solid {card_color};">
-                <h4 style="margin: 0 0 0.5rem 0; color: {card_color};">📋 RÉSUMÉ SITUATION</h4>
+                <h4 style="margin: 0 0 0.5rem 0; color: {card_color};">RÉSUMÉ SITUATION</h4>
                 <p style="margin: 0; font-size: 0.85rem;"><strong>Rendement actuel:</strong> {current_prediction:.2f}%</p>
                 <p style="margin: 0; font-size: 0.85rem;"><strong>Changement prévu:</strong> {changement_global:+.2f}% (18 mois)</p>
                 <p style="margin: 0; font-size: 0.85rem;"><strong>Tendance court terme:</strong> {trend_direction} {trend_strength}</p>
@@ -1151,7 +1118,7 @@ def main():
             strategy = recommandation_base['recommandation']
             st.markdown(f"""
             <div style="background: rgba(0,0,0,0.05); padding: 1rem; border-radius: 8px; border-left: 4px solid {card_color};">
-                <h4 style="margin: 0 0 0.5rem 0; color: {card_color};">⚡ ACTIONS IMMÉDIATES</h4>
+                <h4 style="margin: 0 0 0.5rem 0; color: {card_color};">ACTIONS IMMÉDIATES</h4>
                 <p style="margin: 0; font-size: 0.85rem;"><strong>Stratégie:</strong> {strategy}</p>
                 <p style="margin: 0; font-size: 0.85rem;"><strong>Horizon décision:</strong> {"Immédiat" if urgency in ["IMMÉDIATE", "ÉLEVÉE"] else "1-3 mois"}</p>
                 <p style="margin: 0; font-size: 0.85rem;"><strong>Impact financier:</strong> {impact_10m:.0f}K MAD/an (10M MAD)</p>
@@ -1163,7 +1130,7 @@ def main():
         st.markdown("---")
         
         # Overview chart
-        st.subheader("📊 Évolution des Rendements: Historique et Prédictions")
+        st.subheader("Évolution des Rendements: Historique et Prédictions")
         
         fig_overview = go.Figure()
         
@@ -1209,24 +1176,40 @@ def main():
         
         st.plotly_chart(fig_overview, use_container_width=True)
         
-        # Quick recommendations
-        st.subheader("🎯 Recommandations Rapides")
+        # Quick recommendations with professional cards
+        st.subheader("Recommandations Rapides")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3, gap="medium")
         
         for i, (scenario, rec) in enumerate(st.session_state.recommandations.items()):
             with [col1, col2, col3][i]:
+                # Determine card color based on recommendation
+                if rec['recommandation'] == 'TAUX VARIABLE':
+                    card_color_rec = '#22c55e'
+                elif rec['recommandation'] == 'TAUX FIXE':
+                    card_color_rec = '#ef4444'
+                else:
+                    card_color_rec = '#f59e0b'
+                
                 st.markdown(f"""
-                <div class="metric-card">
-                    <h4>{scenario}</h4>
-                    <p><strong>{rec['recommandation']}</strong></p>
-                    <p>Changement: {rec['changement_rendement']:+.2f}%</p>
-                    <p>Risque: {rec['niveau_risque']}</p>
+                <div class="metric-card" style="border-left: 4px solid {card_color_rec};">
+                    <h4 style="color: #374151; font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">{scenario}</h4>
+                    <div style="background: {card_color_rec}; color: white; padding: 0.5rem; border-radius: 6px; margin-bottom: 0.75rem; text-align: center;">
+                        <p style="margin: 0; font-size: 0.9rem; font-weight: 600;">{rec['recommandation']}</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.8rem; color: #6b7280;">Changement:</span>
+                        <span style="font-size: 0.8rem; font-weight: 500; color: #374151;">{rec['changement_rendement']:+.2f}%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="font-size: 0.8rem; color: #6b7280;">Risque:</span>
+                        <span style="font-size: 0.8rem; font-weight: 500; color: #374151;">{rec['niveau_risque']}</span>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
     
     with tab2:
-        st.header("🔮 Prédictions Détaillées")
+        st.header("Prédictions Détaillées")
         
         scenario_selectionne = st.selectbox(
             "Choisissez un scénario:",
@@ -1251,7 +1234,7 @@ def main():
             st.metric("Écart vs Juin 2025", f"{baseline_comparison:+.2f}%")
         
         # Detailed prediction chart
-        st.subheader(f"📊 Prédictions Quotidiennes - Scénario {scenario_selectionne}")
+        st.subheader(f"Prédictions Quotidiennes - Scénario {scenario_selectionne}")
         
         donnees_affichage = pred_scenario[::3]
         
@@ -1301,7 +1284,7 @@ def main():
         st.plotly_chart(fig_detail, use_container_width=True)
         
         # Export functionality
-        if st.button("⬇ Télécharger les Prédictions"):
+        if st.button("Télécharger les Prédictions"):
             pred_export = pred_scenario.copy()
             pred_export['Baseline_Juin_2025'] = last_historical_yield
             
@@ -1314,7 +1297,7 @@ def main():
             )
     
     with tab3:
-        st.header("💼 Recommandations Stratégiques")
+        st.header("Recommandations Stratégiques")
         
         # Global recommendation
         liste_recommandations = [rec['recommandation'] for rec in st.session_state.recommandations.values()]
@@ -1338,7 +1321,7 @@ def main():
         
         st.markdown(f"""
         <div class="recommendation-box" style="background: linear-gradient(135deg, {couleur_globale} 0%, {couleur_globale}AA 100%);">
-            <h2>▲ RECOMMANDATION GLOBALE SOFAC</h2>
+            <h2>RECOMMANDATION GLOBALE SOFAC</h2>
             <h3>{strategie_globale}</h3>
             <p>{raison_globale}</p>
             <small>{quality_text}</small>
@@ -1346,10 +1329,10 @@ def main():
         """, unsafe_allow_html=True)
         
         # Detailed scenario analysis
-        st.subheader("📊 Analyse Détaillée par Scénario")
+        st.subheader("Analyse Détaillée par Scénario")
         
         for nom_scenario, rec in st.session_state.recommandations.items():
-            with st.expander(f"📈 Scénario {nom_scenario}", expanded=True):
+            with st.expander(f"Scénario {nom_scenario}", expanded=True):
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
@@ -1402,7 +1385,7 @@ def main():
                     st.plotly_chart(fig_mini, use_container_width=True)
         
         # Financial impact calculator
-        st.subheader("💰 Calculateur d'Impact Financier")
+        st.subheader("Calculateur d'Impact Financier")
         
         col1, col2 = st.columns(2)
         
@@ -1430,7 +1413,7 @@ def main():
         if abs(changement_cas_base) > 0.2:
             if changement_cas_base < 0:
                 st.success(f"""
-                💰 **Économies Potentielles avec TAUX VARIABLE:**
+                **Économies Potentielles avec TAUX VARIABLE:**
                 
                 - **Économies annuelles:** {abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
                 - **Économies totales ({duree_emprunt} ans):** {abs(impact_total):,.0f} MAD
@@ -1438,7 +1421,7 @@ def main():
                 """)
             else:
                 st.warning(f"""
-                💰 **Coûts Évités avec TAUX FIXE:**
+                **Coûts Évités avec TAUX FIXE:**
                 
                 - **Surcoûts évités annuellement:** {changement_cas_base * montant_emprunt * 10_000:,.0f} MAD
                 - **Surcoûts évités totaux ({duree_emprunt} ans):** {impact_total:,.0f} MAD
@@ -1446,7 +1429,7 @@ def main():
                 """)
         else:
             st.info(f"""
-            💰 **Impact Financier Limité:**
+            **Impact Financier Limité:**
             
             - **Variation attendue:** ±{abs(changement_cas_base):.2f}% vs juin 2025 ({last_historical_yield:.2f}%)
             - **Impact annuel:** ±{abs(changement_cas_base) * montant_emprunt * 10_000:,.0f} MAD
