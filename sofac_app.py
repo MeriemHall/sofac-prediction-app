@@ -474,12 +474,9 @@ def main():
     
     # Sidebar with logo
     with st.sidebar:
-        # Add logo to sidebar
-        st.markdown(f"""
-        <div class="sidebar-logo">
-            {logo_svg}
-        </div>
-        """, unsafe_allow_html=True)
+        # Add logo to sidebar - simplified approach
+        logo_svg = create_sofac_logo_svg()
+        st.markdown(f'<div style="text-align: center; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">{logo_svg}</div>', unsafe_allow_html=True)
         
         st.header("Informations du Modèle")
         
@@ -910,21 +907,23 @@ def main():
     st.markdown("---")
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    st.markdown(f"""
-    <div style="text-align: center; color: #666; padding: 2rem; font-size: 0.8rem; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px;">
-        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
-            <div style="margin-right: 1rem;">
-                {logo_svg}
-            </div>
-            <div>
-                <p style="margin: 0; font-weight: bold; font-size: 1rem; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
-                <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
-            </div>
+    # Create a simpler footer without complex HTML
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        # Simple logo display
+        logo_svg = create_sofac_logo_svg()
+        st.markdown(f'<div style="text-align: center; margin-bottom: 1rem;">{logo_svg}</div>', unsafe_allow_html=True)
+        
+        # Footer text
+        st.markdown(f"""
+        <div style="text-align: center; color: #666; font-size: 0.8rem;">
+            <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
+            <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
+            <p style="margin: 0.5rem 0;">Baseline: Juin 2025 ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+            <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
         </div>
-        <p style="margin: 0.5rem 0;">Baseline: Juin 2025 ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
-        <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
