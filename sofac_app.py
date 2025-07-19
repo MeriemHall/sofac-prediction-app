@@ -10,6 +10,9 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import warnings
+import base64
+from PIL import Image
+import io
 warnings.filterwarnings('ignore')
 
 st.set_page_config(
@@ -19,10 +22,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Professional CSS
-st.markdown("""
+# Function to encode image to base64
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# Function to create the SOFAC logo as SVG (since we can't load external images)
+def create_sofac_logo_svg():
+    return """
+    <svg width="200" height="80" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
+        <!-- Yellow circle -->
+        <circle cx="25" cy="25" r="8" fill="#FFD700"/>
+        <!-- Blue swoosh -->
+        <path d="M15 35 Q30 25 45 35 Q60 45 75 35 Q90 25 105 35" 
+              stroke="#1e3c72" stroke-width="4" fill="none"/>
+        <!-- SOFAC text -->
+        <text x="15" y="55" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#1e3c72">SOFAC</text>
+        <!-- Tagline -->
+        <text x="15" y="70" font-family="Arial, sans-serif" font-size="10" fill="#FF6B35">Dites oui au super crédit</text>
+    </svg>
+    """
+
+# Professional CSS with logo integration
+st.markdown(f"""
 <style>
-    .main-header {
+    .main-header {{
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3d5aa3 100%);
         padding: 2rem;
         border-radius: 12px;
@@ -30,43 +55,82 @@ st.markdown("""
         text-align: center;
         margin-bottom: 2rem;
         box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    }
-    .executive-dashboard {
+        position: relative;
+    }}
+    .logo-container {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }}
+    .logo-svg {{
+        margin-right: 2rem;
+        background: white;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }}
+    .header-text {{
+        text-align: left;
+    }}
+    .executive-dashboard {{
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border: 2px solid #dee2e6;
         border-radius: 16px;
         padding: 2rem;
         margin: 2rem 0;
         box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    }
-    .status-card {
+    }}
+    .status-card {{
         background: white;
         border-radius: 12px;
         padding: 1.5rem;
         margin: 0.8rem 0;
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         border-left: 4px solid #2a5298;
-    }
-    .metric-box {
+    }}
+    .metric-box {{
         background: white;
         border-radius: 10px;
         padding: 1.2rem;
         text-align: center;
         box-shadow: 0 3px 15px rgba(0,0,0,0.08);
         border-top: 3px solid #2a5298;
-    }
-    .recommendation-panel {
+    }}
+    .recommendation-panel {{
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 16px;
         padding: 2rem;
         color: white;
         margin: 2rem 0;
         box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-    }
-    .stMetric label { font-size: 0.75rem !important; }
-    h1 { font-size: 1.4rem !important; }
-    h2 { font-size: 1.2rem !important; }
-    p { font-size: 0.82rem !important; }
+    }}
+    .sidebar-logo {{
+        text-align: center;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }}
+    .stMetric label {{ font-size: 0.75rem !important; }}
+    h1 {{ font-size: 1.4rem !important; }}
+    h2 {{ font-size: 1.2rem !important; }}
+    p {{ font-size: 0.82rem !important; }}
+    
+    /* Mobile responsiveness for logo */
+    @media (max-width: 768px) {{
+        .logo-container {{
+            flex-direction: column;
+        }}
+        .logo-svg {{
+            margin-right: 0;
+            margin-bottom: 1rem;
+        }}
+        .header-text {{
+            text-align: center;
+        }}
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -380,12 +444,21 @@ def generate_recommendations(predictions):
     return recommendations
 
 def main():
-    # Header
-    st.markdown("""
+    # Header with logo
+    logo_svg = create_sofac_logo_svg()
+    
+    st.markdown(f"""
     <div class="main-header">
-        <h1>SOFAC - Système de Prédiction des Rendements</h1>
-        <p>Modèle d'Intelligence Financière 52-Semaines</p>
-        <p>Données Bank Al-Maghrib & HCP | Mise à jour: Horaire</p>
+        <div class="logo-container">
+            <div class="logo-svg">
+                {logo_svg}
+            </div>
+            <div class="header-text">
+                <h1>Système de Prédiction des Rendements</h1>
+                <p>Modèle d'Intelligence Financière 52-Semaines</p>
+                <p>Données Bank Al-Maghrib & HCP | Mise à jour: Horaire</p>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -402,8 +475,15 @@ def main():
     live_data = fetch_live_data()
     baseline_yield = 1.75  # June 2025
     
-    # Sidebar
+    # Sidebar with logo
     with st.sidebar:
+        # Add logo to sidebar
+        st.markdown(f"""
+        <div class="sidebar-logo">
+            {logo_svg}
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.header("Informations du Modèle")
         
         st.markdown("### Données en Temps Réel")
@@ -533,7 +613,7 @@ def main():
         <div class="status-card" style="border-left-color: {status_color};">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h3 style="margin: 0; color: #2c3e50;">Situation au {today}</h3>
+                    <h3 style="margin: 0; color: #2c3e50;">Situation au {today_display}</h3>
                     <p style="margin: 0.5rem 0; font-weight: 600; color: {status_color};">{status}</p>
                 </div>
                 <div style="text-align: center;">
@@ -829,15 +909,23 @@ def main():
             - Impact annuel: ±{abs(base_change) * loan_amount * 10_000:,.0f} MAD
             """)
     
-    # Footer
+    # Footer with SOFAC branding
     st.markdown("---")
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     st.markdown(f"""
-    <div style="text-align: center; color: #666; padding: 1rem; font-size: 0.8rem;">
-        <p><strong>SOFAC - Modèle de Prédiction des Rendements 52-Semaines</strong></p>
-        <p>Baseline: Juin 2025 ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
-        <p><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
+    <div style="text-align: center; color: #666; padding: 2rem; font-size: 0.8rem; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px;">
+        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+            <div style="margin-right: 1rem;">
+                {logo_svg}
+            </div>
+            <div>
+                <p style="margin: 0; font-weight: bold; font-size: 1rem; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
+                <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
+            </div>
+        </div>
+        <p style="margin: 0.5rem 0;">Baseline: Juin 2025 ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+        <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
     </div>
     """, unsafe_allow_html=True)
 
