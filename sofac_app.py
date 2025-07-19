@@ -30,19 +30,15 @@ def get_base64_of_bin_file(bin_file):
 
 # Function to create the SOFAC logo as SVG (since we can't load external images)
 def create_sofac_logo_svg():
-    return """
-    <svg width="200" height="80" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
-        <!-- Yellow circle -->
-        <circle cx="25" cy="25" r="8" fill="#FFD700"/>
-        <!-- Blue swoosh -->
-        <path d="M15 35 Q30 25 45 35 Q60 45 75 35 Q90 25 105 35" 
-              stroke="#1e3c72" stroke-width="4" fill="none"/>
-        <!-- SOFAC text -->
-        <text x="15" y="55" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#1e3c72">SOFAC</text>
-        <!-- Tagline -->
-        <text x="15" y="70" font-family="Arial, sans-serif" font-size="10" fill="#FF6B35">Dites oui au super crédit</text>
+    return '''
+    <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="20" r="6" fill="#FFD700"/>
+        <path d="M12 28 Q24 20 36 28 Q48 36 60 28 Q72 20 84 28" 
+              stroke="#1e3c72" stroke-width="3" fill="none"/>
+        <text x="12" y="45" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1e3c72">SOFAC</text>
+        <text x="12" y="57" font-family="Arial, sans-serif" font-size="8" fill="#FF6B35">Dites oui au super crédit</text>
     </svg>
-    """
+    '''
 
 # Professional CSS with logo integration
 st.markdown(f"""
@@ -444,23 +440,24 @@ def generate_recommendations(predictions):
     return recommendations
 
 def main():
-    # Header with logo
-    logo_svg = create_sofac_logo_svg()
+    # Alternative header approach if HTML doesn't render properly
+    col_logo, col_text = st.columns([1, 3])
     
-    st.markdown(f"""
-    <div class="main-header">
-        <div class="logo-container">
-            <div class="logo-svg">
-                {logo_svg}
-            </div>
-            <div class="header-text">
-                <h1>Système de Prédiction des Rendements</h1>
-                <p>Modèle d'Intelligence Financière 52-Semaines</p>
-                <p>Données Bank Al-Maghrib & HCP | Mise à jour: Horaire</p>
-            </div>
+    with col_logo:
+        # Display logo
+        logo_svg = create_sofac_logo_svg()
+        st.markdown(f'<div style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">{logo_svg}</div>', unsafe_allow_html=True)
+    
+    with col_text:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3d5aa3 100%); 
+                    padding: 2rem; border-radius: 12px; color: white; margin-bottom: 2rem;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+            <h1 style="margin: 0; color: white;">Système de Prédiction des Rendements</h1>
+            <p style="margin: 0.5rem 0; color: white;">Modèle d'Intelligence Financière 52-Semaines</p>
+            <p style="margin: 0; color: white;">Données Bank Al-Maghrib &amp; HCP | Mise à jour: Horaire</p>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     # Load data and models
     if 'data_loaded' not in st.session_state:
