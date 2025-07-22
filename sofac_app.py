@@ -908,37 +908,58 @@ def main():
         
         # Global recommendation based on risk tolerance and scenarios
         variable_recommendations = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
+        total_scenarios = len(scenarios_analysis)
         
+        # Calculate average savings/costs
+        avg_cost_difference = np.mean([analysis['cost_difference'] for analysis in scenarios_analysis.values()])
+        avg_volatility = np.mean([analysis['volatility'] for analysis in scenarios_analysis.values()])
+        max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
+        
+        # Improved decision logic
         if risk_tolerance == "Faible":
-            if variable_recommendations >= 2 and all(analysis['volatility'] < 0.3 for analysis in scenarios_analysis.values()):
+            # For low risk tolerance, need strong evidence AND low volatility
+            if variable_recommendations == total_scenarios and avg_cost_difference < -1000000 and max_volatility < 0.4:
                 final_recommendation = "TAUX VARIABLE"
-                final_reason = "Majorité des scénarios favorables avec volatilité acceptable"
+                final_reason = f"Économies substantielles ({abs(avg_cost_difference):,.0f} MAD) avec volatilité acceptable"
                 final_color = "#28a745"
-            else:
-                final_recommendation = "TAUX FIXE"
-                final_reason = "Sécurité privilégiée - éviter les fluctuations"
-                final_color = "#dc3545"
-        elif risk_tolerance == "Moyenne":
-            if variable_recommendations >= 2:
-                final_recommendation = "TAUX VARIABLE"
-                final_reason = "Équilibre favorable entre économies potentielles et risque"
-                final_color = "#28a745"
-            else:
+            elif variable_recommendations >= 2 and avg_cost_difference < -500000 and max_volatility < 0.3:
                 final_recommendation = "STRATÉGIE MIXTE"
-                final_reason = "Répartir 50/50 pour optimiser le risque"
+                final_reason = f"Économies probables mais risque limité avec approche mixte"
                 final_color = "#ffc107"
-        else:  # Élevée
-            best_scenario = min(scenarios_analysis.items(), key=lambda x: x[1]['cost_difference'])
-            if best_scenario[1]['cost_difference'] < 0:
+            else:
+                final_recommendation = "TAUX FIXE"
+                final_reason = "Sécurité privilégiée - volatilité ou économies insuffisantes"
+                final_color = "#dc3545"
+                
+        elif risk_tolerance == "Moyenne":
+            if variable_recommendations >= 2 and avg_cost_difference < -200000:
                 final_recommendation = "TAUX VARIABLE"
-                final_reason = f"Opportunité d'économies importantes (scénario {best_scenario[0]})"
+                final_reason = f"Équilibre favorable: économies de {abs(avg_cost_difference):,.0f} MAD avec risque acceptable"
+                final_color = "#28a745"
+            elif variable_recommendations >= 2:
+                final_recommendation = "STRATÉGIE MIXTE"
+                final_reason = "Économies modérées - répartition 50/50 pour optimiser le risque"
+                final_color = "#ffc107"
+            else:
+                final_recommendation = "TAUX FIXE"
+                final_reason = "Majorité des scénarios défavorables au taux variable"
+                final_color = "#dc3545"
+                
+        else:  # Élevée
+            if variable_recommendations >= 1 and avg_cost_difference < 0:
+                final_recommendation = "TAUX VARIABLE"
+                final_reason = f"Opportunité d'économies: {abs(avg_cost_difference):,.0f} MAD - risque acceptable"
+                final_color = "#28a745"
+            elif avg_cost_difference < 500000:  # Less than 500k extra cost
+                final_recommendation = "TAUX VARIABLE" 
+                final_reason = "Tolérance élevée au risque - potentiel de gains à long terme"
                 final_color = "#28a745"
             else:
                 final_recommendation = "TAUX FIXE"
-                final_reason = "Tous les scénarios défavorables au taux variable"
+                final_reason = "Tous les scénarios défavorables - coûts trop élevés"
                 final_color = "#dc3545"
         
-        # Final recommendation display
+        # Final recommendation display with consistency explanation
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, {final_color}, {final_color}AA); 
                     color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; text-align: center;">
@@ -946,6 +967,12 @@ def main():
             <h3>{final_recommendation}</h3>
             <p><strong>Justification:</strong> {final_reason}</p>
             <p><strong>Montant:</strong> {loan_amount}M MAD | <strong>Durée:</strong> {loan_duration} ans | <strong>Taux fixe alternatif:</strong> {current_fixed_rate}%</p>
+            <hr style="margin: 1rem 0; opacity: 0.3;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">
+                <p><strong>Analyse:</strong> {variable_recommendations}/{total_scenarios} scénarios favorables au taux variable</p>
+                <p><strong>Économie moyenne:</strong> {abs(avg_cost_difference):,.0f} MAD | <strong>Volatilité max:</strong> {max_volatility:.2f}%</p>
+                <p><strong>Niveau de confiance:</strong> {min(95, 60 + variable_recommendations * 15 + (20 if avg_cost_difference < -1000000 else 0))}%</p>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
