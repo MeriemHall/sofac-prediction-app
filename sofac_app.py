@@ -1163,38 +1163,6 @@ def main():
                     )
                     
                     st.plotly_chart(fig_mini, use_container_width=True)
-        
-        # Financial calculator
-        st.subheader("Calculateur d'Impact Financier")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            loan_amount = st.slider("Montant emprunt (millions MAD):", 1, 100, 10)
-        with col2:
-            loan_duration = st.slider("Durée emprunt (années):", 1, 10, 3)
-        
-        base_change = st.session_state.recommendations['Cas_de_Base']['changement']
-        total_impact = base_change * loan_amount * 1_000_000 / 100 * loan_duration
-        
-        if abs(base_change) > 0.2:
-            if base_change < 0:
-                st.success(f"""
-                **Économies Potentielles avec TAUX VARIABLE:**
-                - Économies annuelles: {abs(base_change) * loan_amount * 10_000:,.0f} MAD
-                - Économies totales ({loan_duration} ans): {abs(total_impact):,.0f} MAD
-                """)
-            else:
-                st.warning(f"""
-                **Coûts Évités avec TAUX FIXE:**
-                - Surcoûts évités annuellement: {base_change * loan_amount * 10_000:,.0f} MAD
-                - Surcoûts évités totaux ({loan_duration} ans): {total_impact:,.0f} MAD
-                """)
-        else:
-            st.info(f"""
-            **Impact Financier Limité:**
-            - Variation attendue: ±{abs(base_change):.2f}%
-            - Impact annuel: ±{abs(base_change) * loan_amount * 10_000:,.0f} MAD
-            """)
     
     # Footer with SOFAC branding
     st.markdown("---")
