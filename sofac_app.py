@@ -804,14 +804,261 @@ def main():
     with tab3:
         st.header("Recommandations Stratégiques")
         
-        # Global recommendation
-        recommendations_list = [rec['recommandation'] for rec in st.session_state.recommendations.values()]
+        # Enhanced Loan Decision Section
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+                    color: white; padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
+            <h3 style="margin: 0; color: white;">🏦 AIDE À LA DÉCISION EMPRUNT SOFAC</h3>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Analyse comparative Taux Fixe vs Taux Variable sur la durée du contrat</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if recommendations_list.count('TAUX VARIABLE') >= 2:
+        # Enhanced Loan Parameters Section
+        st.subheader("⚙️ Paramètres de l'Emprunt")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            loan_amount = st.slider("Montant (millions MAD):", 1, 500, 50)
+        with col2:
+            loan_duration = st.slider("Durée (années):", 1, 10, 5)
+        with col3:
+            current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
+        with col4:
+            risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
+        
+        # Calculate comprehensive loan analysis
+        scenarios_analysis = {}
+        
+        for scenario_name, pred_df in st.session_state.predictions.items():
+            # Get predictions for the loan duration
+            loan_duration_days = loan_duration * 365
+            relevant_predictions = pred_df.head(loan_duration_days)
+            
+            # Calculate variable rate costs (assuming annual rate changes)
+            variable_rates_annual = []
+            for year in range(loan_duration):
+                start_day = year * 365
+                end_day = min((year + 1) * 365, len(relevant_predictions))
+                if start_day < len(relevant_predictions):
+                    year_data = relevant_predictions.iloc[start_day:end_day]
+                    avg_rate_year = year_data['rendement_predit'].mean()
+                    variable_rates_annual.append(avg_rate_year)
+                else:
+                    # If we don't have data for this year, use the last available rate
+                    variable_rates_annual.append(variable_rates_annual[-1] if variable_rates_annual else baseline_yield)
+            
+            # Calculate costs
+            fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
+            variable_cost_total = sum([(rate / 100) * loan_amount * 1_000_000 for rate in variable_rates_annual])
+            
+            cost_difference = variable_cost_total - fixed_cost_total
+            cost_difference_percentage = (cost_difference / fixed_cost_total) * 100
+            
+            # Risk metrics
+            volatility = relevant_predictions['rendement_predit'].std()
+            max_rate = max(variable_rates_annual)
+            min_rate = min(variable_rates_annual)
+            rate_range = max_rate - min_rate
+            
+            scenarios_analysis[scenario_name] = {
+                'variable_rates_annual': variable_rates_annual,
+                'avg_variable_rate': np.mean(variable_rates_annual),
+                'fixed_cost_total': fixed_cost_total,
+                'variable_cost_total': variable_cost_total,
+                'cost_difference': cost_difference,
+                'cost_difference_percentage': cost_difference_percentage,
+                'volatility': volatility,
+                'max_rate': max_rate,
+                'min_rate': min_rate,
+                'rate_range': rate_range
+            }
+        
+        # Decision Matrix
+        st.subheader("📊 Matrice de Décision par Scénario")
+        
+        decision_data = []
+        for scenario_name, analysis in scenarios_analysis.items():
+            if analysis['cost_difference'] < 0:
+                recommendation = "TAUX VARIABLE"
+                savings = abs(analysis['cost_difference'])
+                decision_color = "#28a745"
+                decision_text = f"Économie de {savings:,.0f} MAD"
+            else:
+                recommendation = "TAUX FIXE" 
+                extra_cost = analysis['cost_difference']
+                decision_color = "#dc3545"
+                decision_text = f"Éviter surcoût de {extra_cost:,.0f} MAD"
+            
+            risk_level = "FAIBLE" if analysis['volatility'] < 0.2 else "MOYEN" if analysis['volatility'] < 0.4 else "ÉLEVÉ"
+            
+            decision_data.append({
+                'Scénario': scenario_name,
+                'Taux Variable Moyen': f"{analysis['avg_variable_rate']:.2f}%",
+                'Fourchette': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
+                'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
+                'Différence vs Fixe': decision_text,
+                'Recommandation': recommendation,
+                'Niveau Risque': risk_level,
+                'Volatilité': f"{analysis['volatility']:.2f}%"
+            })
+        
+        # Display decision matrix as a table
+        decision_df = pd.DataFrame(decision_data)
+        st.dataframe(decision_df, use_container_width=True, hide_index=True)
+        
+        # Global recommendation based on risk tolerance and scenarios
+        variable_recommendations = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
+        
+        if risk_tolerance == "Faible":
+            if variable_recommendations >= 2 and all(analysis['volatility'] < 0.3 for analysis in scenarios_analysis.values()):
+                final_recommendation = "TAUX VARIABLE"
+                final_reason = "Majorité des scénarios favorables avec volatilité acceptable"
+                final_color = "#28a745"
+            else:
+                final_recommendation = "TAUX FIXE"
+                final_reason = "Sécurité privilégiée - éviter les fluctuations"
+                final_color = "#dc3545"
+        elif risk_tolerance == "Moyenne":
+            if variable_recommendations >= 2:
+                final_recommendation = "TAUX VARIABLE"
+                final_reason = "Équilibre favorable entre économies potentielles et risque"
+                final_color = "#28a745"
+            else:
+                final_recommendation = "STRATÉGIE MIXTE"
+                final_reason = "Répartir 50/50 pour optimiser le risque"
+                final_color = "#ffc107"
+        else:  # Élevée
+            best_scenario = min(scenarios_analysis.items(), key=lambda x: x[1]['cost_difference'])
+            if best_scenario[1]['cost_difference'] < 0:
+                final_recommendation = "TAUX VARIABLE"
+                final_reason = f"Opportunité d'économies importantes (scénario {best_scenario[0]})"
+                final_color = "#28a745"
+            else:
+                final_recommendation = "TAUX FIXE"
+                final_reason = "Tous les scénarios défavorables au taux variable"
+                final_color = "#dc3545"
+        
+        # Final recommendation display
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {final_color}, {final_color}AA); 
+                    color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; text-align: center;">
+            <h2>🎯 DÉCISION FINALE SOFAC</h2>
+            <h3>{final_recommendation}</h3>
+            <p><strong>Justification:</strong> {final_reason}</p>
+            <p><strong>Montant:</strong> {loan_amount}M MAD | <strong>Durée:</strong> {loan_duration} ans | <strong>Taux fixe alternatif:</strong> {current_fixed_rate}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Detailed cost breakdown
+        st.subheader("💰 Analyse Détaillée des Coûts")
+        
+        base_case_analysis = scenarios_analysis['Cas_de_Base']
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### Option Taux Fixe")
+            st.metric("Taux", f"{current_fixed_rate:.2f}%")
+            st.metric("Coût Total", f"{base_case_analysis['fixed_cost_total']:,.0f} MAD")
+            st.metric("Coût Annuel", f"{base_case_analysis['fixed_cost_total']/loan_duration:,.0f} MAD")
+            st.success("✅ Prévisibilité totale")
+        
+        with col2:
+            st.markdown("### Option Taux Variable")
+            st.metric("Taux Moyen Prédit", f"{base_case_analysis['avg_variable_rate']:.2f}%")
+            st.metric("Coût Total Estimé", f"{base_case_analysis['variable_cost_total']:,.0f} MAD")
+            st.metric("Fourchette Annuelle", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
+            if base_case_analysis['cost_difference'] < 0:
+                st.success(f"💰 Économie potentielle: {abs(base_case_analysis['cost_difference']):,.0f} MAD")
+            else:
+                st.warning(f"⚠️ Surcoût potentiel: {base_case_analysis['cost_difference']:,.0f} MAD")
+        
+        # Yearly breakdown chart
+        st.subheader("📈 Évolution Annuelle des Taux (Cas de Base)")
+        
+        years = list(range(1, loan_duration + 1))
+        fig_yearly = go.Figure()
+        
+        # Fixed rate line
+        fig_yearly.add_trace(go.Scatter(
+            x=years,
+            y=[current_fixed_rate] * loan_duration,
+            mode='lines+markers',
+            name='Taux Fixe',
+            line=dict(color='#dc3545', width=3, dash='dash'),
+            marker=dict(size=8)
+        ))
+        
+        # Variable rate line (base case)
+        fig_yearly.add_trace(go.Scatter(
+            x=years,
+            y=base_case_analysis['variable_rates_annual'],
+            mode='lines+markers',
+            name='Taux Variable (Prévu)',
+            line=dict(color='#17a2b8', width=3),
+            marker=dict(size=8)
+        ))
+        
+        fig_yearly.update_layout(
+            height=400,
+            template="plotly_white",
+            xaxis_title="Année",
+            yaxis_title="Taux d'intérêt (%)",
+            title="Comparaison Taux Fixe vs Variable sur la Durée du Prêt"
+        )
+        
+        st.plotly_chart(fig_yearly, use_container_width=True)
+        
+        # Risk assessment
+        st.subheader("⚠️ Évaluation des Risques")
+        
+        risk_col1, risk_col2, risk_col3 = st.columns(3)
+        
+        with risk_col1:
+            st.markdown("### Risque de Taux")
+            if base_case_analysis['volatility'] < 0.2:
+                st.success("🟢 FAIBLE")
+                risk_desc = "Fluctuations limitées attendues"
+            elif base_case_analysis['volatility'] < 0.4:
+                st.warning("🟡 MOYEN") 
+                risk_desc = "Fluctuations modérées possibles"
+            else:
+                st.error("🔴 ÉLEVÉ")
+                risk_desc = "Fortes fluctuations possibles"
+            st.write(risk_desc)
+        
+        with risk_col2:
+            st.markdown("### Risque de Liquidité")
+            max_annual_diff = max(base_case_analysis['variable_rates_annual']) - current_fixed_rate
+            if max_annual_diff < 0.5:
+                st.success("🟢 FAIBLE")
+                liquidity_desc = "Impact limité sur la trésorerie"
+            elif max_annual_diff < 1.0:
+                st.warning("🟡 MOYEN")
+                liquidity_desc = "Impact modéré à prévoir"
+            else:
+                st.error("🔴 ÉLEVÉ")
+                liquidity_desc = "Impact significatif possible"
+            st.write(liquidity_desc)
+        
+        with risk_col3:
+            st.markdown("### Recommandation Finale")
+            if final_recommendation == "TAUX VARIABLE":
+                st.success("📈 VARIABLE")
+            elif final_recommendation == "TAUX FIXE":
+                st.error("📊 FIXE") 
+            else:
+                st.warning("⚖️ MIXTE")
+            st.write(f"Confiance: {70 + variable_recommendations * 10}%")
+        
+        # Global recommendation summary
+        recommendations_list = [scenarios_analysis[scenario]['cost_difference'] < 0 for scenario in scenarios_analysis.keys()]
+        
+        if recommendations_list.count(True) >= 2:
             global_strategy = "TAUX VARIABLE"
             global_reason = "Majorité des scénarios favorisent les taux variables"
             global_color = "#28a745"
-        elif recommendations_list.count('TAUX FIXE') >= 2:
+        elif recommendations_list.count(False) >= 2:
             global_strategy = "TAUX FIXE"
             global_reason = "Majorité des scénarios favorisent les taux fixes"
             global_color = "#dc3545"
@@ -833,40 +1080,47 @@ def main():
         st.subheader("Analyse Détaillée par Scénario")
         
         for scenario, rec in st.session_state.recommendations.items():
-            with st.expander(f"Scénario {scenario}", expanded=True):
+            with st.expander(f"📋 Scénario {scenario}", expanded=True):
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
+                    scenario_analysis = scenarios_analysis[scenario]
                     st.markdown(f"""
                     **Recommandation:** {rec['recommandation']}
                     
-                    **Justification:** {rec['raison']}
+                    **Analyse Financière:**
+                    - Taux variable moyen: {scenario_analysis['avg_variable_rate']:.2f}%
+                    - Fourchette: {scenario_analysis['min_rate']:.2f}% - {scenario_analysis['max_rate']:.2f}%
+                    - Coût total (variable): {scenario_analysis['variable_cost_total']:,.0f} MAD
+                    - Différence vs fixe: {scenario_analysis['cost_difference']:+,.0f} MAD ({scenario_analysis['cost_difference_percentage']:+.1f}%)
                     
-                    **Métriques:**
-                    - Rendement moyen prédit: {rec['rendement_moyen']:.2f}%
-                    - Changement vs Juin 2025: {rec['changement']:+.2f}%
-                    - Volatilité: {rec['volatilite']:.2f}%
+                    **Métriques de Risque:**
+                    - Volatilité: {scenario_analysis['volatility']:.2f}%
+                    - Amplitude: {scenario_analysis['rate_range']:.2f}%
                     - Niveau de risque: {rec['niveau_risque']}
                     """)
                 
                 with col2:
-                    # Mini chart
+                    # Mini chart for each scenario
                     pred_mini = st.session_state.predictions[scenario][::30]
                     
                     fig_mini = go.Figure()
-                    fig_mini.add_hline(y=baseline_yield, line_dash="dash", line_color="blue")
+                    fig_mini.add_hline(y=current_fixed_rate, line_dash="dash", line_color="red", 
+                                     annotation_text=f"Taux Fixe: {current_fixed_rate:.2f}%")
                     fig_mini.add_trace(go.Scatter(
                         x=pred_mini['Date'],
                         y=pred_mini['rendement_predit'],
                         mode='lines+markers',
-                        line=dict(color=colors[scenario], width=2)
+                        line=dict(color=colors[scenario], width=2),
+                        name="Taux Variable"
                     ))
                     
                     fig_mini.update_layout(
                         height=200,
                         showlegend=False,
                         template="plotly_white",
-                        margin=dict(l=20, r=20, t=20, b=20)
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        title=f"Évolution - {scenario}"
                     )
                     
                     st.plotly_chart(fig_mini, use_container_width=True)
