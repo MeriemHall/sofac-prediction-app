@@ -493,53 +493,61 @@ def main():
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
         
-        # TODAY'S PREDICTION SECTION
+        # STRATEGIC OUTLOOK SECTION (replacing daily prediction)
         st.sidebar.markdown("---")
-        st.sidebar.subheader("📅 Prédiction du Jour")
+        st.sidebar.subheader("🎯 Vision Stratégique")
         
-        # Get today's date and prediction
-        today = datetime.now()
-        today_str = today.strftime('%Y-%m-%d')
-        today_display = today.strftime('%d/%m/%Y')
-        
-        # Find today's prediction in the base case scenario
+        # Calculate strategic metrics
         cas_base_predictions = st.session_state.predictions['Cas_de_Base']
         
-        # Try to find today's prediction
-        today_prediction = None
-        closest_prediction = None
-        closest_date = None
+        # 3-month outlook
+        three_month_data = cas_base_predictions.head(90)  # ~3 months
+        three_month_avg = three_month_data['rendement_predit'].mean()
+        three_month_trend = "↗️ Hausse" if three_month_avg > baseline_yield else "↘️ Baisse" if three_month_avg < baseline_yield else "→ Stable"
         
-        for _, row in cas_base_predictions.iterrows():
-            pred_date = row['Date']
-            if pred_date == today_str:
-                today_prediction = row['rendement_predit']
-                break
-            elif pred_date > today_str and closest_prediction is None:
-                closest_prediction = row['rendement_predit']
-                closest_date = pred_date
+        # 6-month range
+        six_month_data = cas_base_predictions.head(180)  # ~6 months
+        six_month_min = six_month_data['rendement_predit'].min()
+        six_month_max = six_month_data['rendement_predit'].max()
         
-        # Display today's prediction
-        if today_prediction is not None:
-            st.sidebar.success("**" + today_display + "**")
-            st.sidebar.metric(
-                "🎯 Rendement Prédit Aujourd'hui",
-                f"{today_prediction:.2f}%",
-                delta=f"{(today_prediction - baseline_yield):+.2f}%",
-                help="Prédiction pour aujourd'hui vs baseline juin 2025"
-            )
-        elif closest_prediction is not None:
-            closest_date_display = datetime.strptime(closest_date, '%Y-%m-%d').strftime('%d/%m/%Y')
-            st.sidebar.warning("**" + today_display + "**")
-            st.sidebar.metric(
-                "🎯 Prédiction Prochaine",
-                f"{closest_prediction:.2f}%",
-                delta=f"{(closest_prediction - baseline_yield):+.2f}%",
-                help=f"Prédiction pour {closest_date_display}"
-            )
+        # Rate cycle position
+        current_vs_historical = baseline_yield
+        if current_vs_historical < 2.0:
+            cycle_position = "🟢 Bas de cycle"
+        elif current_vs_historical < 3.0:
+            cycle_position = "🟡 Cycle moyen"
         else:
-            st.sidebar.info("**" + today_display + "**")
-            st.sidebar.write("🎯 **Prédiction:** Données en cours de traitement")
+            cycle_position = "🔴 Haut de cycle"
+        
+        # Volatility assessment for next 6 months
+        volatility_6m = six_month_data['rendement_predit'].std()
+        stability_score = "🟢 Stable" if volatility_6m < 0.2 else "🟡 Modéré" if volatility_6m < 0.4 else "🔴 Volatil"
+        
+        st.sidebar.metric(
+            "📈 Tendance 3 mois",
+            f"{three_month_avg:.2f}%",
+            delta=f"{three_month_trend}",
+            help="Direction générale sur 3 mois"
+        )
+        
+        st.sidebar.metric(
+            "🎯 Fourchette 6 mois", 
+            f"{six_month_min:.2f}%-{six_month_max:.2f}%",
+            help="Plage attendue sur 6 mois"
+        )
+        
+        st.sidebar.info(f"**Position cycle:** {cycle_position}")
+        st.sidebar.info(f"**Stabilité:** {stability_score}")
+        
+        # Strategic decision window
+        if three_month_avg < current_vs_historical - 0.3:
+            strategic_window = "🟢 Fenêtre favorable taux variable"
+        elif three_month_avg > current_vs_historical + 0.3:
+            strategic_window = "🔴 Privilégier taux fixe"
+        else:
+            strategic_window = "🟡 Période de transition"
+            
+        st.sidebar.success(strategic_window)
         
         if st.sidebar.button("Actualiser"):
             st.cache_data.clear()
@@ -557,132 +565,136 @@ def main():
     with tab1:
         # Executive Dashboard
         st.markdown('<div class="executive-dashboard">', unsafe_allow_html=True)
-        st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">Tableau de Bord Exécutif</div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">Tableau de Bord Stratégique</div>', unsafe_allow_html=True)
         
-        # Current situation - get today's actual prediction
-        today = datetime.now()
-        today_str = today.strftime('%Y-%m-%d')
-        today_display = today.strftime('%d/%m/%Y')
-        
-        # Find today's prediction in the base case scenario
+        # Strategic analysis instead of current situation
         cas_de_base_predictions = st.session_state.predictions['Cas_de_Base']
-        current_prediction = None
         
-        # Try to find today's prediction
-        for _, row in cas_de_base_predictions.iterrows():
-            pred_date = row['Date']
-            if pred_date == today_str:
-                current_prediction = row['rendement_predit']
-                break
-            elif pred_date > today_str and current_prediction is None:
-                current_prediction = row['rendement_predit']
-                break
+        # Calculate strategic periods
+        q1_data = cas_de_base_predictions.head(90)    # 3 months
+        q2_data = cas_de_base_predictions.head(180)   # 6 months  
+        year1_data = cas_de_base_predictions.head(365) # 1 year
         
-        # If no prediction found, use the first available prediction
-        if current_prediction is None:
-            current_prediction = cas_de_base_predictions['rendement_predit'].iloc[0]
+        q1_avg = q1_data['rendement_predit'].mean()
+        q2_avg = q2_data['rendement_predit'].mean() 
+        year1_avg = year1_data['rendement_predit'].mean()
         
-        evolution = current_prediction - baseline_yield
-        
-        # Status determination
-        if evolution > 0.4:
-            status = "TAUX ÉLEVÉS - CRITIQUE"
-            status_color = "#dc3545"
-            action = "BLOQUER LES TAUX MAINTENANT"
-        elif evolution > 0.1:
-            status = "TAUX EN HAUSSE - ATTENTION"
-            status_color = "#ffc107"
-            action = "PRÉPARER STRATÉGIE DE COUVERTURE"
-        elif evolution < -0.4:
-            status = "OPPORTUNITÉ - TAUX FAVORABLES"
-            status_color = "#28a745"
-            action = "MAXIMISER TAUX VARIABLES"
+        # Determine strategic environment
+        if year1_avg < baseline_yield - 0.4:
+            strategic_environment = "ENVIRONNEMENT DE BAISSE"
+            env_color = "#28a745"
+            strategic_action = "PRIVILÉGIER TAUX VARIABLES"
+        elif year1_avg > baseline_yield + 0.4:
+            strategic_environment = "ENVIRONNEMENT DE HAUSSE"
+            env_color = "#dc3545"
+            strategic_action = "SÉCURISER AVEC TAUX FIXES"
         else:
-            status = "MARCHÉ STABLE"
-            status_color = "#17a2b8"
-            action = "MAINTENIR STRATÉGIE ACTUELLE"
+            strategic_environment = "ENVIRONNEMENT STABLE"
+            env_color = "#17a2b8"
+            strategic_action = "APPROCHE ÉQUILIBRÉE RECOMMANDÉE"
         
-        # Status card
+        # Rate cycle analysis
+        trend_6m = q2_avg - baseline_yield
+        volatility_6m = q2_data['rendement_predit'].std()
+        
+        # Strategic status card
         st.markdown(f"""
-        <div class="status-card" style="border-left-color: {status_color};">
+        <div class="status-card" style="border-left-color: {env_color};">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h3 style="margin: 0; color: #2c3e50;">Situation au {today_display}</h3>
-                    <p style="margin: 0.5rem 0; font-weight: 600; color: {status_color};">{status}</p>
+                    <h3 style="margin: 0; color: #2c3e50;">Environnement Stratégique</h3>
+                    <p style="margin: 0.5rem 0; font-weight: 600; color: {env_color};">{strategic_environment}</p>
+                    <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">{strategic_action}</p>
                 </div>
                 <div style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: 700; color: #2c3e50;">{current_prediction:.2f}%</div>
-                    <div style="font-size: 0.8rem; color: #6c757d;">Rendement Courant</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: #2c3e50;">{year1_avg:.2f}%</div>
+                    <div style="font-size: 0.8rem; color: #6c757d;">Moyenne 12 mois</div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 1.2rem; font-weight: 600; color: {status_color};">{evolution:+.2f}%</div>
-                    <div style="font-size: 0.8rem; color: #6c757d;">vs Juin 2025</div>
+                    <div style="font-size: 1.2rem; font-weight: 600; color: {env_color};">{trend_6m:+.2f}%</div>
+                    <div style="font-size: 0.8rem; color: #6c757d;">Tendance 6 mois</div>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Metrics
+        # Strategic metrics
         col1, col2, col3, col4 = st.columns(4)
         
-        volatility = st.session_state.predictions['Cas_de_Base']['rendement_predit'].std()
-        impact_10m = abs(st.session_state.recommendations['Cas_de_Base']['changement']) * 10
+        # Calculate strategic decision windows
+        optimal_window = "Q1" if q1_avg < q2_avg < year1_avg else "Q2-Q4" if q2_avg < year1_avg else "Immédiate"
+        risk_level = "Faible" if volatility_6m < 0.2 else "Modéré" if volatility_6m < 0.4 else "Élevé"
         
         with col1:
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">BASELINE JUIN</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{baseline_yield:.2f}%</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 3 MOIS</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q1_avg:.2f}%</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col2:
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">ÉVOLUTION</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: {status_color};">{evolution:+.2f}%</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 6 MOIS</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q2_avg:.2f}%</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col3:
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">VOLATILITÉ</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{volatility:.2f}%</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">STABILITÉ 6M</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{risk_level}</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col4:
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">IMPACT 10M MAD</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{impact_10m:.0f}K/an</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">FENÊTRE OPTIMALE</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{optimal_window}</div>
             </div>
             """, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Recommendations
-        strategy = st.session_state.recommendations['Cas_de_Base']['recommandation']
-        change_global = st.session_state.recommendations['Cas_de_Base']['changement']
+        # Strategic recommendations
+        q1_trend = q1_avg - baseline_yield
+        q2_trend = q2_avg - baseline_yield
+        year1_trend = year1_avg - baseline_yield
+        
+        # Determine optimal action timing
+        if q1_trend < -0.3 and q2_trend < -0.2:
+            timing_recommendation = "AGIR RAPIDEMENT - Fenêtre favorable immédiate"
+            timing_color = "#28a745"
+        elif year1_trend < -0.2:
+            timing_recommendation = "PLANIFIER - Opportunités à moyen terme"
+            timing_color = "#17a2b8"
+        elif q1_trend > 0.2:
+            timing_recommendation = "SÉCURISER - Hausse imminente des taux"
+            timing_color = "#dc3545"
+        else:
+            timing_recommendation = "SURVEILLER - Environnement stable"
+            timing_color = "#ffc107"
         
         st.markdown(f"""
         <div class="recommendation-panel">
-            <div style="text-align: center; font-size: 1.3rem; font-weight: 700; margin-bottom: 1.5rem;">RECOMMANDATIONS STRATÉGIQUES</div>
+            <div style="text-align: center; font-size: 1.3rem; font-weight: 700; margin-bottom: 1.5rem;">STRATÉGIE & TIMING RECOMMANDÉS</div>
             <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem; margin: 0.8rem 0;">
-                <h4 style="margin: 0 0 0.5rem 0; color: white;">Action Prioritaire</h4>
-                <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">{action}</p>
+                <h4 style="margin: 0 0 0.5rem 0; color: white;">Timing Stratégique</h4>
+                <p style="margin: 0; font-size: 1.1rem; font-weight: 600; color: {timing_color};">{timing_recommendation}</p>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                 <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
-                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Stratégie Globale</h5>
-                    <p style="margin: 0; font-weight: 600;">{strategy}</p>
-                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Changement: {change_global:+.2f}%</p>
+                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 3 Mois</h5>
+                    <p style="margin: 0; font-weight: 600;">{q1_avg:.2f}%</p>
+                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Évolution: {q1_trend:+.2f}%</p>
                 </div>
                 <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
-                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Impact Financier</h5>
-                    <p style="margin: 0; font-weight: 600;">{abs(change_global) * 100:.0f}K MAD/an</p>
-                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Pour 10M MAD emprunt</p>
+                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 12 Mois</h5>
+                    <p style="margin: 0; font-weight: 600;">{year1_avg:.2f}%</p>
+                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Tendance: {year1_trend:+.2f}%</p>
                 </div>
             </div>
         </div>
