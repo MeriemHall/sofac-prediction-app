@@ -866,15 +866,22 @@ def main():
         # Enhanced Loan Parameters Section
         st.subheader("⚙️ Paramètres de l'Emprunt")
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             loan_amount = st.slider("Montant (millions MAD):", 1, 500, 50)
         with col2:
             loan_duration = st.slider("Durée (années):", 1, 10, 5)
+            if loan_duration > 2:
+                st.warning("⚠️ Prédictions limitées jusqu'à Déc 2026. Années 3+ utilisent des projections constantes.")
         with col3:
             current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
         with col4:
+            bank_risk_premium = st.number_input("Prime de risque banque (bp):", min_value=0, max_value=500, value=130, step=10, help="130 bp = 1.30%")
+        with col5:
             risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
+        
+        # Convert basis points to percentage
+        risk_premium_pct = bank_risk_premium / 100
         
         # Calculate comprehensive loan analysis
         scenarios_analysis = {}
@@ -884,18 +891,21 @@ def main():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Calculate variable rate costs (assuming annual rate changes)
+            # Calculate variable rate costs (assuming annual rate changes + bank risk premium)
             variable_rates_annual = []
             for year in range(loan_duration):
                 start_day = year * 365
                 end_day = min((year + 1) * 365, len(relevant_predictions))
                 if start_day < len(relevant_predictions):
                     year_data = relevant_predictions.iloc[start_day:end_day]
-                    avg_rate_year = year_data['rendement_predit'].mean()
+                    avg_market_rate_year = year_data['rendement_predit'].mean()
+                    # Add bank's risk premium to market rate
+                    avg_rate_year = avg_market_rate_year + risk_premium_pct
                     variable_rates_annual.append(avg_rate_year)
                 else:
-                    # If we don't have data for this year, use the last available rate
-                    variable_rates_annual.append(variable_rates_annual[-1] if variable_rates_annual else baseline_yield)
+                    # If we don't have data for this year, use the last available rate + premium
+                    last_market_rate = variable_rates_annual[-1] - risk_premium_pct if variable_rates_annual else baseline_yield
+                    variable_rates_annual.append(last_market_rate + risk_premium_pct)
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
@@ -943,7 +953,8 @@ def main():
             
             decision_data.append({
                 'Scénario': scenario_name,
-                'Taux Variable Moyen': f"{analysis['avg_variable_rate']:.2f}%",
+                'Taux Marché Moyen': f"{analysis['avg_variable_rate'] - risk_premium_pct:.2f}%",
+                'Taux Variable Final': f"{analysis['avg_variable_rate']:.2f}%",
                 'Fourchette': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
                 'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
                 'Différence vs Fixe': decision_text,
