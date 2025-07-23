@@ -608,21 +608,35 @@ def main():
         volatility_6m = six_month_data['rendement_predit'].std()
         stability_score = "🟢 Stable" if volatility_6m < 0.2 else "🟡 Modéré" if volatility_6m < 0.4 else "🔴 Volatil"
         
-        st.sidebar.metric(
-            "📈 Tendance 3 mois",
-            f"{three_month_avg:.2f}%",
-            delta=f"{three_month_trend}",
-            help="Direction générale sur 3 mois"
-        )
+        # Custom styled strategic metrics
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">📈 Tendance 3 mois</div>
+            <div class="small-metric-value">{three_month_avg:.2f}%</div>
+            <div style="font-size: 0.55rem; color: #666; margin-top: 0.1rem;">{three_month_trend}</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.sidebar.metric(
-            "🎯 Fourchette 6 mois", 
-            f"{six_month_min:.2f}%-{six_month_max:.2f}%",
-            help="Plage attendue sur 6 mois"
-        )
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">🎯 Fourchette 6 mois</div>
+            <div class="small-metric-value">{six_month_min:.2f}%-{six_month_max:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.sidebar.info(f"**Position cycle:** {cycle_position}")
-        st.sidebar.info(f"**Stabilité:** {stability_score}")
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #2a5298;">
+            <div style="font-size: 0.6rem; color: #6c757d; margin-bottom: 0.2rem;"><strong>Position cycle:</strong></div>
+            <div style="font-size: 0.7rem; font-weight: 600;">{cycle_position}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #2a5298;">
+            <div style="font-size: 0.6rem; color: #6c757d; margin-bottom: 0.2rem;"><strong>Stabilité:</strong></div>
+            <div style="font-size: 0.7rem; font-weight: 600;">{stability_score}</div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Strategic decision window
         if three_month_avg < current_vs_historical - 0.3:
@@ -631,8 +645,12 @@ def main():
             strategic_window = "🔴 Privilégier taux fixe"
         else:
             strategic_window = "🟡 Période de transition"
-            
-        st.sidebar.success(strategic_window)
+        
+        st.markdown(f"""
+        <div style="background: #e8f5e8; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #28a745;">
+            <div style="font-size: 0.65rem; font-weight: 600; color: #155724;">{strategic_window}</div>
+        </div>
+        """, unsafe_allow_html=True)
         
         if st.sidebar.button("Actualiser"):
             st.cache_data.clear()
