@@ -132,25 +132,38 @@ st.markdown(f"""
 
 @st.cache_data(ttl=3600)
 def fetch_live_data():
-    """Fetch live economic data and calculate current baseline"""
+    """Fetch live economic data with stable baseline management"""
     # Get current date
     today = datetime.now()
     
-    # In real implementation, this would fetch actual market data
-    # For now, we'll interpolate from our last known data point
-    days_since_baseline = (today - datetime(2025, 6, 30)).days
+    # Define baseline anchor points (would be updated manually/quarterly in production)
+    baseline_anchors = {
+        '2025-06-30': 1.75,  # Last historical data point
+        '2025-07-31': 1.72,  # July month-end (estimated/forecasted)
+        '2025-08-31': 1.69,  # August month-end (estimated/forecasted)
+        # In production: these would be updated based on actual market data
+    }
     
-    # Simple interpolation for demonstration (in reality, use market data)
-    # Assuming gradual decline from June baseline
-    current_baseline = 1.75 - (days_since_baseline * 0.001)  # Very gradual decline
-    current_baseline = max(1.50, current_baseline)  # Floor at 1.50%
+    # Find the current baseline (most recent anchor point before today)
+    current_baseline = 1.75  # Default
+    baseline_date = '2025-06-30'  # Default
+    
+    for date_str, rate in sorted(baseline_anchors.items()):
+        anchor_date = datetime.strptime(date_str, '%Y-%m-%d')
+        if anchor_date <= today:
+            current_baseline = rate
+            baseline_date = date_str
+    
+    # Format baseline date for display
+    baseline_display = datetime.strptime(baseline_date, '%Y-%m-%d').strftime('%B %Y')
     
     return {
         'policy_rate': 2.25,
         'inflation': 1.1,
         'gdp_growth': 4.8,
         'current_baseline': current_baseline,
-        'baseline_date': today.strftime('%Y-%m-%d'),
+        'baseline_date': baseline_display,
+        'baseline_date_raw': baseline_date,
         'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP'},
         'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
     }
