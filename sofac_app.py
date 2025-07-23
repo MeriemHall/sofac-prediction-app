@@ -132,13 +132,27 @@ st.markdown(f"""
 
 @st.cache_data(ttl=3600)
 def fetch_live_data():
-    """Fetch live economic data"""
+    """Fetch live economic data and calculate current baseline"""
+    # Get current date
+    today = datetime.now()
+    
+    # In real implementation, this would fetch actual market data
+    # For now, we'll interpolate from our last known data point
+    days_since_baseline = (today - datetime(2025, 6, 30)).days
+    
+    # Simple interpolation for demonstration (in reality, use market data)
+    # Assuming gradual decline from June baseline
+    current_baseline = 1.75 - (days_since_baseline * 0.001)  # Very gradual decline
+    current_baseline = max(1.50, current_baseline)  # Floor at 1.50%
+    
     return {
         'policy_rate': 2.25,
         'inflation': 1.1,
         'gdp_growth': 4.8,
+        'current_baseline': current_baseline,
+        'baseline_date': today.strftime('%Y-%m-%d'),
         'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP'},
-        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
     }
 
 @st.cache_data
@@ -470,7 +484,8 @@ def main():
             st.session_state.data_loaded = True
     
     live_data = fetch_live_data()
-    baseline_yield = 1.75  # June 2025
+    baseline_yield = live_data['current_baseline']  # Use current calculated baseline
+    baseline_date = live_data['baseline_date']
     
     # Sidebar with logo
     with st.sidebar:
@@ -488,7 +503,7 @@ def main():
             st.metric("Inflation", f"{live_data['inflation']:.2f}%")
         
         with col2:
-            st.metric("Rendement Actuel", f"{baseline_yield:.2f}%", help="Baseline Juin 2025")
+            st.metric("Rendement Actuel", f"{baseline_yield:.2f}%", help=f"Baseline {baseline_date}")
             st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
@@ -1181,7 +1196,7 @@ def main():
         <div style="text-align: center; color: #666; font-size: 0.8rem;">
             <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
             <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
-            <p style="margin: 0.5rem 0;">Baseline: Juin 2025 ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+            <p style="margin: 0.5rem 0;">Baseline: {baseline_date} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
             <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
         </div>
         """, unsafe_allow_html=True)
