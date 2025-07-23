@@ -509,62 +509,15 @@ def main():
         st.header("Informations du Modèle")
         
         st.markdown("### Données en Temps Réel")
-        
-        # Add custom styling for smaller metrics
-        st.markdown("""
-        <style>
-        .small-metric {
-            text-align: center;
-            padding: 0.5rem;
-            margin: 0.3rem 0;
-            background: white;
-            border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .small-metric-label {
-            font-size: 0.6rem;
-            color: #666;
-            margin-bottom: 0.2rem;
-        }
-        .small-metric-value {
-            font-size: 0.9rem;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
         col1, col2 = st.sidebar.columns(2)
         
         with col1:
-            st.markdown(f"""
-            <div class="small-metric">
-                <div class="small-metric-label">Taux Directeur</div>
-                <div class="small-metric-value">{live_data['policy_rate']:.2f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class="small-metric">
-                <div class="small-metric-label">Inflation</div>
-                <div class="small-metric-value">{live_data['inflation']:.2f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Taux Directeur", f"{live_data['policy_rate']:.2f}%")
+            st.metric("Inflation", f"{live_data['inflation']:.2f}%")
         
         with col2:
-            st.markdown(f"""
-            <div class="small-metric">
-                <div class="small-metric-label">Baseline Actuelle</div>
-                <div class="small-metric-value">{baseline_yield:.2f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class="small-metric">
-                <div class="small-metric-label">Croissance PIB</div>
-                <div class="small-metric-value">{live_data['gdp_growth']:.2f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Baseline Actuelle", f"{baseline_yield:.2f}%", help=f"Point d'ancrage: {baseline_date}")
+            st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
         
@@ -578,7 +531,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # STRATEGIC OUTLOOK SECTION (replacing daily prediction)
+        # STRATEGIC OUTLOOK SECTION
         st.sidebar.markdown("---")
         st.sidebar.subheader("🎯 Vision Stratégique")
         
@@ -608,35 +561,21 @@ def main():
         volatility_6m = six_month_data['rendement_predit'].std()
         stability_score = "🟢 Stable" if volatility_6m < 0.2 else "🟡 Modéré" if volatility_6m < 0.4 else "🔴 Volatil"
         
-        # Custom styled strategic metrics
-        st.markdown(f"""
-        <div class="small-metric">
-            <div class="small-metric-label">📈 Tendance 3 mois</div>
-            <div class="small-metric-value">{three_month_avg:.2f}%</div>
-            <div style="font-size: 0.55rem; color: #666; margin-top: 0.1rem;">{three_month_trend}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.sidebar.metric(
+            "📈 Tendance 3 mois",
+            f"{three_month_avg:.2f}%",
+            delta=f"{three_month_trend}",
+            help="Direction générale sur 3 mois"
+        )
         
-        st.markdown(f"""
-        <div class="small-metric">
-            <div class="small-metric-label">🎯 Fourchette 6 mois</div>
-            <div class="small-metric-value">{six_month_min:.2f}%-{six_month_max:.2f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.sidebar.metric(
+            "🎯 Fourchette 6 mois", 
+            f"{six_month_min:.2f}%-{six_month_max:.2f}%",
+            help="Plage attendue sur 6 mois"
+        )
         
-        st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #2a5298;">
-            <div style="font-size: 0.6rem; color: #6c757d; margin-bottom: 0.2rem;"><strong>Position cycle:</strong></div>
-            <div style="font-size: 0.7rem; font-weight: 600;">{cycle_position}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #2a5298;">
-            <div style="font-size: 0.6rem; color: #6c757d; margin-bottom: 0.2rem;"><strong>Stabilité:</strong></div>
-            <div style="font-size: 0.7rem; font-weight: 600;">{stability_score}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.sidebar.info(f"**Position cycle:** {cycle_position}")
+        st.sidebar.info(f"**Stabilité:** {stability_score}")
         
         # Strategic decision window
         if three_month_avg < current_vs_historical - 0.3:
@@ -645,46 +584,18 @@ def main():
             strategic_window = "🔴 Privilégier taux fixe"
         else:
             strategic_window = "🟡 Période de transition"
-        
-        st.markdown(f"""
-        <div style="background: #e8f5e8; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #28a745;">
-            <div style="font-size: 0.65rem; font-weight: 600; color: #155724;">{strategic_window}</div>
-        </div>
-        """, unsafe_allow_html=True)
+            
+        st.sidebar.success(strategic_window)
         
         if st.sidebar.button("Actualiser"):
             st.cache_data.clear()
             st.rerun()
         
         st.markdown("### Performance du Modèle")
-        
-        # Custom styled performance metrics
-        st.markdown(f"""
-        <div class="small-metric">
-            <div class="small-metric-label">R² Score</div>
-            <div class="small-metric-value">{st.session_state.r2:.1%}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="small-metric">
-            <div class="small-metric-label">Précision</div>
-            <div class="small-metric-value">±{st.session_state.mae:.2f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="small-metric">
-            <div class="small-metric-label">Validation Croisée</div>
-            <div class="small-metric-value">±{st.session_state.mae_cv:.2f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div style="background: #d4edda; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #28a745;">
-            <div style="font-size: 0.65rem; font-weight: 600; color: #155724;">Modèle calibré avec succès</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("R² Score", f"{st.session_state.r2:.1%}")
+        st.metric("Précision", f"±{st.session_state.mae:.2f}%")
+        st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%")
+        st.success("Modèle calibré avec succès")
     
     # Main tabs
     tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
