@@ -617,21 +617,48 @@ def main():
         q2_avg = q2_data['rendement_predit'].mean() 
         year1_avg = year1_data['rendement_predit'].mean()
         
-        # Determine strategic environment
-        if year1_avg < baseline_yield - 0.4:
-            strategic_environment = "ENVIRONNEMENT DE BAISSE"
-            env_color = "#28a745"
-            strategic_action = "PRIVILÉGIER TAUX VARIABLES"
-        elif year1_avg > baseline_yield + 0.4:
-            strategic_environment = "ENVIRONNEMENT DE HAUSSE"
-            env_color = "#dc3545"
-            strategic_action = "SÉCURISER AVEC TAUX FIXES"
+        # IMPROVED environment assessment logic
+        q1_change = q1_avg - baseline_yield
+        q2_change = q2_avg - baseline_yield
+        year1_change = year1_avg - baseline_yield
+        
+        # Calculate volatility metrics
+        q1_volatility = q1_data['rendement_predit'].std()
+        max_deviation = max(abs(q1_change), abs(q2_change), abs(year1_change))
+        
+        # Better environment classification
+        if max_deviation > 0.5:
+            if q1_change > 0.3:
+                strategic_environment = "ENVIRONNEMENT DE HAUSSE"
+                env_color = "#dc3545"
+                strategic_action = "SÉCURISER IMMÉDIATEMENT - TAUX FIXES"
+            elif year1_change < -0.3:
+                strategic_environment = "ENVIRONNEMENT DE BAISSE"
+                env_color = "#28a745"
+                strategic_action = "MAXIMISER TAUX VARIABLES"
+            else:
+                strategic_environment = "ENVIRONNEMENT CYCLIQUE"
+                env_color = "#ff6b35"
+                strategic_action = "STRATÉGIE ADAPTATIVE REQUISE"
+        elif max_deviation > 0.25:
+            if q1_change > 0.2:
+                strategic_environment = "ENVIRONNEMENT DE HAUSSE MODÉRÉE"
+                env_color = "#ffc107"
+                strategic_action = "PRÉPARER COUVERTURE - SURVEILLER"
+            elif q1_volatility > 0.3:
+                strategic_environment = "ENVIRONNEMENT VOLATIL"
+                env_color = "#6f42c1"
+                strategic_action = "GESTION ACTIVE DU RISQUE"
+            else:
+                strategic_environment = "ENVIRONNEMENT EN TRANSITION"
+                env_color = "#17a2b8"
+                strategic_action = "APPROCHE ÉQUILIBRÉE"
         else:
             strategic_environment = "ENVIRONNEMENT STABLE"
-            env_color = "#17a2b8"
-            strategic_action = "APPROCHE ÉQUILIBRÉE RECOMMANDÉE"
+            env_color = "#28a745"
+            strategic_action = "MAINTENIR STRATÉGIE ACTUELLE"
         
-        # Rate cycle analysis
+        # Rate cycle analysis with improved interpretation
         trend_6m = q2_avg - baseline_yield
         volatility_6m = q2_data['rendement_predit'].std()
         
@@ -697,23 +724,29 @@ def main():
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Strategic recommendations
+        # Strategic recommendations with improved timing logic
         q1_trend = q1_avg - baseline_yield
         q2_trend = q2_avg - baseline_yield
         year1_trend = year1_avg - baseline_yield
         
-        # Determine optimal action timing
-        if q1_trend < -0.3 and q2_trend < -0.2:
-            timing_recommendation = "AGIR RAPIDEMENT - Fenêtre favorable immédiate"
-            timing_color = "#28a745"
+        # Enhanced timing recommendation with cycle awareness
+        if q1_trend > 0.3 and q2_trend > 0.2:
+            timing_recommendation = "AGIR IMMÉDIATEMENT - Cycle de hausse confirmé"
+            timing_color = "#dc3545"
+        elif q1_trend > 0.25 and q2_trend < q1_trend:
+            timing_recommendation = "SÉCURISER MAINTENANT - Pic temporaire approche"
+            timing_color = "#ff6b35"
+        elif q1_trend < -0.3 and q2_trend < -0.2:
+            timing_recommendation = "ATTENDRE - Baisse continue favorable"
+            timing_color = "#28a745"  
+        elif abs(q1_trend - q2_trend) > 0.2:
+            timing_recommendation = "STRATÉGIE ADAPTATIVE - Environnement cyclique"
+            timing_color = "#6f42c1"
         elif year1_trend < -0.2:
             timing_recommendation = "PLANIFIER - Opportunités à moyen terme"
             timing_color = "#17a2b8"
-        elif q1_trend > 0.2:
-            timing_recommendation = "SÉCURISER - Hausse imminente des taux"
-            timing_color = "#dc3545"
         else:
-            timing_recommendation = "SURVEILLER - Environnement stable"
+            timing_recommendation = "SURVEILLER - Signaux mixtes"
             timing_color = "#ffc107"
         
         st.markdown(f"""
@@ -866,22 +899,15 @@ def main():
         # Enhanced Loan Parameters Section
         st.subheader("⚙️ Paramètres de l'Emprunt")
         
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             loan_amount = st.slider("Montant (millions MAD):", 1, 500, 50)
         with col2:
             loan_duration = st.slider("Durée (années):", 1, 10, 5)
-            if loan_duration > 2:
-                st.warning("⚠️ Prédictions limitées jusqu'à Déc 2026. Années 3+ utilisent des projections constantes.")
         with col3:
             current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
         with col4:
-            bank_risk_premium = st.number_input("Prime de risque banque (bp):", min_value=0, max_value=500, value=130, step=10, help="130 bp = 1.30%")
-        with col5:
             risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
-        
-        # Convert basis points to percentage
-        risk_premium_pct = bank_risk_premium / 100
         
         # Calculate comprehensive loan analysis
         scenarios_analysis = {}
@@ -891,21 +917,18 @@ def main():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Calculate variable rate costs (assuming annual rate changes + bank risk premium)
+            # Calculate variable rate costs (assuming annual rate changes)
             variable_rates_annual = []
             for year in range(loan_duration):
                 start_day = year * 365
                 end_day = min((year + 1) * 365, len(relevant_predictions))
                 if start_day < len(relevant_predictions):
                     year_data = relevant_predictions.iloc[start_day:end_day]
-                    avg_market_rate_year = year_data['rendement_predit'].mean()
-                    # Add bank's risk premium to market rate
-                    avg_rate_year = avg_market_rate_year + risk_premium_pct
+                    avg_rate_year = year_data['rendement_predit'].mean()
                     variable_rates_annual.append(avg_rate_year)
                 else:
-                    # If we don't have data for this year, use the last available rate + premium
-                    last_market_rate = variable_rates_annual[-1] - risk_premium_pct if variable_rates_annual else baseline_yield
-                    variable_rates_annual.append(last_market_rate + risk_premium_pct)
+                    # If we don't have data for this year, use the last available rate
+                    variable_rates_annual.append(variable_rates_annual[-1] if variable_rates_annual else baseline_yield)
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
@@ -953,8 +976,7 @@ def main():
             
             decision_data.append({
                 'Scénario': scenario_name,
-                'Taux Marché Moyen': f"{analysis['avg_variable_rate'] - risk_premium_pct:.2f}%",
-                'Taux Variable Final': f"{analysis['avg_variable_rate']:.2f}%",
+                'Taux Variable Moyen': f"{analysis['avg_variable_rate']:.2f}%",
                 'Fourchette': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
                 'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
                 'Différence vs Fixe': decision_text,
