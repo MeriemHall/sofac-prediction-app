@@ -509,15 +509,62 @@ def main():
         st.header("Informations du Modèle")
         
         st.markdown("### Données en Temps Réel")
+        
+        # Add custom styling for smaller metrics
+        st.markdown("""
+        <style>
+        .small-metric {
+            text-align: center;
+            padding: 0.5rem;
+            margin: 0.3rem 0;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .small-metric-label {
+            font-size: 0.6rem;
+            color: #666;
+            margin-bottom: 0.2rem;
+        }
+        .small-metric-value {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         col1, col2 = st.sidebar.columns(2)
         
         with col1:
-            st.metric("Taux Directeur", f"{live_data['policy_rate']:.2f}%")
-            st.metric("Inflation", f"{live_data['inflation']:.2f}%")
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Taux Directeur</div>
+                <div class="small-metric-value">{live_data['policy_rate']:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Inflation</div>
+                <div class="small-metric-value">{live_data['inflation']:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col2:
-            st.metric("Baseline Actuelle", f"{baseline_yield:.2f}%", help=f"Point d'ancrage: {baseline_date}")
-            st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Baseline Actuelle</div>
+                <div class="small-metric-value">{baseline_yield:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Croissance PIB</div>
+                <div class="small-metric-value">{live_data['gdp_growth']:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
         
