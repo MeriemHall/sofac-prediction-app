@@ -724,23 +724,29 @@ def main():
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Strategic recommendations
+        # Strategic recommendations with improved timing logic
         q1_trend = q1_avg - baseline_yield
         q2_trend = q2_avg - baseline_yield
         year1_trend = year1_avg - baseline_yield
         
-        # Determine optimal action timing
-        if q1_trend < -0.3 and q2_trend < -0.2:
-            timing_recommendation = "AGIR RAPIDEMENT - Fenêtre favorable immédiate"
-            timing_color = "#28a745"
+        # Enhanced timing recommendation with cycle awareness
+        if q1_trend > 0.3 and q2_trend > 0.2:
+            timing_recommendation = "AGIR IMMÉDIATEMENT - Cycle de hausse confirmé"
+            timing_color = "#dc3545"
+        elif q1_trend > 0.25 and q2_trend < q1_trend:
+            timing_recommendation = "SÉCURISER MAINTENANT - Pic temporaire approche"
+            timing_color = "#ff6b35"
+        elif q1_trend < -0.3 and q2_trend < -0.2:
+            timing_recommendation = "ATTENDRE - Baisse continue favorable"
+            timing_color = "#28a745"  
+        elif abs(q1_trend - q2_trend) > 0.2:
+            timing_recommendation = "STRATÉGIE ADAPTATIVE - Environnement cyclique"
+            timing_color = "#6f42c1"
         elif year1_trend < -0.2:
             timing_recommendation = "PLANIFIER - Opportunités à moyen terme"
             timing_color = "#17a2b8"
-        elif q1_trend > 0.2:
-            timing_recommendation = "SÉCURISER - Hausse imminente des taux"
-            timing_color = "#dc3545"
         else:
-            timing_recommendation = "SURVEILLER - Environnement stable"
+            timing_recommendation = "SURVEILLER - Signaux mixtes"
             timing_color = "#ffc107"
         
         st.markdown(f"""
