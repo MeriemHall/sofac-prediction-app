@@ -657,10 +657,34 @@ def main():
             st.rerun()
         
         st.markdown("### Performance du Modèle")
-        st.metric("R² Score", f"{st.session_state.r2:.1%}")
-        st.metric("Précision", f"±{st.session_state.mae:.2f}%")
-        st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%")
-        st.success("Modèle calibré avec succès")
+        
+        # Custom styled performance metrics
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">R² Score</div>
+            <div class="small-metric-value">{st.session_state.r2:.1%}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">Précision</div>
+            <div class="small-metric-value">±{st.session_state.mae:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">Validation Croisée</div>
+            <div class="small-metric-value">±{st.session_state.mae_cv:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="background: #d4edda; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #28a745;">
+            <div style="font-size: 0.65rem; font-weight: 600; color: #155724;">Modèle calibré avec succès</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Main tabs
     tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
@@ -971,8 +995,13 @@ def main():
             loan_duration = st.slider("Durée (années):", 1, 10, 5)
         with col3:
             current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
+            # Automatic risk premium display next to fixed rate input
+            st.info(f"📊 **Taux variable automatique:** Référence + 1,30% (prime de risque)")
         with col4:
             risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
+        
+        # Fixed banking spread (130 basis points) - as we discussed
+        banking_spread = 1.30
         
         # Calculate comprehensive loan analysis
         scenarios_analysis = {}
@@ -982,7 +1011,7 @@ def main():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Calculate variable rate costs (assuming annual rate changes)
+            # Calculate variable rate costs (with automatic 130bp banking spread)
             variable_rates_annual = []
             for year in range(loan_duration):
                 start_day = year * 365
@@ -990,10 +1019,13 @@ def main():
                 if start_day < len(relevant_predictions):
                     year_data = relevant_predictions.iloc[start_day:end_day]
                     avg_rate_year = year_data['rendement_predit'].mean()
-                    variable_rates_annual.append(avg_rate_year)
+                    # Add standard banking spread (130 basis points)
+                    effective_variable_rate = avg_rate_year + banking_spread
+                    variable_rates_annual.append(effective_variable_rate)
                 else:
-                    # If we don't have data for this year, use the last available rate
-                    variable_rates_annual.append(variable_rates_annual[-1] if variable_rates_annual else baseline_yield)
+                    # If we don't have data for this year, use the last available rate + spread
+                    last_rate = variable_rates_annual[-1] if variable_rates_annual else (baseline_yield + banking_spread)
+                    variable_rates_annual.append(last_rate)
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
@@ -1041,8 +1073,8 @@ def main():
             
             decision_data.append({
                 'Scénario': scenario_name,
-                'Taux Variable Moyen': f"{analysis['avg_variable_rate']:.2f}%",
-                'Fourchette': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
+                'Taux Variable Effectif': f"{analysis['avg_variable_rate']:.2f}%",
+                'Fourchette Effectif': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
                 'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
                 'Différence vs Fixe': decision_text,
                 'Recommandation': recommendation,
@@ -1140,9 +1172,11 @@ def main():
         
         with col2:
             st.markdown("### Option Taux Variable")
-            st.metric("Taux Moyen Prédit", f"{base_case_analysis['avg_variable_rate']:.2f}%")
-            st.metric("Coût Total Estimé", f"{base_case_analysis['variable_cost_total']:,.0f} MAD")
-            st.metric("Fourchette Annuelle", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
+            reference_rate = base_case_analysis['avg_variable_rate'] - banking_spread
+            st.metric("Taux Référence Moyen", f"{reference_rate:.2f}%", help="Prédiction du modèle")
+            st.metric("+ Marge Bancaire", f"+{banking_spread:.2f}%", help="130 points de base standard")
+            st.metric("= Taux Effectif SOFAC", f"{base_case_analysis['avg_variable_rate']:.2f}%", help="Taux réel proposé")
+            st.metric("Fourchette Effective", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
             if base_case_analysis['cost_difference'] < 0:
                 st.success(f"💰 Économie potentielle: {abs(base_case_analysis['cost_difference']):,.0f} MAD")
             else:
