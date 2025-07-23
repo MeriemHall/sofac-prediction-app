@@ -516,10 +516,20 @@ def main():
             st.metric("Inflation", f"{live_data['inflation']:.2f}%")
         
         with col2:
-            st.metric("Rendement Actuel", f"{baseline_yield:.2f}%", help=f"Baseline {baseline_date}")
+            st.metric("Baseline Actuelle", f"{baseline_yield:.2f}%", help=f"Point d'ancrage: {baseline_date}")
             st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
+        
+        # Baseline explanation
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 6px; border-left: 3px solid #2a5298; margin: 0.5rem 0;">
+            <div style="font-size: 0.75rem; color: #6c757d;">
+                <strong>📍 Baseline:</strong> {baseline_date} ({baseline_yield:.2f}%)<br>
+                <strong>📊 Référence:</strong> Dernière ancre de marché confirmée
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # STRATEGIC OUTLOOK SECTION (replacing daily prediction)
         st.sidebar.markdown("---")
