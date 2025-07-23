@@ -509,15 +509,62 @@ def main():
         st.header("Informations du Modèle")
         
         st.markdown("### Données en Temps Réel")
+        
+        # Add custom styling for smaller metrics
+        st.markdown("""
+        <style>
+        .small-metric {
+            text-align: center;
+            padding: 0.5rem;
+            margin: 0.3rem 0;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .small-metric-label {
+            font-size: 0.6rem;
+            color: #666;
+            margin-bottom: 0.2rem;
+        }
+        .small-metric-value {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         col1, col2 = st.sidebar.columns(2)
         
         with col1:
-            st.metric("Taux Directeur", f"{live_data['policy_rate']:.2f}%")
-            st.metric("Inflation", f"{live_data['inflation']:.2f}%")
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Taux Directeur</div>
+                <div class="small-metric-value">{live_data['policy_rate']:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Inflation</div>
+                <div class="small-metric-value">{live_data['inflation']:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col2:
-            st.metric("Baseline Actuelle", f"{baseline_yield:.2f}%", help=f"Point d'ancrage: {baseline_date}")
-            st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Baseline Actuelle</div>
+                <div class="small-metric-value">{baseline_yield:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <div class="small-metric">
+                <div class="small-metric-label">Croissance PIB</div>
+                <div class="small-metric-value">{live_data['gdp_growth']:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
         
@@ -561,21 +608,35 @@ def main():
         volatility_6m = six_month_data['rendement_predit'].std()
         stability_score = "🟢 Stable" if volatility_6m < 0.2 else "🟡 Modéré" if volatility_6m < 0.4 else "🔴 Volatil"
         
-        st.sidebar.metric(
-            "📈 Tendance 3 mois",
-            f"{three_month_avg:.2f}%",
-            delta=f"{three_month_trend}",
-            help="Direction générale sur 3 mois"
-        )
+        # Custom styled strategic metrics
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">📈 Tendance 3 mois</div>
+            <div class="small-metric-value">{three_month_avg:.2f}%</div>
+            <div style="font-size: 0.55rem; color: #666; margin-top: 0.1rem;">{three_month_trend}</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.sidebar.metric(
-            "🎯 Fourchette 6 mois", 
-            f"{six_month_min:.2f}%-{six_month_max:.2f}%",
-            help="Plage attendue sur 6 mois"
-        )
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">🎯 Fourchette 6 mois</div>
+            <div class="small-metric-value">{six_month_min:.2f}%-{six_month_max:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.sidebar.info(f"**Position cycle:** {cycle_position}")
-        st.sidebar.info(f"**Stabilité:** {stability_score}")
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #2a5298;">
+            <div style="font-size: 0.6rem; color: #6c757d; margin-bottom: 0.2rem;"><strong>Position cycle:</strong></div>
+            <div style="font-size: 0.7rem; font-weight: 600;">{cycle_position}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #2a5298;">
+            <div style="font-size: 0.6rem; color: #6c757d; margin-bottom: 0.2rem;"><strong>Stabilité:</strong></div>
+            <div style="font-size: 0.7rem; font-weight: 600;">{stability_score}</div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Strategic decision window
         if three_month_avg < current_vs_historical - 0.3:
@@ -584,18 +645,46 @@ def main():
             strategic_window = "🔴 Privilégier taux fixe"
         else:
             strategic_window = "🟡 Période de transition"
-            
-        st.sidebar.success(strategic_window)
+        
+        st.markdown(f"""
+        <div style="background: #e8f5e8; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #28a745;">
+            <div style="font-size: 0.65rem; font-weight: 600; color: #155724;">{strategic_window}</div>
+        </div>
+        """, unsafe_allow_html=True)
         
         if st.sidebar.button("Actualiser"):
             st.cache_data.clear()
             st.rerun()
         
         st.markdown("### Performance du Modèle")
-        st.metric("R² Score", f"{st.session_state.r2:.1%}")
-        st.metric("Précision", f"±{st.session_state.mae:.2f}%")
-        st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%")
-        st.success("Modèle calibré avec succès")
+        
+        # Custom styled performance metrics
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">R² Score</div>
+            <div class="small-metric-value">{st.session_state.r2:.1%}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">Précision</div>
+            <div class="small-metric-value">±{st.session_state.mae:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="small-metric">
+            <div class="small-metric-label">Validation Croisée</div>
+            <div class="small-metric-value">±{st.session_state.mae_cv:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="background: #d4edda; padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; border-left: 3px solid #28a745;">
+            <div style="font-size: 0.65rem; font-weight: 600; color: #155724;">Modèle calibré avec succès</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Main tabs
     tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
@@ -909,6 +998,22 @@ def main():
         with col4:
             risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
         
+        # Fixed banking spread (130 basis points)
+        banking_spread = 1.30
+        
+        # Display the automatic spread application
+        st.markdown(f"""
+        <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #1976d2;">
+            <h5 style="margin: 0 0 0.5rem 0; color: #1565c0;">📋 Méthodologie Taux Variable</h5>
+            <p style="margin: 0; font-size: 0.9rem;">
+                <strong>Taux variable effectif</strong> = Taux de référence prédit + {banking_spread:.0f} points de base (marge bancaire standard)
+            </p>
+            <p style="margin: 0.3rem 0 0 0; font-size: 0.8rem; color: #1565c0;">
+                <em>Cette marge est automatiquement appliquée pour refléter les conditions réelles du marché bancaire marocain.</em>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         # Calculate comprehensive loan analysis
         scenarios_analysis = {}
         
@@ -917,7 +1022,7 @@ def main():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Calculate variable rate costs (assuming annual rate changes)
+            # Calculate variable rate costs (with automatic 130bp banking spread)
             variable_rates_annual = []
             for year in range(loan_duration):
                 start_day = year * 365
@@ -925,10 +1030,13 @@ def main():
                 if start_day < len(relevant_predictions):
                     year_data = relevant_predictions.iloc[start_day:end_day]
                     avg_rate_year = year_data['rendement_predit'].mean()
-                    variable_rates_annual.append(avg_rate_year)
+                    # Add standard banking spread (130 basis points)
+                    effective_variable_rate = avg_rate_year + banking_spread
+                    variable_rates_annual.append(effective_variable_rate)
                 else:
-                    # If we don't have data for this year, use the last available rate
-                    variable_rates_annual.append(variable_rates_annual[-1] if variable_rates_annual else baseline_yield)
+                    # If we don't have data for this year, use the last available rate + spread
+                    last_rate = variable_rates_annual[-1] if variable_rates_annual else (baseline_yield + banking_spread)
+                    variable_rates_annual.append(last_rate)
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
@@ -976,8 +1084,8 @@ def main():
             
             decision_data.append({
                 'Scénario': scenario_name,
-                'Taux Variable Moyen': f"{analysis['avg_variable_rate']:.2f}%",
-                'Fourchette': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
+                'Taux Variable Effectif': f"{analysis['avg_variable_rate']:.2f}%",
+                'Fourchette Effectif': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
                 'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
                 'Différence vs Fixe': decision_text,
                 'Recommandation': recommendation,
@@ -1075,9 +1183,11 @@ def main():
         
         with col2:
             st.markdown("### Option Taux Variable")
-            st.metric("Taux Moyen Prédit", f"{base_case_analysis['avg_variable_rate']:.2f}%")
-            st.metric("Coût Total Estimé", f"{base_case_analysis['variable_cost_total']:,.0f} MAD")
-            st.metric("Fourchette Annuelle", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
+            reference_rate = base_case_analysis['avg_variable_rate'] - banking_spread
+            st.metric("Taux Référence Moyen", f"{reference_rate:.2f}%", help="Prédiction du modèle")
+            st.metric("+ Marge Bancaire", f"+{banking_spread:.2f}%", help="130 points de base standard")
+            st.metric("= Taux Effectif SOFAC", f"{base_case_analysis['avg_variable_rate']:.2f}%", help="Taux réel proposé")
+            st.metric("Fourchette Effective", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
             if base_case_analysis['cost_difference'] < 0:
                 st.success(f"💰 Économie potentielle: {abs(base_case_analysis['cost_difference']):,.0f} MAD")
             else:
