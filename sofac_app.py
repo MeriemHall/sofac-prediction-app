@@ -617,21 +617,48 @@ def main():
         q2_avg = q2_data['rendement_predit'].mean() 
         year1_avg = year1_data['rendement_predit'].mean()
         
-        # Determine strategic environment
-        if year1_avg < baseline_yield - 0.4:
-            strategic_environment = "ENVIRONNEMENT DE BAISSE"
-            env_color = "#28a745"
-            strategic_action = "PRIVILÉGIER TAUX VARIABLES"
-        elif year1_avg > baseline_yield + 0.4:
-            strategic_environment = "ENVIRONNEMENT DE HAUSSE"
-            env_color = "#dc3545"
-            strategic_action = "SÉCURISER AVEC TAUX FIXES"
+        # IMPROVED environment assessment logic
+        q1_change = q1_avg - baseline_yield
+        q2_change = q2_avg - baseline_yield
+        year1_change = year1_avg - baseline_yield
+        
+        # Calculate volatility metrics
+        q1_volatility = q1_data['rendement_predit'].std()
+        max_deviation = max(abs(q1_change), abs(q2_change), abs(year1_change))
+        
+        # Better environment classification
+        if max_deviation > 0.5:
+            if q1_change > 0.3:
+                strategic_environment = "ENVIRONNEMENT DE HAUSSE"
+                env_color = "#dc3545"
+                strategic_action = "SÉCURISER IMMÉDIATEMENT - TAUX FIXES"
+            elif year1_change < -0.3:
+                strategic_environment = "ENVIRONNEMENT DE BAISSE"
+                env_color = "#28a745"
+                strategic_action = "MAXIMISER TAUX VARIABLES"
+            else:
+                strategic_environment = "ENVIRONNEMENT CYCLIQUE"
+                env_color = "#ff6b35"
+                strategic_action = "STRATÉGIE ADAPTATIVE REQUISE"
+        elif max_deviation > 0.25:
+            if q1_change > 0.2:
+                strategic_environment = "ENVIRONNEMENT DE HAUSSE MODÉRÉE"
+                env_color = "#ffc107"
+                strategic_action = "PRÉPARER COUVERTURE - SURVEILLER"
+            elif q1_volatility > 0.3:
+                strategic_environment = "ENVIRONNEMENT VOLATIL"
+                env_color = "#6f42c1"
+                strategic_action = "GESTION ACTIVE DU RISQUE"
+            else:
+                strategic_environment = "ENVIRONNEMENT EN TRANSITION"
+                env_color = "#17a2b8"
+                strategic_action = "APPROCHE ÉQUILIBRÉE"
         else:
             strategic_environment = "ENVIRONNEMENT STABLE"
-            env_color = "#17a2b8"
-            strategic_action = "APPROCHE ÉQUILIBRÉE RECOMMANDÉE"
+            env_color = "#28a745"
+            strategic_action = "MAINTENIR STRATÉGIE ACTUELLE"
         
-        # Rate cycle analysis
+        # Rate cycle analysis with improved interpretation
         trend_6m = q2_avg - baseline_yield
         volatility_6m = q2_data['rendement_predit'].std()
         
