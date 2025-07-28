@@ -912,6 +912,18 @@ def main():
             # Simple practical risk tolerance
             max_volatility_accepted = st.number_input("Volatilité Max (%):", min_value=0.1, max_value=1.0, value=0.35, step=0.05, help="Volatilité maximale acceptable")
         
+        # Add explanatory box for volatility guidance
+        st.markdown(f"""
+        <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #1976d2;">
+            <div style="font-size: 0.85rem; color: #1565c0;">
+                <strong>💡 Guide de Tolérance:</strong>
+                <br>• <strong>Conservateur:</strong> 0.20-0.30% (volatilité très limitée)
+                <br>• <strong>Équilibré:</strong> 0.30-0.40% (tolérance moyenne recommandée: 0.40%)
+                <br>• <strong>Agressif:</strong> 0.40-0.60% (volatilité élevée pour gains supérieurs)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         # Simple risk tolerance mapping
         if max_volatility_accepted <= 0.25:
             risk_tolerance = "Conservateur"
