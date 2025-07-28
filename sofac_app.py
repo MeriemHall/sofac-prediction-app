@@ -899,20 +899,34 @@ def main():
         # Enhanced Loan Parameters Section
         st.subheader("⚙️ Paramètres de l'Emprunt")
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             loan_amount = st.slider("Montant (millions MAD):", 1, 500, 50)
         with col2:
             loan_duration = st.slider("Durée (années):", 1, 10, 5)
         with col3:
             current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
-            # Automatic risk premium display next to fixed rate input
-            st.info(f"📊 **Taux variable automatique:** Référence + 1,30% (prime de risque)")
         with col4:
+            # Adjustable risk premium instead of fixed 1.30%
+            risk_premium = st.number_input("Prime de risque (%):", min_value=0.5, max_value=3.0, value=1.3, step=0.1, help="Marge bancaire sur taux de référence")
+        with col5:
             risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
         
-        # Fixed banking spread (130 basis points) - as we discussed
-        banking_spread = 1.30
+        # Display the automatic calculation with adjustable premium
+        st.markdown(f"""
+        <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #1976d2;">
+            <h5 style="margin: 0 0 0.5rem 0; color: #1565c0;">📊 Configuration Taux Variable</h5>
+            <p style="margin: 0; font-size: 0.9rem;">
+                <strong>Formule:</strong> Taux Variable = Référence Prédite + Prime de Risque ({risk_premium:.1f}%)
+            </p>
+            <p style="margin: 0.3rem 0 0 0; font-size: 0.8rem; color: #1565c0;">
+                <em>💡 Valeurs typiques: 1.0-1.5% (marché normal) | 1.5-2.5% (conditions difficiles) | 0.8-1.2% (clients privilégiés)</em>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Use the adjustable risk premium instead of fixed banking_spread
+        banking_spread = risk_premium
         
         # Calculate comprehensive loan analysis
         scenarios_analysis = {}
@@ -1085,8 +1099,8 @@ def main():
             st.markdown("### Option Taux Variable")
             reference_rate = base_case_analysis['avg_variable_rate'] - banking_spread
             st.metric("Taux Référence Moyen", f"{reference_rate:.2f}%", help="Prédiction du modèle")
-            st.metric("+ Marge Bancaire", f"+{banking_spread:.2f}%", help="130 points de base standard")
-            st.metric("= Taux Effectif SOFAC", f"{base_case_analysis['avg_variable_rate']:.2f}%", help="Taux réel proposé")
+            st.metric("+ Prime de Risque", f"+{banking_spread:.2f}%", help=f"Prime ajustable ({banking_spread:.1f}%)")
+            st.metric("= Taux Effectif SOFAC", f"{base_case_analysis['avg_variable_rate']:.2f}%", help="Taux réel avec prime")
             st.metric("Fourchette Effective", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
             if base_case_analysis['cost_difference'] < 0:
                 st.success(f"💰 Économie potentielle: {abs(base_case_analysis['cost_difference']):,.0f} MAD")
