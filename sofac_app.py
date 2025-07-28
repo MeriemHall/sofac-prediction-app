@@ -912,19 +912,6 @@ def main():
         with col5:
             risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
         
-        # Display the automatic calculation with adjustable premium
-        st.markdown(f"""
-        <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #1976d2;">
-            <h5 style="margin: 0 0 0.5rem 0; color: #1565c0;">📊 Configuration Taux Variable</h5>
-            <p style="margin: 0; font-size: 0.9rem;">
-                <strong>Formule:</strong> Taux Variable = Référence Prédite + Prime de Risque ({risk_premium:.1f}%)
-            </p>
-            <p style="margin: 0.3rem 0 0 0; font-size: 0.8rem; color: #1565c0;">
-                <em>💡 Valeurs typiques: 1.0-1.5% (marché normal) | 1.5-2.5% (conditions difficiles) | 0.8-1.2% (clients privilégiés)</em>
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
         # Use the adjustable risk premium instead of fixed banking_spread
         banking_spread = risk_premium
         
