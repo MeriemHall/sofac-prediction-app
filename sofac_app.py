@@ -910,7 +910,32 @@ def main():
             # Adjustable risk premium instead of fixed 1.30%
             risk_premium = st.number_input("Prime de risque (%):", min_value=0.5, max_value=3.0, value=1.3, step=0.1, help="Marge bancaire sur taux de référence")
         with col5:
-            risk_tolerance = st.selectbox("Tolérance au risque:", ["Faible", "Moyenne", "Élevée"])
+            # More precise risk tolerance with percentage thresholds
+            volatility_threshold = st.number_input("Seuil volatilité (%):", min_value=0.1, max_value=1.0, value=0.3, step=0.05, help="Volatilité maximale acceptable pour recommander taux variable")
+        
+        # Convert volatility threshold to risk tolerance categories for display
+        if volatility_threshold <= 0.2:
+            risk_tolerance_display = "Très Faible"
+            risk_tolerance = "Faible"
+        elif volatility_threshold <= 0.3:
+            risk_tolerance_display = "Faible"
+            risk_tolerance = "Faible"
+        elif volatility_threshold <= 0.5:
+            risk_tolerance_display = "Moyenne"
+            risk_tolerance = "Moyenne"
+        else:
+            risk_tolerance_display = "Élevée"
+            risk_tolerance = "Élevée"
+        
+        # Display current risk profile
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0; border-left: 3px solid #6c757d;">
+            <div style="font-size: 0.8rem; color: #495057;">
+                <strong>📊 Profil de risque:</strong> {risk_tolerance_display} (Seuil: {volatility_threshold:.2f}%)
+                <br><em>Volatilité ≤ {volatility_threshold:.2f}% = Acceptable pour taux variable</em>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Use the adjustable risk premium instead of fixed banking_spread
         banking_spread = risk_premium
@@ -1007,48 +1032,48 @@ def main():
         avg_volatility = np.mean([analysis['volatility'] for analysis in scenarios_analysis.values()])
         max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
         
-        # Improved decision logic
+        # Improved decision logic using precise volatility threshold
         if risk_tolerance == "Faible":
-            # For low risk tolerance, need strong evidence AND low volatility
-            if variable_recommendations == total_scenarios and avg_cost_difference < -1000000 and max_volatility < 0.4:
+            # For low risk tolerance, use strict volatility and savings criteria
+            if variable_recommendations == total_scenarios and avg_cost_difference < -1000000 and max_volatility <= volatility_threshold:
                 final_recommendation = "TAUX VARIABLE"
-                final_reason = f"Économies substantielles ({abs(avg_cost_difference):,.0f} MAD) avec volatilité acceptable"
+                final_reason = f"Économies substantielles ({abs(avg_cost_difference):,.0f} MAD) avec volatilité acceptable (≤{volatility_threshold:.2f}%)"
                 final_color = "#28a745"
-            elif variable_recommendations >= 2 and avg_cost_difference < -500000 and max_volatility < 0.3:
+            elif variable_recommendations >= 2 and avg_cost_difference < -500000 and max_volatility <= volatility_threshold * 0.8:
                 final_recommendation = "STRATÉGIE MIXTE"
-                final_reason = f"Économies probables mais risque limité avec approche mixte"
+                final_reason = f"Économies probables avec volatilité très faible (≤{volatility_threshold * 0.8:.2f}%)"
                 final_color = "#ffc107"
             else:
                 final_recommendation = "TAUX FIXE"
-                final_reason = "Sécurité privilégiée - volatilité ou économies insuffisantes"
+                final_reason = f"Volatilité dépassant le seuil ({max_volatility:.2f}% > {volatility_threshold:.2f}%) ou économies insuffisantes"
                 final_color = "#dc3545"
                 
         elif risk_tolerance == "Moyenne":
-            if variable_recommendations >= 2 and avg_cost_difference < -200000:
+            if variable_recommendations >= 2 and avg_cost_difference < -200000 and max_volatility <= volatility_threshold:
                 final_recommendation = "TAUX VARIABLE"
-                final_reason = f"Équilibre favorable: économies de {abs(avg_cost_difference):,.0f} MAD avec risque acceptable"
+                final_reason = f"Équilibre favorable: économies de {abs(avg_cost_difference):,.0f} MAD avec volatilité acceptable (≤{volatility_threshold:.2f}%)"
                 final_color = "#28a745"
-            elif variable_recommendations >= 2:
+            elif variable_recommendations >= 2 and max_volatility <= volatility_threshold * 1.2:
                 final_recommendation = "STRATÉGIE MIXTE"
-                final_reason = "Économies modérées - répartition 50/50 pour optimiser le risque"
+                final_reason = f"Économies modérées avec volatilité près du seuil ({max_volatility:.2f}%)"
                 final_color = "#ffc107"
             else:
                 final_recommendation = "TAUX FIXE"
-                final_reason = "Majorité des scénarios défavorables au taux variable"
+                final_reason = f"Volatilité excessive ({max_volatility:.2f}% > {volatility_threshold:.2f}%) ou scénarios défavorables"
                 final_color = "#dc3545"
                 
         else:  # Élevée
-            if variable_recommendations >= 1 and avg_cost_difference < 0:
+            if variable_recommendations >= 1 and avg_cost_difference < 0 and max_volatility <= volatility_threshold:
                 final_recommendation = "TAUX VARIABLE"
-                final_reason = f"Opportunité d'économies: {abs(avg_cost_difference):,.0f} MAD - risque acceptable"
+                final_reason = f"Opportunité d'économies: {abs(avg_cost_difference):,.0f} MAD avec volatilité acceptable (≤{volatility_threshold:.2f}%)"
                 final_color = "#28a745"
-            elif avg_cost_difference < 500000:  # Less than 500k extra cost
+            elif avg_cost_difference < 500000 and max_volatility <= volatility_threshold * 1.5:
                 final_recommendation = "TAUX VARIABLE" 
-                final_reason = "Tolérance élevée au risque - potentiel de gains à long terme"
+                final_reason = f"Tolérance élevée - acceptation volatilité jusqu'à {volatility_threshold * 1.5:.2f}%"
                 final_color = "#28a745"
             else:
                 final_recommendation = "TAUX FIXE"
-                final_reason = "Tous les scénarios défavorables - coûts trop élevés"
+                final_reason = f"Volatilité excessive même pour profil élevé ({max_volatility:.2f}% > {volatility_threshold * 1.5:.2f}%)"
                 final_color = "#dc3545"
         
         # Final recommendation display with consistency explanation
@@ -1137,15 +1162,15 @@ def main():
         
         with risk_col1:
             st.markdown("### Risque de Taux")
-            if base_case_analysis['volatility'] < 0.2:
-                st.success("🟢 FAIBLE")
-                risk_desc = "Fluctuations limitées attendues"
-            elif base_case_analysis['volatility'] < 0.4:
-                st.warning("🟡 MOYEN") 
-                risk_desc = "Fluctuations modérées possibles"
+            if base_case_analysis['volatility'] <= volatility_threshold:
+                st.success("🟢 ACCEPTABLE")
+                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% ≤ Seuil {volatility_threshold:.2f}%"
+            elif base_case_analysis['volatility'] <= volatility_threshold * 1.3:
+                st.warning("🟡 MODÉRÉ") 
+                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% légèrement au-dessus du seuil"
             else:
                 st.error("🔴 ÉLEVÉ")
-                risk_desc = "Fortes fluctuations possibles"
+                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% >> Seuil {volatility_threshold:.2f}%"
             st.write(risk_desc)
         
         with risk_col2:
