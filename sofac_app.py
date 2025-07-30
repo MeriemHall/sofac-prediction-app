@@ -565,15 +565,6 @@ def main():
         six_month_min = six_month_data['rendement_predit'].min()
         six_month_max = six_month_data['rendement_predit'].max()
         
-        # Rate cycle position
-        current_vs_historical = baseline_yield
-        if current_vs_historical < 2.0:
-            cycle_position = "🟢 Bas de cycle"
-        elif current_vs_historical < 3.0:
-            cycle_position = "🟡 Cycle moyen"
-        else:
-            cycle_position = "🔴 Haut de cycle"
-        
         # Volatility assessment for next 6 months
         volatility_6m = six_month_data['rendement_predit'].std()
         stability_score = "🟢 Stable" if volatility_6m < 0.2 else "🟡 Modéré" if volatility_6m < 0.4 else "🔴 Volatil"
@@ -591,13 +582,10 @@ def main():
             help="Plage attendue sur 6 mois"
         )
         
-        st.sidebar.info(f"**Position cycle:** {cycle_position}")
-        st.sidebar.info(f"**Stabilité:** {stability_score}")
-        
         # Strategic decision window
-        if three_month_avg < current_vs_historical - 0.3:
+        if three_month_avg < baseline_yield - 0.3:
             strategic_window = "🟢 Fenêtre favorable taux variable"
-        elif three_month_avg > current_vs_historical + 0.3:
+        elif three_month_avg > baseline_yield + 0.3:
             strategic_window = "🔴 Privilégier taux fixe"
         else:
             strategic_window = "🟡 Période de transition"
@@ -1219,48 +1207,7 @@ def main():
         
         st.plotly_chart(fig_yearly, use_container_width=True)
         
-        # Risk assessment
-        st.subheader("⚠️ Évaluation des Risques")
-        
-        risk_col1, risk_col2, risk_col3 = st.columns(3)
-        
-        with risk_col1:
-            st.markdown("### Risque de Taux")
-            if base_case_analysis['volatility'] <= max_volatility_accepted:
-                st.success("🟢 ACCEPTABLE")
-                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% ≤ Seuil {max_volatility_accepted:.2f}%"
-            else:
-                st.error("🔴 TROP ÉLEVÉ")
-                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% > Seuil {max_volatility_accepted:.2f}%"
-            st.write(risk_desc)
-        
-        with risk_col2:
-            st.markdown("### Risque de Liquidité")
-            max_annual_diff = max(base_case_analysis['variable_rates_annual']) - current_fixed_rate
-            if max_annual_diff < 0.5:
-                st.success("🟢 FAIBLE")
-                liquidity_desc = "Impact limité sur la trésorerie"
-            elif max_annual_diff < 1.0:
-                st.warning("🟡 MOYEN")
-                liquidity_desc = "Impact modéré à prévoir"
-            else:
-                st.error("🔴 ÉLEVÉ")
-                liquidity_desc = "Impact significatif possible"
-            st.write(liquidity_desc)
-        
-        with risk_col3:
-            st.markdown("### Recommandation Finale")
-            if final_recommendation == "TAUX VARIABLE":
-                st.success("📈 VARIABLE")
-            elif final_recommendation == "TAUX FIXE":
-                st.error("📊 FIXE") 
-            else:
-                st.warning("⚖️ MIXTE")
-            st.write(f"Confiance: {70 + variable_recommendations * 10}%")
-        
-        # Global recommendation summary - USE THE SAME LOGIC as final decision
-        # Remove the old conflicting logic and use cost-based analysis
-        
+        # Global recommendation summary
         # Count scenarios that actually save money (cost_difference < 0)
         profitable_scenarios = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
         total_scenarios = len(scenarios_analysis)
