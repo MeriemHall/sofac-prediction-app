@@ -1254,21 +1254,30 @@ def main():
                 st.warning("⚖️ MIXTE")
             st.write(f"Confiance: {70 + variable_recommendations * 10}%")
         
-        # Global recommendation summary
-        recommendations_list = [scenarios_analysis[scenario]['cost_difference'] < 0 for scenario in scenarios_analysis.keys()]
+        # Global recommendation summary - USE THE SAME LOGIC as final decision
+        # Remove the old conflicting logic and use cost-based analysis
         
-        if recommendations_list.count(True) >= 2:
+        # Count scenarios that actually save money (cost_difference < 0)
+        profitable_scenarios = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
+        total_scenarios = len(scenarios_analysis)
+        
+        # Use the same logic as the final decision for consistency
+        if profitable_scenarios >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted:
             global_strategy = "TAUX VARIABLE"
-            global_reason = "Majorité des scénarios favorisent les taux variables"
+            global_reason = f"Majorité des scénarios favorables ({profitable_scenarios}/{total_scenarios}) avec volatilité acceptable"
             global_color = "#28a745"
-        elif recommendations_list.count(False) >= 2:
+        elif profitable_scenarios >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted * 1.3:
+            global_strategy = "STRATÉGIE MIXTE"
+            global_reason = f"Économies probables mais volatilité légèrement élevée ({max_volatility:.2f}%)"
+            global_color = "#ffc107"
+        elif avg_cost_difference >= 0:
             global_strategy = "TAUX FIXE"
-            global_reason = "Majorité des scénarios favorisent les taux fixes"
+            global_reason = f"Taux fixe plus avantageux - évite surcoûts"
             global_color = "#dc3545"
         else:
-            global_strategy = "STRATÉGIE MIXTE"
-            global_reason = "Signaux mixtes - approche équilibrée recommandée"
-            global_color = "#ffc107"
+            global_strategy = "TAUX FIXE"
+            global_reason = f"Volatilité trop élevée ({max_volatility:.2f}%) malgré économies potentielles"
+            global_color = "#dc3545"
         
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, {global_color}, {global_color}AA); 
