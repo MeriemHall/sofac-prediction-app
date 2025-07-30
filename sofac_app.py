@@ -264,7 +264,7 @@ def create_dataset():
     return pd.DataFrame(donnees_mensuelles)
 
 def train_model(df):
-    """Train prediction model with proper variable names and realistic performance metrics"""
+    """Train prediction model with comprehensive performance metrics"""
     X = df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
     y = df['Rendement_52s']
     
@@ -275,22 +275,17 @@ def train_model(df):
     r2 = r2_score(y, y_pred)
     mae = mean_absolute_error(y, y_pred)
     
-    # Cross-validation with realistic results for extended model
+    # Calculate ML model accuracy
+    # For regression, accuracy can be defined as percentage of predictions within acceptable tolerance
+    tolerance = 0.15  # 15 basis points tolerance for "accurate" prediction
+    accurate_predictions = np.abs(y - y_pred) <= tolerance
+    accuracy = np.mean(accurate_predictions) * 100  # Convert to percentage
+    
+    # Cross-validation
     scores_cv = cross_val_score(model, X, y, cv=5, scoring='neg_mean_absolute_error')
     mae_cv = -scores_cv.mean()
     
-    # Adjust metrics to reflect extended model complexity and uncertainty
-    # Extended models typically have lower accuracy due to longer horizons
-    r2_adjusted = r2 * 0.85  # Reduce R² to reflect extended horizon uncertainty
-    mae_adjusted = mae * 1.25  # Increase MAE to reflect longer-term prediction challenges
-    mae_cv_adjusted = mae_cv * 1.30  # Cross-validation shows higher uncertainty
-    
-    # Ensure realistic bounds
-    r2_final = max(0.65, min(0.85, r2_adjusted))  # Realistic range for macro models
-    mae_final = max(0.25, min(0.45, mae_adjusted))  # Realistic precision for 5+ year horizons
-    mae_cv_final = max(0.30, min(0.50, mae_cv_adjusted))  # Conservative CV estimate
-    
-    return model, r2_final, mae_final, mae_cv_final
+    return model, r2, mae, mae_cv, accuracy
 
 def generate_scenarios():
     """Generate realistic economic scenarios with extended predictions"""
@@ -512,7 +507,7 @@ def main():
     if 'data_loaded' not in st.session_state:
         with st.spinner("Chargement du modèle..."):
             st.session_state.df = create_dataset()
-            st.session_state.model, st.session_state.r2, st.session_state.mae, st.session_state.mae_cv = train_model(st.session_state.df)
+            st.session_state.model, st.session_state.r2, st.session_state.mae, st.session_state.mae_cv, st.session_state.accuracy = train_model(st.session_state.df)
             st.session_state.scenarios = generate_scenarios()
             st.session_state.predictions = predict_yields(st.session_state.scenarios, st.session_state.model)
             st.session_state.recommendations = generate_recommendations(st.session_state.predictions)
@@ -617,6 +612,7 @@ def main():
         st.metric("R² Score", f"{st.session_state.r2:.1%}")
         st.metric("Précision", f"±{st.session_state.mae:.2f}%")
         st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%")
+        st.metric("Exactitude ML", f"{st.session_state.accuracy:.1f}%", help="Pourcentage de prédictions dans la tolérance ±15bp")
         st.success("Modèle calibré avec succès")
     
     # Main tabs
