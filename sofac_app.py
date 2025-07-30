@@ -672,37 +672,46 @@ def main():
         
         st.markdown("### Performance du Modèle")
         
-        # Get confidence metrics for the base case scenario
-        base_confidence = st.session_state.confidence_metrics['Cas_de_Base']
-        
-        # Display time-sensitive metrics
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Coefficient de détermination sur données test")
-            st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
-        
-        with col2:
-            st.metric("Confiance 1M", f"{base_confidence['confidence_1m']:.1%}", help="Fiabilité à 1 mois")
-            st.metric("Confiance 1A", f"{base_confidence['confidence_1y']:.1%}", help="Fiabilité à 1 an")
-        
-        # Additional metrics
-        st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%", help="Erreur CV sur données d'entraînement")
-        st.metric("Exactitude Ajustée", f"{st.session_state.accuracy:.1f}%", help="Précision ajustée pour horizon 5 ans")
-        
-        # Model reliability indicator
-        if st.session_state.r2 > 0.7:
-            st.success("✅ Modèle fiable")
-        elif st.session_state.r2 > 0.5:
-            st.warning("⚠️ Fiabilité modérée")
+        # Safety check for confidence metrics
+        if hasattr(st.session_state, 'confidence_metrics') and 'Cas_de_Base' in st.session_state.confidence_metrics:
+            # Get confidence metrics for the base case scenario
+            base_confidence = st.session_state.confidence_metrics['Cas_de_Base']
+            
+            # Display time-sensitive metrics
+            col1, col2 = st.sidebar.columns(2)
+            with col1:
+                st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Coefficient de détermination sur données test")
+                st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne")
+            
+            with col2:
+                st.metric("Confiance 1M", f"{base_confidence['confidence_1m']:.1%}", help="Fiabilité à 1 mois")
+                st.metric("Confiance 1A", f"{base_confidence['confidence_1y']:.1%}", help="Fiabilité à 1 an")
+            
+            # Additional metrics
+            st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%", help="Erreur CV sur données d'entraînement")
+            st.metric("Exactitude Ajustée", f"{st.session_state.accuracy:.1f}%", help="Précision ajustée pour horizon 5 ans")
+            
+            # Model reliability indicator
+            if st.session_state.r2 > 0.7:
+                st.success("✅ Modèle fiable")
+            elif st.session_state.r2 > 0.5:
+                st.warning("⚠️ Fiabilité modérée")
+            else:
+                st.error("❌ Fiabilité limitée")
+            
+            # Confidence degradation info
+            st.info(f"""
+            **📉 Dégradation Temporelle:**
+            - 6 mois: {base_confidence['confidence_6m']:.0%}
+            - 5 ans: {base_confidence['confidence_5y']:.0%}
+            """)
         else:
-            st.error("❌ Fiabilité limitée")
-        
-        # Confidence degradation info
-        st.info(f"""
-        **📉 Dégradation Temporelle:**
-        - 6 mois: {base_confidence['confidence_6m']:.0%}
-        - 5 ans: {base_confidence['confidence_5y']:.0%}
-        """)
+            # Fallback display while loading
+            st.metric("R² Score", f"{st.session_state.r2:.1%}" if hasattr(st.session_state, 'r2') else "Calcul...")
+            st.metric("Précision", f"±{st.session_state.mae:.2f}%" if hasattr(st.session_state, 'mae') else "Calcul...")
+            st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%" if hasattr(st.session_state, 'mae_cv') else "Calcul...")
+            st.metric("Exactitude", f"{st.session_state.accuracy:.1f}%" if hasattr(st.session_state, 'accuracy') else "Calcul...")
+            st.info("⏳ Calcul des métriques de confiance...")
 
     
     # Main tabs
@@ -956,27 +965,30 @@ def main():
             change = pred_data['rendement_predit'].mean() - baseline_yield
             st.metric("Écart vs Juin 2025", f"{change:+.2f}%")
         
-        # Add confidence metrics for this scenario
-        scenario_confidence = st.session_state.confidence_metrics[scenario_choice]
-        
-        st.markdown("### 📊 Métriques de Fiabilité")
-        conf_col1, conf_col2, conf_col3, conf_col4 = st.columns(4)
-        
-        with conf_col1:
-            st.metric("Confiance 1 Mois", f"{scenario_confidence['confidence_1m']:.1%}")
-        with conf_col2:
-            st.metric("Confiance 6 Mois", f"{scenario_confidence['confidence_6m']:.1%}")
-        with conf_col3:
-            st.metric("Confiance 1 An", f"{scenario_confidence['confidence_1y']:.1%}")
-        with conf_col4:
-            st.metric("Confiance Moyenne", f"{scenario_confidence['avg_confidence']:.1%}")
-        
-        # Warning about prediction accuracy
-        st.warning("""
-        ⚠️ **Important**: La fiabilité des prédictions diminue avec le temps. Les prédictions à court terme (1-6 mois) 
-        sont plus fiables que celles à long terme (3-5 ans). Utilisez ces données comme guide stratégique, 
-        pas comme garantie future.
-        """)
+        # Add confidence metrics for this scenario (with safety check)
+        if hasattr(st.session_state, 'confidence_metrics') and scenario_choice in st.session_state.confidence_metrics:
+            scenario_confidence = st.session_state.confidence_metrics[scenario_choice]
+            
+            st.markdown("### 📊 Métriques de Fiabilité")
+            conf_col1, conf_col2, conf_col3, conf_col4 = st.columns(4)
+            
+            with conf_col1:
+                st.metric("Confiance 1 Mois", f"{scenario_confidence['confidence_1m']:.1%}")
+            with conf_col2:
+                st.metric("Confiance 6 Mois", f"{scenario_confidence['confidence_6m']:.1%}")
+            with conf_col3:
+                st.metric("Confiance 1 An", f"{scenario_confidence['confidence_1y']:.1%}")
+            with conf_col4:
+                st.metric("Confiance Moyenne", f"{scenario_confidence['avg_confidence']:.1%}")
+            
+            # Warning about prediction accuracy
+            st.warning("""
+            ⚠️ **Important**: La fiabilité des prédictions diminue avec le temps. Les prédictions à court terme (1-6 mois) 
+            sont plus fiables que celles à long terme (3-5 ans). Utilisez ces données comme guide stratégique, 
+            pas comme garantie future.
+            """)
+        else:
+            st.info("⏳ Calcul des métriques de confiance en cours...")
         
         # Detailed chart
         st.subheader(f"Prédictions Quotidiennes - {scenario_choice}")
