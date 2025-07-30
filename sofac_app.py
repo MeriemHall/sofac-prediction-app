@@ -564,6 +564,39 @@ def calculate_prediction_confidence(predictions, baseline_yield, max_horizon_day
         }
     
     return predictions, confidence_metrics
+
+def generate_recommendations(predictions):
+    """Generate strategic recommendations"""
+    baseline = 1.75
+    recommendations = {}
+    
+    for scenario_name, pred_df in predictions.items():
+        avg_yield = pred_df['rendement_predit'].mean()
+        change = avg_yield - baseline
+        volatility = pred_df['rendement_predit'].std()
+        
+        if change > 0.3:
+            recommendation = "TAUX FIXE"
+            reason = "Hausse attendue des rendements - bloquer les taux"
+        elif change < -0.3:
+            recommendation = "TAUX VARIABLE"
+            reason = "Baisse attendue des rendements - profiter des taux variables"
+        else:
+            recommendation = "STRATÉGIE MIXTE"
+            reason = "Évolution stable - approche équilibrée"
+        
+        risk_level = "ÉLEVÉ" if volatility > 0.3 else "MOYEN" if volatility > 0.15 else "FAIBLE"
+        
+        recommendations[scenario_name] = {
+            'recommandation': recommendation,
+            'raison': reason,
+            'niveau_risque': risk_level,
+            'rendement_moyen': avg_yield,
+            'changement': change,
+            'volatilite': volatility
+        }
+    
+    return recommendations
     """Generate strategic recommendations"""
     baseline = 1.75
     recommendations = {}
