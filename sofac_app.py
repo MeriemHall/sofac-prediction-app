@@ -943,61 +943,56 @@ def main():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Professional Forward Curve methodology for variable rate calculation
+            # Fixed Professional Forward Curve methodology 
             variable_rates_annual = []
             
             # Phase 1: Use actual model predictions where available
             available_years = min(loan_duration, len(relevant_predictions) // 365)
+            
+            # Debug: Let's see what we actually have
+            print(f"Debug: Available years of predictions: {available_years}")
+            print(f"Debug: Total prediction length: {len(relevant_predictions)} days")
             
             for year in range(available_years):
                 start_day = year * 365
                 end_day = min((year + 1) * 365, len(relevant_predictions))
                 year_data = relevant_predictions.iloc[start_day:end_day]
                 avg_rate_year = year_data['rendement_predit'].mean()
+                print(f"Debug: Year {year+1} reference rate: {avg_rate_year:.3f}%")
                 effective_variable_rate = avg_rate_year + banking_spread
                 variable_rates_annual.append(effective_variable_rate)
             
-            # Phase 2: Forward Curve extrapolation for remaining years
+            # Phase 2: CORRECTED Forward Curve extrapolation
             if loan_duration > available_years:
-                last_market_rate = variable_rates_annual[-1] - banking_spread  # Remove spread for calculation
+                # Get the last available reference rate (without banking spread)
+                last_reference_rate = variable_rates_annual[-1] - banking_spread
+                print(f"Debug: Last reference rate for extrapolation: {last_reference_rate:.3f}%")
+                
+                # Morocco's economic fundamentals
+                long_term_equilibrium = 2.0  # Long-term neutral rate for Morocco
+                reversion_speed = 0.20       # Gradual mean reversion
                 
                 for year in range(available_years, loan_duration):
                     years_ahead = year - available_years + 1
                     
-                    if years_ahead == 1:
-                        # 1-year forward based on recent rate evolution
-                        if len(variable_rates_annual) >= 2:
-                            # Calculate recent trend but dampen it
-                            recent_change = (variable_rates_annual[-1] - variable_rates_annual[-2]) - banking_spread
-                            # Forward markets typically price in 50% of recent trend
-                            forward_rate = last_market_rate + (recent_change * 0.5)
-                        else:
-                            forward_rate = last_market_rate
-                    else:
-                        # Multi-year forwards with mean reversion to long-term equilibrium
-                        long_term_equilibrium = 2.5  # Morocco's long-term neutral rate
-                        reversion_speed = 0.25       # Moderate mean reversion speed
-                        
-                        # Mean reversion formula: F(t) = LR + (R0 - LR) * exp(-λ*t)
-                        forward_rate = long_term_equilibrium + (last_market_rate - long_term_equilibrium) * np.exp(-reversion_speed * years_ahead)
+                    # CORRECTED: Mean reversion to equilibrium
+                    # Formula: R(t) = LR + (R0 - LR) × e^(-λ×t)
+                    reference_rate = long_term_equilibrium + (last_reference_rate - long_term_equilibrium) * np.exp(-reversion_speed * years_ahead)
                     
-                    # Add term premium (increases with maturity as investors demand compensation for duration risk)
-                    if years_ahead <= 2:
-                        term_premium = 0.10 + 0.05 * years_ahead  # Lower premium for near-term
-                    else:
-                        term_premium = 0.20 + 0.03 * (years_ahead - 2)  # Higher premium for long-term
+                    # Add modest term premium (should be small)
+                    term_premium = 0.05 + 0.02 * min(years_ahead, 3)  # Capped at reasonable level
+                    reference_rate += term_premium
                     
-                    forward_rate += term_premium
+                    # Reasonable bounds for Morocco
+                    reference_rate = max(1.2, min(3.5, reference_rate))
                     
-                    # Apply reasonable bounds based on Morocco's historical range
-                    forward_rate = max(1.5, min(4.5, forward_rate))
+                    print(f"Debug: Year {year+1} extrapolated reference rate: {reference_rate:.3f}%")
                     
-                    # Add banking spread back to get client rate
-                    effective_variable_rate = forward_rate + banking_spread
+                    # Add banking spread to get effective rate
+                    effective_variable_rate = reference_rate + banking_spread
                     variable_rates_annual.append(effective_variable_rate)
-                    
-                    # Update reference for next iteration
-                    last_market_rate = forward_rate
+            
+            print(f"Debug: Final variable rates: {[f'{rate:.3f}%' for rate in variable_rates_annual]}")
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
