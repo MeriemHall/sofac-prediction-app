@@ -943,21 +943,61 @@ def main():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Calculate variable rate costs (with automatic 130bp banking spread)
+            # Professional Forward Curve methodology for variable rate calculation
             variable_rates_annual = []
-            for year in range(loan_duration):
+            
+            # Phase 1: Use actual model predictions where available
+            available_years = min(loan_duration, len(relevant_predictions) // 365)
+            
+            for year in range(available_years):
                 start_day = year * 365
                 end_day = min((year + 1) * 365, len(relevant_predictions))
-                if start_day < len(relevant_predictions):
-                    year_data = relevant_predictions.iloc[start_day:end_day]
-                    avg_rate_year = year_data['rendement_predit'].mean()
-                    # Add standard banking spread (130 basis points)
-                    effective_variable_rate = avg_rate_year + banking_spread
+                year_data = relevant_predictions.iloc[start_day:end_day]
+                avg_rate_year = year_data['rendement_predit'].mean()
+                effective_variable_rate = avg_rate_year + banking_spread
+                variable_rates_annual.append(effective_variable_rate)
+            
+            # Phase 2: Forward Curve extrapolation for remaining years
+            if loan_duration > available_years:
+                last_market_rate = variable_rates_annual[-1] - banking_spread  # Remove spread for calculation
+                
+                for year in range(available_years, loan_duration):
+                    years_ahead = year - available_years + 1
+                    
+                    if years_ahead == 1:
+                        # 1-year forward based on recent rate evolution
+                        if len(variable_rates_annual) >= 2:
+                            # Calculate recent trend but dampen it
+                            recent_change = (variable_rates_annual[-1] - variable_rates_annual[-2]) - banking_spread
+                            # Forward markets typically price in 50% of recent trend
+                            forward_rate = last_market_rate + (recent_change * 0.5)
+                        else:
+                            forward_rate = last_market_rate
+                    else:
+                        # Multi-year forwards with mean reversion to long-term equilibrium
+                        long_term_equilibrium = 2.5  # Morocco's long-term neutral rate
+                        reversion_speed = 0.25       # Moderate mean reversion speed
+                        
+                        # Mean reversion formula: F(t) = LR + (R0 - LR) * exp(-λ*t)
+                        forward_rate = long_term_equilibrium + (last_market_rate - long_term_equilibrium) * np.exp(-reversion_speed * years_ahead)
+                    
+                    # Add term premium (increases with maturity as investors demand compensation for duration risk)
+                    if years_ahead <= 2:
+                        term_premium = 0.10 + 0.05 * years_ahead  # Lower premium for near-term
+                    else:
+                        term_premium = 0.20 + 0.03 * (years_ahead - 2)  # Higher premium for long-term
+                    
+                    forward_rate += term_premium
+                    
+                    # Apply reasonable bounds based on Morocco's historical range
+                    forward_rate = max(1.5, min(4.5, forward_rate))
+                    
+                    # Add banking spread back to get client rate
+                    effective_variable_rate = forward_rate + banking_spread
                     variable_rates_annual.append(effective_variable_rate)
-                else:
-                    # If we don't have data for this year, use the last available rate + spread
-                    last_rate = variable_rates_annual[-1] if variable_rates_annual else (baseline_yield + banking_spread)
-                    variable_rates_annual.append(last_rate)
+                    
+                    # Update reference for next iteration
+                    last_market_rate = forward_rate
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
