@@ -1108,47 +1108,33 @@ def main():
         avg_volatility = np.mean([analysis['volatility'] for analysis in scenarios_analysis.values()])
         max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
         
-        # CORRECTED decision logic using precise volatility threshold and scenario consensus
-        variable_recommendations_count = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
-        total_scenarios = len(scenarios_analysis)
+        # CORRECTED: Simple, logical decision logic
+        avg_savings = abs(avg_cost_difference)
         
-        # Calculate average savings/costs
-        avg_cost_difference = np.mean([analysis['cost_difference'] for analysis in scenarios_analysis.values()])
-        avg_volatility = np.mean([analysis['volatility'] for analysis in scenarios_analysis.values()])
-        max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
-        
-        print(f"Debug Decision Logic:")
-        print(f"- Variable recommendations: {variable_recommendations_count}/{total_scenarios}")
-        print(f"- Average cost difference: {avg_cost_difference:,.0f} MAD")
-        print(f"- Max volatility: {max_volatility:.3f}%")
-        print(f"- Volatility threshold: {max_volatility_accepted:.3f}%")
-        
-        # FIXED: Simplified and consistent decision logic
-        if variable_recommendations_count >= 2:  # Majority of scenarios favor variable
-            if max_volatility <= max_volatility_accepted:
-                final_recommendation = "TAUX VARIABLE"
-                final_reason = f"Majorité des scénarios favorables ({variable_recommendations_count}/{total_scenarios}) avec volatilité acceptable ({max_volatility:.2f}% ≤ {max_volatility_accepted:.2f}%)"
-                final_color = "#28a745"
-            else:
-                final_recommendation = "TAUX FIXE"
-                final_reason = f"Bien que {variable_recommendations_count}/{total_scenarios} scénarios soient favorables, volatilité trop élevée ({max_volatility:.2f}% > {max_volatility_accepted:.2f}%)"
-                final_color = "#dc3545"
-        elif variable_recommendations_count == 1:  # Mixed signals
-            if max_volatility <= max_volatility_accepted and avg_cost_difference < -100000:
-                final_recommendation = "STRATÉGIE MIXTE"
-                final_reason = f"Signaux mixtes mais économies potentielles ({abs(avg_cost_difference):,.0f} MAD) avec volatilité acceptable"
-                final_color = "#ffc107"
-            else:
-                final_recommendation = "TAUX FIXE"
-                final_reason = f"Signaux mixtes et volatilité ou économies insuffisantes"
-                final_color = "#dc3545"
-        else:  # No scenarios favor variable
+        # Basic logic: if variable saves money and volatility is acceptable → VARIABLE
+        if variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted:
+            # Variable rate saves money with acceptable volatility
+            final_recommendation = "TAUX VARIABLE"
+            final_reason = f"Économies favorables ({avg_savings:,.0f} MAD) avec volatilité acceptable ({max_volatility:.2f}% ≤ {max_volatility_accepted:.2f}%)"
+            final_color = "#28a745"
+            
+        elif variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted * 1.3:
+            # Variable saves money but volatility slightly high
+            final_recommendation = "STRATÉGIE MIXTE"
+            final_reason = f"Économies probables ({avg_savings:,.0f} MAD) mais volatilité légèrement élevée ({max_volatility:.2f}%)"
+            final_color = "#ffc107"
+            
+        elif avg_cost_difference >= 0:
+            # Variable rate costs more → Fixed rate is better
             final_recommendation = "TAUX FIXE"
-            final_reason = f"Aucun scénario ne favorise le taux variable - taux fixe recommandé"
+            final_reason = f"Taux fixe plus avantageux - évite surcoût de {avg_savings:,.0f} MAD"
             final_color = "#dc3545"
-        
-        print(f"Final decision: {final_recommendation}")
-        print(f"Reason: {final_reason}")
+            
+        else:
+            # Variable saves money but volatility too high
+            final_recommendation = "TAUX FIXE"
+            final_reason = f"Volatilité trop élevée ({max_volatility:.2f}% > {max_volatility_accepted:.2f}%) malgré économies potentielles"
+            final_color = "#dc3545"
         
         # Final recommendation display with consistency explanation
         st.markdown(f"""
