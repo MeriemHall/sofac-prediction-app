@@ -927,8 +927,8 @@ def main():
         with col4:
             risk_premium = st.number_input("Prime de risque (%):", min_value=0.5, max_value=3.0, value=1.3, step=0.1, help="Marge bancaire sur taux de référence")
         with col5:
-            # Simple practical risk tolerance
-            max_volatility_accepted = st.number_input("Volatilité Max (%):", min_value=0.1, max_value=1.0, value=0.35, step=0.05, help="Volatilité maximale acceptable")
+            # More realistic default tolerance that accommodates normal volatility
+            max_volatility_accepted = st.number_input("Volatilité Max (%):", min_value=0.1, max_value=1.0, value=0.40, step=0.05, help="Volatilité maximale acceptable")
         
         # Add explanatory box for volatility guidance
         st.markdown(f"""
@@ -1108,20 +1108,24 @@ def main():
         avg_volatility = np.mean([analysis['volatility'] for analysis in scenarios_analysis.values()])
         max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
         
-        # CORRECTED: Simple, logical decision logic
+        # IMPROVED: Logical decision logic with reasonable tolerance margins
         avg_savings = abs(avg_cost_difference)
         
-        # Basic logic: if variable saves money and volatility is acceptable → VARIABLE
-        if variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted:
-            # Variable rate saves money with acceptable volatility
+        # Add tolerance margin to avoid triggering mixte for tiny volatility differences
+        volatility_tolerance_margin = 0.05  # 5bp margin for measurement uncertainty
+        effective_max_volatility = max_volatility_accepted + volatility_tolerance_margin
+        
+        # Basic logic: if variable saves money and volatility is reasonable → VARIABLE
+        if variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= effective_max_volatility:
+            # Variable rate saves money with acceptable volatility (including margin)
             final_recommendation = "TAUX VARIABLE"
             final_reason = f"Économies favorables ({avg_savings:,.0f} MAD) avec volatilité acceptable ({max_volatility:.2f}% ≤ {max_volatility_accepted:.2f}%)"
             final_color = "#28a745"
             
-        elif variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted * 1.3:
-            # Variable saves money but volatility slightly high
+        elif variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted * 1.5:
+            # Variable saves money but volatility meaningfully higher
             final_recommendation = "STRATÉGIE MIXTE"
-            final_reason = f"Économies probables ({avg_savings:,.0f} MAD) mais volatilité légèrement élevée ({max_volatility:.2f}%)"
+            final_reason = f"Économies probables ({avg_savings:,.0f} MAD) mais volatilité élevée ({max_volatility:.2f}% > {max_volatility_accepted:.2f}%)"
             final_color = "#ffc107"
             
         elif avg_cost_difference >= 0:
@@ -1133,7 +1137,7 @@ def main():
         else:
             # Variable saves money but volatility too high
             final_recommendation = "TAUX FIXE"
-            final_reason = f"Volatilité trop élevée ({max_volatility:.2f}% > {max_volatility_accepted:.2f}%) malgré économies potentielles"
+            final_reason = f"Volatilité excessive ({max_volatility:.2f}% >> {max_volatility_accepted:.2f}%) malgré économies potentielles"
             final_color = "#dc3545"
         
         # Final recommendation display with consistency explanation
