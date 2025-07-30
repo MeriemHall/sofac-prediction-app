@@ -943,56 +943,43 @@ def main():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Fixed Professional Forward Curve methodology 
+            # SIMPLIFIED and LOGICAL variable rate calculation
             variable_rates_annual = []
             
-            # Phase 1: Use actual model predictions where available
-            available_years = min(loan_duration, len(relevant_predictions) // 365)
+            # Get the full prediction data we have available
+            total_prediction_days = len(relevant_predictions)
+            max_years_predicted = total_prediction_days // 365
             
-            # Debug: Let's see what we actually have
-            print(f"Debug: Available years of predictions: {available_years}")
-            print(f"Debug: Total prediction length: {len(relevant_predictions)} days")
-            
-            for year in range(available_years):
-                start_day = year * 365
-                end_day = min((year + 1) * 365, len(relevant_predictions))
-                year_data = relevant_predictions.iloc[start_day:end_day]
-                avg_rate_year = year_data['rendement_predit'].mean()
-                print(f"Debug: Year {year+1} reference rate: {avg_rate_year:.3f}%")
-                effective_variable_rate = avg_rate_year + banking_spread
-                variable_rates_annual.append(effective_variable_rate)
-            
-            # Phase 2: CORRECTED Forward Curve extrapolation
-            if loan_duration > available_years:
-                # Get the last available reference rate (without banking spread)
-                last_reference_rate = variable_rates_annual[-1] - banking_spread
-                print(f"Debug: Last reference rate for extrapolation: {last_reference_rate:.3f}%")
+            for year in range(loan_duration):
+                if year < max_years_predicted:
+                    # Use actual model predictions
+                    start_day = year * 365
+                    end_day = min((year + 1) * 365, len(relevant_predictions))
+                    year_data = relevant_predictions.iloc[start_day:end_day]
+                    reference_rate = year_data['rendement_predit'].mean()
+                else:
+                    # For years beyond predictions, use simple logical extrapolation
+                    if max_years_predicted > 0:
+                        # Get the trend from available predictions
+                        last_year_data = relevant_predictions.iloc[-365:] if len(relevant_predictions) >= 365 else relevant_predictions
+                        last_reference_rate = last_year_data['rendement_predit'].mean()
+                        
+                        # Simple decline toward long-term target
+                        years_beyond = year - max_years_predicted + 1
+                        long_term_target = 1.8  # Conservative long-term rate for Morocco
+                        
+                        # Linear convergence (much simpler and more predictable)
+                        decay_rate = (last_reference_rate - long_term_target) / 3  # Converge over 3 years
+                        reference_rate = max(long_term_target, last_reference_rate - (decay_rate * years_beyond))
+                    else:
+                        # Fallback if no predictions available
+                        reference_rate = baseline_yield
                 
-                # Morocco's economic fundamentals
-                long_term_equilibrium = 2.0  # Long-term neutral rate for Morocco
-                reversion_speed = 0.20       # Gradual mean reversion
+                # Add banking spread to get effective client rate
+                effective_rate = reference_rate + banking_spread
+                variable_rates_annual.append(effective_rate)
                 
-                for year in range(available_years, loan_duration):
-                    years_ahead = year - available_years + 1
-                    
-                    # CORRECTED: Mean reversion to equilibrium
-                    # Formula: R(t) = LR + (R0 - LR) × e^(-λ×t)
-                    reference_rate = long_term_equilibrium + (last_reference_rate - long_term_equilibrium) * np.exp(-reversion_speed * years_ahead)
-                    
-                    # Add modest term premium (should be small)
-                    term_premium = 0.05 + 0.02 * min(years_ahead, 3)  # Capped at reasonable level
-                    reference_rate += term_premium
-                    
-                    # Reasonable bounds for Morocco
-                    reference_rate = max(1.2, min(3.5, reference_rate))
-                    
-                    print(f"Debug: Year {year+1} extrapolated reference rate: {reference_rate:.3f}%")
-                    
-                    # Add banking spread to get effective rate
-                    effective_variable_rate = reference_rate + banking_spread
-                    variable_rates_annual.append(effective_variable_rate)
-            
-            print(f"Debug: Final variable rates: {[f'{rate:.3f}%' for rate in variable_rates_annual]}")
+                print(f"Year {year+1}: Reference {reference_rate:.3f}% + Spread {banking_spread:.1f}% = {effective_rate:.3f}%")
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
