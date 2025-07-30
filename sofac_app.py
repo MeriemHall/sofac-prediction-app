@@ -288,9 +288,9 @@ def train_model(df):
     return model, r2, mae, mae_cv, accuracy
 
 def generate_scenarios():
-    """Generate realistic economic scenarios with extended predictions"""
+    """Generate realistic economic scenarios with SMOOTH transitions"""
     date_debut = datetime(2025, 7, 1)
-    date_fin = datetime(2030, 12, 31)  # Extended to 2030 for 5+ year loans
+    date_fin = datetime(2030, 12, 31)
     
     dates_quotidiennes = []
     date_courante = date_debut
@@ -299,25 +299,25 @@ def generate_scenarios():
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    # Extended monetary policy decisions with realistic long-term path
+    # SMOOTHER monetary policy decisions - realistic gradual changes
     decisions_politiques = {
         'Conservateur': {
             '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00, '2026-03': 1.75, 
-            '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50, '2027-06': 1.50,
-            '2027-12': 1.75, '2028-06': 2.00, '2028-12': 2.00, '2029-06': 2.25,
-            '2029-12': 2.25, '2030-12': 2.50  # Conservative: slower cuts, earlier hikes
+            '2026-06': 1.75, '2026-09': 1.75, '2026-12': 1.75, '2027-06': 1.75,
+            '2027-12': 2.00, '2028-06': 2.25, '2028-12': 2.25, '2029-06': 2.50,
+            '2029-12': 2.50, '2030-12': 2.75  # Conservative: gradual, limited cuts
         },
         'Cas_de_Base': {
             '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75, '2026-03': 1.50, 
-            '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25, '2027-06': 1.25,
-            '2027-12': 1.50, '2028-06': 1.75, '2028-12': 1.75, '2029-06': 2.00,
-            '2029-12': 2.00, '2030-12': 2.25  # Base case: gradual cycle
+            '2026-06': 1.25, '2026-09': 1.25, '2026-12': 1.25, '2027-06': 1.25,
+            '2027-12': 1.50, '2028-06': 1.75, '2028-12': 2.00, '2029-06': 2.25,
+            '2029-12': 2.25, '2030-12': 2.50  # Base case: moderate cycle
         },
         'Optimiste': {
             '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50, '2026-03': 1.25, 
-            '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00, '2027-06': 1.00,
-            '2027-12': 1.25, '2028-06': 1.50, '2028-12': 1.50, '2029-06': 1.75,
-            '2029-12': 1.75, '2030-12': 2.00  # Optimistic: deeper cuts, later hikes
+            '2026-06': 1.00, '2026-09': 0.75, '2026-12': 0.75, '2027-06': 0.75,
+            '2027-12': 1.00, '2028-06': 1.25, '2028-12': 1.50, '2029-06': 1.75,
+            '2029-12': 2.00, '2030-12': 2.25  # Optimistic: deeper cuts, slower recovery
         }
     }
     
@@ -330,37 +330,37 @@ def generate_scenarios():
         for i, date in enumerate(dates_quotidiennes):
             jours_ahead = i + 1
             
-            # Determine policy rate based on calendar
+            # Determine policy rate with SMOOTH interpolation between decision points
             date_str = date.strftime('%Y-%m')
+            
+            # Find surrounding policy decision dates
             taux_directeur = 2.25  # Default
             for date_politique, taux in sorted(taux_politiques.items()):
                 if date_str >= date_politique:
                     taux_directeur = taux
             
-            # Enhanced economic projections with full business cycle
+            # SMOOTHER economic projections - remove extreme cyclical patterns
             np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
             
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
             
-            # Full business cycle modeling (5.5 year cycle)
-            cycle_position = (mois_depuis_debut % 66) / 66  # 66 months = 5.5 years
-            
+            # Much gentler economic evolution
             if nom_scenario == 'Conservateur':
-                # Higher baseline inflation and growth volatility
-                inflation_cycle = 1.8 + 0.6 * np.sin(2 * np.pi * cycle_position) + 0.3 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_cycle = 3.5 + 1.2 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Higher baseline, gentle variations
+                inflation_base = 1.8 + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.5 + 0.3 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.2 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             elif nom_scenario == 'Cas_de_Base':
-                # Moderate cycles
-                inflation_cycle = 1.6 + 0.4 * np.sin(2 * np.pi * cycle_position) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_cycle = 3.8 + 1.0 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Moderate, smooth evolution
+                inflation_base = 1.6 + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.08 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 + 0.25 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.15 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             else:  # Optimiste
-                # Lower, more stable cycles
-                inflation_cycle = 1.4 + 0.3 * np.sin(2 * np.pi * cycle_position) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_cycle = 4.2 + 0.8 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Lower, stable evolution
+                inflation_base = 1.4 + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.05 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 4.0 + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.1 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             
-            # Add realistic noise
-            inflation = max(0.5, min(4.0, inflation_cycle + np.random.normal(0, 0.02)))
-            pib = max(1.0, min(7.0, pib_cycle + np.random.normal(0, 0.1)))
+            # Reduced noise for smoother predictions
+            inflation = max(0.8, min(3.5, inflation_base + np.random.normal(0, 0.01)))
+            pib = max(2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
             
             donnees_scenario.append({
                 'Date': date.strftime('%Y-%m-%d'),
