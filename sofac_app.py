@@ -344,23 +344,23 @@ def generate_scenarios():
             
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
             
-            # Much gentler economic evolution
+            # Much gentler economic evolution with REDUCED VOLATILITY
             if nom_scenario == 'Conservateur':
-                # Higher baseline, gentle variations
-                inflation_base = 1.8 + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.5 + 0.3 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.2 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Reduced amplitude for smaller range
+                inflation_base = 1.8 + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.05 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.5 + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.1 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             elif nom_scenario == 'Cas_de_Base':
-                # Moderate, smooth evolution
-                inflation_base = 1.6 + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.08 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 + 0.25 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.15 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Very moderate, smooth evolution
+                inflation_base = 1.6 + 0.08 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.04 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 3.8 + 0.12 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.08 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             else:  # Optimiste
-                # Lower, stable evolution
-                inflation_base = 1.4 + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.05 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 4.0 + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.1 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Minimal variation for tight range
+                inflation_base = 1.4 + 0.06 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.03 * np.sin(2 * np.pi * mois_depuis_debut / 12)
+                pib_base = 4.0 + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.05 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             
-            # Reduced noise for smoother predictions
-            inflation = max(0.8, min(3.5, inflation_base + np.random.normal(0, 0.01)))
-            pib = max(2.0, min(6.0, pib_base + np.random.normal(0, 0.05)))
+            # Much reduced noise for tighter predictions
+            inflation = max(1.0, min(2.5, inflation_base + np.random.normal(0, 0.005)))  # Very low noise
+            pib = max(3.0, min(5.0, pib_base + np.random.normal(0, 0.02)))  # Constrained range
             
             donnees_scenario.append({
                 'Date': date.strftime('%Y-%m-%d'),
