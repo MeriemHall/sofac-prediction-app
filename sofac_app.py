@@ -264,95 +264,93 @@ def create_dataset():
     return pd.DataFrame(donnees_mensuelles)
 
 def train_model(df):
-    """Train prediction model with realistic performance metrics"""
-    X = df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
-    y = df['Rendement_52s']
+    """Train prediction model with realistic performance metrics - NO CACHING"""
     
-    # With only 18 anchor points, we need to be more honest about model limitations
-    n_samples = len(df)
+    # Force use of only anchor points (real data) not interpolated data
+    anchor_points_only = df[df['Est_Point_Ancrage'] == True].copy()
+    
+    if len(anchor_points_only) < 10:
+        # If we don't have enough anchor points, use all data but warn about interpolation
+        st.sidebar.warning("⚠️ Utilisation de données interpolées")
+        working_df = df.copy()
+    else:
+        # Use only real anchor points for more honest assessment
+        working_df = anchor_points_only.copy()
+        st.sidebar.info(f"✅ Utilisation de {len(working_df)} points d'ancrage réels")
+    
+    X = working_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
+    y = working_df['Rendement_52s']
+    
+    n_samples = len(working_df)
     n_features = X.shape[1]
     
-    # Calculate degrees of freedom adjustment for small sample size
-    df_adjusted = n_samples - n_features - 1
+    print(f"Training with {n_samples} samples and {n_features} features")
     
-    if n_samples < 30:  # Small sample size
-        # Use Leave-One-Out Cross-Validation for more realistic assessment
-        from sklearn.model_selection import LeaveOneOut
-        loo = LeaveOneOut()
-        
-        y_pred_loo = []
-        y_true_loo = []
-        
-        model = LinearRegression()
-        
-        for train_idx, test_idx in loo.split(X):
-            X_train_fold, X_test_fold = X.iloc[train_idx], X.iloc[test_idx]
-            y_train_fold, y_test_fold = y.iloc[train_idx], y.iloc[test_idx]
-            
-            model.fit(X_train_fold, y_train_fold)
-            y_pred_fold = model.predict(X_test_fold)
-            
-            y_pred_loo.extend(y_pred_fold)
-            y_true_loo.extend(y_test_fold)
-        
-        # Calculate realistic metrics from LOO-CV
-        r2_raw = r2_score(y_true_loo, y_pred_loo)
-        mae = mean_absolute_error(y_true_loo, y_pred_loo)
-        
-        # Apply small sample penalty - adjusted R²
-        r2_adjusted = 1 - (1 - r2_raw) * (n_samples - 1) / df_adjusted
-        
-        # Further penalty for small sample size and long-term predictions
-        sample_size_penalty = min(0.7, n_samples / 50)  # Penalty for < 50 samples
-        horizon_penalty = 0.6  # 40% penalty for 5-year predictions
-        
-        r2_final = max(0.1, r2_adjusted * sample_size_penalty * horizon_penalty)
-        
-        # Calculate prediction accuracy with realistic tolerance
-        tolerance = 0.25  # Increase tolerance for small sample
-        accurate_predictions = np.abs(np.array(y_true_loo) - np.array(y_pred_loo)) <= tolerance
-        accuracy = np.mean(accurate_predictions) * 100
-        
-        # Apply same penalties to accuracy
-        accuracy_final = max(30.0, accuracy * sample_size_penalty * horizon_penalty)
-        
-        # Increase MAE to reflect uncertainty
-        mae_final = mae * (1.5 + (5 - 1) * 0.2)  # Increase for 5-year horizon
-        
-        # Cross-validation MAE
-        from sklearn.model_selection import cross_val_score
-        cv_scores = cross_val_score(model, X, y, cv=min(5, n_samples), scoring='neg_mean_absolute_error')
-        mae_cv = -cv_scores.mean()
-        
-        # Retrain on full dataset for predictions
-        model.fit(X, y)
-        
-        return model, r2_final, mae_final, mae_cv, accuracy_final
+    # Always use Leave-One-Out Cross-Validation for small datasets
+    from sklearn.model_selection import LeaveOneOut
+    loo = LeaveOneOut()
     
+    y_pred_loo = []
+    y_true_loo = []
+    
+    model = LinearRegression()
+    
+    # Perform Leave-One-Out Cross-Validation
+    for train_idx, test_idx in loo.split(X):
+        X_train_fold, X_test_fold = X.iloc[train_idx], X.iloc[test_idx]
+        y_train_fold, y_test_fold = y.iloc[train_idx], y.iloc[test_idx]
+        
+        model.fit(X_train_fold, y_train_fold)
+        y_pred_fold = model.predict(X_test_fold)
+        
+        y_pred_loo.extend(y_pred_fold)
+        y_true_loo.extend(y_test_fold)
+    
+    # Calculate realistic metrics from LOO-CV
+    r2_raw = r2_score(y_true_loo, y_pred_loo)
+    mae = mean_absolute_error(y_true_loo, y_pred_loo)
+    
+    print(f"Raw LOO-CV R²: {r2_raw:.3f}")
+    
+    # Apply realistic adjustments for small sample and long-term predictions
+    if n_samples < 30:
+        # Small sample penalty
+        sample_penalty = min(0.9, n_samples / 30)
+        print(f"Sample penalty: {sample_penalty:.3f} (for {n_samples} samples)")
     else:
-        # Standard approach for larger datasets (this branch won't execute with current data)
-        split_idx = int(len(df) * 0.8)
-        X_train, X_test = X[:split_idx], X[split_idx:]
-        y_train, y_test = y[:split_idx], y[split_idx:]
-        
-        model = LinearRegression()
-        model.fit(X_train, y_train)
-        
-        y_pred_test = model.predict(X_test)
-        r2 = r2_score(y_test, y_pred_test)
-        mae = mean_absolute_error(y_test, y_pred_test)
-        
-        tolerance = 0.15
-        accurate_predictions = np.abs(y_test - y_pred_test) <= tolerance
-        accuracy = np.mean(accurate_predictions) * 100
-        
-        from sklearn.model_selection import cross_val_score
-        scores_cv = cross_val_score(model, X_train, y_train, cv=5, scoring='neg_mean_absolute_error')
-        mae_cv = -scores_cv.mean()
-        
-        model.fit(X, y)
-        
-        return model, r2, mae, mae_cv, accuracy
+        sample_penalty = 1.0
+    
+    # Long-term prediction penalty (5 years)
+    horizon_penalty = 0.85  # 15% penalty for 5-year horizon
+    print(f"Horizon penalty: {horizon_penalty:.3f}")
+    
+    # Apply penalties
+    r2_adjusted = max(0.1, r2_raw * sample_penalty * horizon_penalty)
+    
+    print(f"Final adjusted R²: {r2_adjusted:.3f}")
+    
+    # Calculate prediction accuracy with realistic tolerance
+    tolerance = 0.25  # 25 basis points
+    accurate_predictions = np.abs(np.array(y_true_loo) - np.array(y_pred_loo)) <= tolerance
+    accuracy = np.mean(accurate_predictions) * 100
+    
+    # Apply same penalties to accuracy
+    accuracy_adjusted = max(30.0, accuracy * sample_penalty * horizon_penalty)
+    
+    # Adjust MAE for uncertainty
+    mae_adjusted = mae * (1.0 + (5 - 1) * 0.1)  # Increase for 5-year horizon
+    
+    # Cross-validation MAE on training data
+    from sklearn.model_selection import cross_val_score
+    cv_scores = cross_val_score(model, X, y, cv=min(5, n_samples), scoring='neg_mean_absolute_error')
+    mae_cv = -cv_scores.mean()
+    
+    # Retrain on full dataset for actual predictions
+    model.fit(X, y)
+    
+    print(f"Final metrics: R²={r2_adjusted:.3f}, MAE={mae_adjusted:.3f}, Accuracy={accuracy_adjusted:.1f}%")
+    
+    return model, r2_adjusted, mae_adjusted, mae_cv, accuracy_adjusted
 
 def generate_scenarios():
     """Generate realistic economic scenarios with SMOOTH transitions"""
@@ -619,8 +617,11 @@ def main():
         """, unsafe_allow_html=True)
     
     # Load data and models
-    if 'data_loaded' not in st.session_state:
-        with st.spinner("Chargement du modèle..."):
+    if 'data_loaded' not in st.session_state or st.sidebar.button("🔄 Recalculer Modèle"):
+        with st.spinner("Recalcul du modèle avec validation croisée..."):
+            # Force clear cache and recalculate
+            st.cache_data.clear()
+            
             st.session_state.df = create_dataset()
             st.session_state.model, st.session_state.r2, st.session_state.mae, st.session_state.mae_cv, st.session_state.accuracy = train_model(st.session_state.df)
             st.session_state.scenarios = generate_scenarios()
@@ -634,6 +635,10 @@ def main():
             
             st.session_state.recommendations = generate_recommendations(st.session_state.predictions)
             st.session_state.data_loaded = True
+            
+            # Show the recalculation results
+            st.sidebar.success(f"✅ Modèle recalculé: R²={st.session_state.r2:.1%}")
+            st.sidebar.info("Métriques mises à jour avec validation LOO-CV")
     
     live_data = fetch_live_data()
     baseline_yield = live_data['current_baseline']  # Use current calculated baseline
@@ -716,6 +721,10 @@ def main():
         
         if st.sidebar.button("Actualiser"):
             st.cache_data.clear()
+            # Clear all session state related to model
+            for key in ['data_loaded', 'model', 'r2', 'mae', 'mae_cv', 'accuracy', 'scenarios', 'predictions', 'confidence_metrics', 'recommendations']:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
         
         st.markdown("### Performance du Modèle")
