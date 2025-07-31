@@ -479,7 +479,6 @@ if __name__ == "__main__":
         
         # Bank Al-Maghrib baseline explanation with real-time status
         baseline_info = live_data.get('baseline_info', {})
-        fetch_status = live_data.get('fetch_status', {})
         baseline_status = fetch_status.get('baseline', '🟡 Dernière Publication')
         
         # Determine background color based on data freshness
@@ -507,7 +506,6 @@ if __name__ == "__main__":
         elif '🟢' in baseline_status:
             st.sidebar.success("✅ Données Bank Al-Maghrib à jour")
         
-        # STRATEGIC OUTLOOK SECTION
         st.sidebar.markdown("---")
         st.sidebar.subheader("🎯 Vision Stratégique")
         
