@@ -132,38 +132,51 @@ st.markdown(f"""
 
 @st.cache_data(ttl=3600)
 def fetch_live_data():
-    """Fetch live economic data with stable baseline management"""
-    # Get current date
+    """Fetch live economic data with official BAM baseline management"""
     today = datetime.now()
     
-    # Define baseline anchor points (would be updated manually/quarterly in production)
-    baseline_anchors = {
-        '2025-06-30': 1.75,  # Last historical data point
-        '2025-07-31': 1.72,  # July month-end (estimated/forecasted)
-        '2025-08-31': 1.69,  # August month-end (estimated/forecasted)
-        # In production: these would be updated based on actual market data
+    # Official BAM (Bank Al-Maghrib) published rates - UPDATE MANUALLY when new data available
+    official_bam_rates = {
+        '2025-06-30': 1.75,  # Last official BAM published rate - JUNE 2025
+        # '2025-07-31': None,  # July 2025 - TO BE UPDATED when BAM publishes
+        # '2025-08-31': None,  # August 2025 - TO BE UPDATED when BAM publishes
     }
     
-    # Find the current baseline (most recent anchor point before today)
-    current_baseline = 1.75  # Default
-    baseline_date = '2025-06-30'  # Default
+    # Find the most recent official BAM rate
+    current_baseline = 1.75  # Default to June 2025
+    baseline_date_raw = '2025-06-30'  # Default
+    baseline_source = "BAM Juin 2025 (Dernière publication officielle)"
     
-    for date_str, rate in sorted(baseline_anchors.items()):
-        anchor_date = datetime.strptime(date_str, '%Y-%m-%d')
-        if anchor_date <= today:
+    for date_str, rate in sorted(official_bam_rates.items(), reverse=True):
+        rate_date = datetime.strptime(date_str, '%Y-%m-%d')
+        if rate is not None and rate_date <= today:
             current_baseline = rate
-            baseline_date = date_str
+            baseline_date_raw = date_str
+            baseline_month_year = rate_date.strftime('%B %Y')
+            baseline_source = f"BAM {baseline_month_year} (Publication officielle)"
+            break
     
-    # Format baseline date for display
-    baseline_display = datetime.strptime(baseline_date, '%Y-%m-%d').strftime('%B %Y')
+    # Check if we're waiting for new BAM data
+    last_bam_date = datetime.strptime(baseline_date_raw, '%Y-%m-%d')
+    days_since_last_bam = (today - last_bam_date).days
+    
+    if days_since_last_bam > 45:  # More than 1.5 months since last BAM publication
+        update_status = f"⏳ En attente publication BAM ({days_since_last_bam} jours)"
+    elif days_since_last_bam > 35:
+        update_status = f"🔄 Publication BAM attendue prochainement"
+    else:
+        update_status = f"✅ Données BAM à jour"
     
     return {
-        'policy_rate': 2.25,
+        'policy_rate': 2.25,  # Current BAM policy rate
         'inflation': 1.1,
         'gdp_growth': 4.8,
         'current_baseline': current_baseline,
-        'baseline_date': baseline_display,
-        'baseline_date_raw': baseline_date,
+        'baseline_date': baseline_month_year if 'baseline_month_year' in locals() else "Juin 2025",
+        'baseline_date_raw': baseline_date_raw,
+        'baseline_source': baseline_source,
+        'update_status': update_status,
+        'days_since_bam': days_since_last_bam,
         'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP'},
         'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
     }
@@ -538,17 +551,18 @@ def main():
             st.metric("Inflation", f"{live_data['inflation']:.2f}%")
         
         with col2:
-            st.metric("Baseline Actuelle", f"{baseline_yield:.2f}%", help=f"Point d'ancrage: {baseline_date}")
+            st.metric("Baseline Officielle BAM", f"{baseline_yield:.2f}%", help=f"Source: {live_data['baseline_source']}")
             st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
         
-        # Baseline explanation
+        # BAM baseline status and update information
         st.markdown(f"""
         <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 6px; border-left: 3px solid #2a5298; margin: 0.5rem 0;">
             <div style="font-size: 0.75rem; color: #6c757d;">
-                <strong>📍 Baseline:</strong> {baseline_date} ({baseline_yield:.2f}%)<br>
-                <strong>📊 Référence:</strong> Dernière ancre de marché confirmée
+                <strong>📍 Baseline BAM:</strong> {live_data['baseline_date']} ({baseline_yield:.2f}%)<br>
+                <strong>📊 Statut:</strong> {live_data['update_status']}<br>
+                <strong>🔄 Source:</strong> {live_data['baseline_source']}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1282,7 +1296,7 @@ def main():
         <div style="text-align: center; color: #666; font-size: 0.8rem;">
             <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
             <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
-            <p style="margin: 0.5rem 0;">Baseline: {baseline_date} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+            <p style="margin: 0.5rem 0;">Baseline BAM: {live_data['baseline_date']} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
             <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
         </div>
         """, unsafe_allow_html=True)
