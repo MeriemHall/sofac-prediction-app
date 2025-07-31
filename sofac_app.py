@@ -595,7 +595,7 @@ def train_model(df):
             best_metrics)  # Return full metrics for detailed analysis
 
 def generate_scenarios():
-    """Generate realistic economic scenarios with SMOOTH transitions"""
+    """Generate realistic economic scenarios with proper market volatility"""
     date_debut = datetime(2025, 7, 1)
     date_fin = datetime(2030, 12, 31)
     
@@ -606,25 +606,31 @@ def generate_scenarios():
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    # SMOOTHER monetary policy decisions - realistic gradual changes
+    # More realistic monetary policy decisions with gradual changes
     decisions_politiques = {
         'Conservateur': {
-            '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00, '2026-03': 1.75, 
-            '2026-06': 1.75, '2026-09': 1.75, '2026-12': 1.75, '2027-06': 1.75,
-            '2027-12': 2.00, '2028-06': 2.25, '2028-12': 2.25, '2029-06': 2.50,
-            '2029-12': 2.50, '2030-12': 2.75  # Conservative: gradual, limited cuts
+            '2025-06': 2.25, '2025-09': 2.15, '2025-12': 2.00, '2026-03': 1.90, 
+            '2026-06': 1.85, '2026-09': 1.80, '2026-12': 1.85, '2027-03': 1.90,
+            '2027-06': 1.95, '2027-09': 2.00, '2027-12': 2.10, '2028-03': 2.20,
+            '2028-06': 2.30, '2028-09': 2.35, '2028-12': 2.40, '2029-03': 2.45,
+            '2029-06': 2.50, '2029-09': 2.55, '2029-12': 2.60, '2030-06': 2.65,
+            '2030-12': 2.70  # Conservative: limited cuts, gradual recovery
         },
         'Cas_de_Base': {
             '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75, '2026-03': 1.50, 
-            '2026-06': 1.25, '2026-09': 1.25, '2026-12': 1.25, '2027-06': 1.25,
-            '2027-12': 1.50, '2028-06': 1.75, '2028-12': 2.00, '2029-06': 2.25,
-            '2029-12': 2.25, '2030-12': 2.50  # Base case: moderate cycle
+            '2026-06': 1.30, '2026-09': 1.25, '2026-12': 1.20, '2027-03': 1.25,
+            '2027-06': 1.35, '2027-09': 1.45, '2027-12': 1.60, '2028-03': 1.75,
+            '2028-06': 1.90, '2028-09': 2.05, '2028-12': 2.20, '2029-03': 2.25,
+            '2029-06': 2.30, '2029-09': 2.25, '2029-12': 2.20, '2030-06': 2.25,
+            '2030-12': 2.30  # Base case: normal cycle with volatility
         },
         'Optimiste': {
             '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50, '2026-03': 1.25, 
-            '2026-06': 1.00, '2026-09': 0.75, '2026-12': 0.75, '2027-06': 0.75,
-            '2027-12': 1.00, '2028-06': 1.25, '2028-12': 1.50, '2029-06': 1.75,
-            '2029-12': 2.00, '2030-12': 2.25  # Optimistic: deeper cuts, slower recovery
+            '2026-06': 1.00, '2026-09': 0.85, '2026-12': 0.75, '2027-03': 0.80,
+            '2027-06': 0.90, '2027-09': 1.00, '2027-12': 1.15, '2028-03': 1.30,
+            '2028-06': 1.45, '2028-09': 1.60, '2028-12': 1.75, '2029-03': 1.80,
+            '2029-06': 1.85, '2029-09': 1.80, '2029-12': 1.75, '2030-06': 1.80,
+            '2030-12': 1.85  # Optimistic: deeper cuts, slower recovery
         }
     }
     
@@ -637,37 +643,76 @@ def generate_scenarios():
         for i, date in enumerate(dates_quotidiennes):
             jours_ahead = i + 1
             
-            # Determine policy rate with SMOOTH interpolation between decision points
+            # Get base policy rate with smooth interpolation between decision points
             date_str = date.strftime('%Y-%m')
             
-            # Find surrounding policy decision dates
-            taux_directeur = 2.25  # Default
-            for date_politique, taux in sorted(taux_politiques.items()):
-                if date_str >= date_politique:
-                    taux_directeur = taux
+            # Find surrounding policy decision dates for smooth interpolation
+            sorted_dates = sorted(taux_politiques.keys())
+            current_rate = taux_politiques[sorted_dates[0]]  # Default to first
             
-            # SMOOTHER economic projections - remove extreme cyclical patterns
+            for j, policy_date in enumerate(sorted_dates):
+                if date_str >= policy_date:
+                    current_rate = taux_politiques[policy_date]
+                elif j > 0:
+                    # Interpolate between previous and current policy dates
+                    prev_date = sorted_dates[j-1]
+                    prev_rate = taux_politiques[prev_date]
+                    curr_rate = taux_politiques[policy_date]
+                    
+                    # Calculate interpolation factor
+                    prev_month = datetime.strptime(prev_date + '-01', '%Y-%m-%d')
+                    curr_month = datetime.strptime(policy_date + '-01', '%Y-%m-%d')
+                    target_month = datetime(date.year, date.month, 1)
+                    
+                    if curr_month > prev_month:
+                        days_total = (curr_month - prev_month).days
+                        days_elapsed = (target_month - prev_month).days
+                        factor = max(0, min(1, days_elapsed / days_total))
+                        current_rate = prev_rate + factor * (curr_rate - prev_rate)
+                    break
+            
+            taux_directeur = current_rate
+            
+            # Add realistic economic projections with proper cycles and volatility
             np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
             
+            # Time-based factors
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
+            annee_fractionnelle = 2025 + mois_depuis_debut / 12
             
-            # Much gentler economic evolution with REDUCED VOLATILITY
+            # Base economic cycles (more realistic amplitudes)
             if nom_scenario == 'Conservateur':
-                # Reduced amplitude for smaller range
-                inflation_base = 1.8 + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.05 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.5 + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.1 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # More volatile conservative scenario
+                inflation_base = 1.9 + 0.3 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 6)
+                pib_base = 3.2 + 0.4 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
             elif nom_scenario == 'Cas_de_Base':
-                # Very moderate, smooth evolution
-                inflation_base = 1.6 + 0.08 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.04 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 3.8 + 0.12 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.08 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Normal business cycle volatility
+                inflation_base = 1.6 + 0.25 * np.sin(2 * np.pi * mois_depuis_debut / 20) + 0.12 * np.sin(2 * np.pi * mois_depuis_debut / 8)
+                pib_base = 3.8 + 0.35 * np.sin(2 * np.pi * mois_depuis_debut / 30) + 0.18 * np.sin(2 * np.pi * mois_depuis_debut / 10)
             else:  # Optimiste
-                # Minimal variation for tight range
-                inflation_base = 1.4 + 0.06 * np.sin(2 * np.pi * mois_depuis_debut / 24) + 0.03 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_base = 4.0 + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 36) + 0.05 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                # Still has cycles but more favorable
+                inflation_base = 1.3 + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 18) + 0.1 * np.sin(2 * np.pi * mois_depuis_debut / 7)
+                pib_base = 4.2 + 0.3 * np.sin(2 * np.pi * mois_depuis_debut / 28) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 9)
             
-            # Much reduced noise for tighter predictions
-            inflation = max(1.0, min(2.5, inflation_base + np.random.normal(0, 0.005)))  # Very low noise
-            pib = max(3.0, min(5.0, pib_base + np.random.normal(0, 0.02)))  # Constrained range
+            # Add seasonal effects
+            mois = date.month
+            seasonal_inflation = 0.05 * np.sin(2 * np.pi * mois / 12)  # Seasonal price variations
+            seasonal_pib = 0.1 * np.sin(2 * np.pi * (mois - 3) / 12)  # Economic seasonality
+            
+            # Add realistic noise and shocks
+            noise_factor = 0.02 if nom_scenario == 'Conservateur' else 0.015  # More noise for conservative
+            inflation_noise = np.random.normal(0, noise_factor)
+            pib_noise = np.random.normal(0, noise_factor * 1.5)
+            
+            # Occasional economic shocks (rare events)
+            if np.random.random() < 0.005:  # 0.5% chance of shock per day
+                shock_magnitude = np.random.uniform(-0.3, 0.2)
+                inflation_noise += shock_magnitude * 0.5
+                pib_noise += shock_magnitude
+            
+            # Final values with bounds
+            inflation = max(0.5, min(4.0, inflation_base + seasonal_inflation + inflation_noise))
+            pib = max(1.0, min(7.0, pib_base + seasonal_pib + pib_noise))
             
             donnees_scenario.append({
                 'Date': date.strftime('%Y-%m-%d'),
@@ -676,7 +721,9 @@ def generate_scenarios():
                 'Croissance_PIB': pib,
                 'Jours_Ahead': jours_ahead,
                 'Jour_Semaine': date.strftime('%A'),
-                'Est_Weekend': date.weekday() >= 5
+                'Est_Weekend': date.weekday() >= 5,
+                'Mois': mois,
+                'Annee': date.year
             })
         
         scenarios[nom_scenario] = pd.DataFrame(donnees_scenario)
@@ -684,7 +731,7 @@ def generate_scenarios():
     return scenarios
 
 def predict_yields(scenarios, model):
-    """Generate yield predictions with enhanced model features"""
+    """Generate yield predictions with enhanced realism and market volatility"""
     baseline = 1.75  # Bank Al-Maghrib baseline (Juin 2025): 1.75%
     predictions = {}
     
@@ -724,7 +771,7 @@ def predict_yields(scenarios, model):
             # Use base features only
             X_features = X_base
         
-        # Generate predictions
+        # Generate base predictions
         rendements_bruts = model.predict(X_features)
         
         # Update lagged features iteratively for enhanced models
@@ -757,35 +804,129 @@ def predict_yields(scenarios, model):
         else:
             rendements_lisses = rendements_bruts
         
-        # Apply scenario-specific adjustments
+        # Apply enhanced market-realistic adjustments
         ajustements = []
+        previous_yield = baseline
+        
         for i, ligne in scenario_df.iterrows():
             ajustement = 0
             
+            # Scenario-specific bias
             if scenario_name == 'Conservateur':
-                ajustement += 0.1
+                ajustement += 0.08
             elif scenario_name == 'Optimiste':
-                ajustement -= 0.05
+                ajustement -= 0.04
             
-            # Time-based uncertainty - make it more gradual
+            # Time-based uncertainty with realistic volatility
             jours_ahead = ligne['Jours_Ahead']
-            incertitude = (jours_ahead / 365) * 0.02  # Reduced from 0.05 for more stability
-            if scenario_name == 'Conservateur':
-                ajustement += incertitude
-            elif scenario_name == 'Optimiste':
-                ajustement -= incertitude * 0.5
+            uncertainty_base = (jours_ahead / 365) * 0.025  # Base uncertainty growth
             
-            # Day of week effects - reduced for more consistency
+            if scenario_name == 'Conservateur':
+                ajustement += uncertainty_base * 1.2
+            elif scenario_name == 'Optimiste':
+                ajustement -= uncertainty_base * 0.6
+            
+            # Market microstructure effects
+            # 1. Day of week effects (more realistic)
             effets_jours = {
-                'Monday': 0.005, 'Tuesday': 0.00, 'Wednesday': -0.005,
-                'Thursday': 0.00, 'Friday': 0.01, 'Saturday': -0.005, 'Sunday': -0.005
+                'Monday': 0.008, 'Tuesday': -0.003, 'Wednesday': 0.002,
+                'Thursday': -0.002, 'Friday': 0.012, 'Saturday': -0.006, 'Sunday': -0.008
             }
             ajustement += effets_jours.get(ligne['Jour_Semaine'], 0)
             
+            # 2. Monthly seasonality (bond market patterns)
+            mois = ligne.get('Mois', (i // 30) % 12 + 1)
+            seasonal_effect = 0.01 * np.sin(2 * np.pi * mois / 12) + 0.005 * np.sin(4 * np.pi * mois / 12)
+            ajustement += seasonal_effect
+            
+            # 3. Economic cycle positioning
+            annee = ligne.get('Annee', 2025 + i // 365)
+            cycle_position = (annee - 2025) / 5  # 5-year cycle
+            cycle_effect = 0.02 * np.sin(2 * np.pi * cycle_position) if scenario_name != 'Optimiste' else 0.01 * np.sin(2 * np.pi * cycle_position)
+            ajustement += cycle_effect
+            
+            # 4. Market volatility clustering (GARCH-like effects)
+            np.random.seed(hash(ligne['Date']) % 2**32)
+            
+            # Base volatility
+            base_vol = 0.008 if scenario_name == 'Conservateur' else 0.006 if scenario_name == 'Cas_de_Base' else 0.005
+            
+            # Volatility clustering - higher volatility after volatile periods
+            if i > 0:
+                previous_change = abs(rendements_lisses[i] - previous_yield) if i < len(rendements_lisses) else 0.01
+                volatility_multiplier = 1 + min(2.0, previous_change * 10)  # Volatility clustering
+                current_vol = base_vol * volatility_multiplier
+            else:
+                current_vol = base_vol
+            
+            # Random market noise with proper distribution
+            market_noise = np.random.normal(0, current_vol)
+            
+            # Occasional market shocks (rare but realistic)
+            if np.random.random() < 0.002:  # 0.2% daily probability
+                shock_magnitude = np.random.normal(0, 0.05)  # ±5bp typical shock
+                market_noise += shock_magnitude
+            
+            ajustement += market_noise
+            
             ajustements.append(ajustement)
         
+        # Apply all adjustments
+        # Apply all adjustments
         rendements_finaux = rendements_lisses + np.array(ajustements)
         rendements_finaux = np.clip(rendements_finaux, 0.1, 8.0)
+        
+        # Ensure realistic progression - prevent unrealistic flat periods
+        for i in range(1, len(rendements_finaux)):
+            # Allow reasonable daily changes (±20bp max, but usually much less)
+            daily_change = rendements_finaux[i] - rendements_finaux[i-1]
+            max_daily_change = 0.20  # 20 basis points max daily change
+            
+            if abs(daily_change) > max_daily_change:
+                rendements_finaux[i] = rendements_finaux[i-1] + np.sign(daily_change) * max_daily_change
+            
+            # Add minimum daily variation to prevent flat periods
+            # Financial markets always have some movement
+            if abs(daily_change) < 0.001:  # Less than 0.1bp change
+                min_variation = np.random.normal(0, 0.002)  # Small random variation
+                rendements_finaux[i] += min_variation
+        
+        # Final bounds check
+        rendements_finaux = np.clip(rendements_finaux, 0.1, 8.0)
+        
+        scenario_df_copy = scenario_df.copy()
+        scenario_df_copy['rendement_predit'] = rendements_finaux
+        scenario_df_copy['scenario'] = scenario_name
+        
+        predictions[scenario_name] = scenario_df_copy
+    
+    return predictions, 8.0)
+        
+        # Ensure realistic progression - prevent unrealistic flat periods
+        for i in range(1, len(rendements_finaux)):
+            # Allow reasonable daily changes (±20bp max, but usually much less)
+            daily_change = rendements_finaux[i] - rendements_finaux[i-1]
+            max_daily_change = 0.20  # 20 basis points max daily change
+            
+            if abs(daily_change) > max_daily_change:
+                rendements_finaux[i] = rendements_finaux[i-1] + np.sign(daily_change) * max_daily_change
+            
+            # Add minimum daily variation to prevent flat periods
+            # Financial markets always have some movement
+            if abs(daily_change) < 0.001:  # Less than 0.1bp change
+                min_variation = np.random.normal(0, 0.002)  # Small random variation
+                rendements_finaux[i] += min_variation
+        
+        # Final bounds check
+        rendements_finaux = np.clip(rendements_finaux, 0.1, 8.0)
+        
+        scenario_df_copy = scenario_df.copy()
+        scenario_df_copy['rendement_predit'] = rendements_finaux
+        scenario_df_copy['scenario'] = scenario_name
+        
+        predictions[scenario_name] = scenario_df_copy
+    
+    return predictions, 8.0)
         
         # Ensure logical progression - smooth out any erratic jumps
         for i in range(1, len(rendements_finaux)):
