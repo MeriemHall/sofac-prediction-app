@@ -1,617 +1,4 @@
-if three_month_avg < current_vs_historical - 0.3:
-            strategic_window = "🟢 Fenêtre favorable taux variable"
-        elif three_month_avg > current_vs_historical + 0.3:
-            strategic_window = "🔴 Privilégier taux fixe"
-        else:
-            strategic_window = "🟡 Période de transition"
-            
-        st.sidebar.success(strategic_window)
-        
-        if st.sidebar.button("Actualiser"):
-            st.cache_data.clear()
-            st.rerun()
-        
-        st.markdown("### Performance du Modèle")
-        st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Qualité de l'ajustement sur données historiques")
-        st.metric("Précision Historique", f"±{st.session_state.mae:.2f}%", help="Erreur moyenne sur données historiques")
-        st.metric("Incertitude 5 ans", f"±{st.session_state.mae_cv:.2f}%", help="Marge d'erreur pour prédictions à 5 ans")
-        st.metric("Fiabilité Pondérée", f"{st.session_state.accuracy:.0f}%", help="Fiabilité ajustée selon l'horizon temporel")
-        
-        confidence_level = max(50, min(85, 90 - st.session_state.prediction_std * 20))
-        st.metric("Niveau de Confiance", f"{confidence_level:.0f}%", help="Confiance globale du modèle sur 5 ans")
-        
-        if st.session_state.accuracy >= 60:
-            st.success("✅ Modèle calibré avec précision")  
-        elif st.session_state.accuracy >= 45:
-            st.warning("⚠️ Modèle avec incertitude modérée")
-        else:
-            st.error("❌ Prédictions à long terme incertaines")
-    
-    tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
-    
-    with tab1:
-        st.markdown('<div class="executive-dashboard">', unsafe_allow_html=True)
-        st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">Tableau de Bord Stratégique</div>', unsafe_allow_html=True)
-        
-        cas_de_base_predictions = st.session_state.predictions['Cas_de_Base']
-        
-        q1_data = cas_de_base_predictions.head(90)
-        q2_data = cas_de_base_predictions.head(180)
-        year1_data = cas_de_base_predictions.head(365)
-        
-        q1_avg = q1_data['rendement_predit'].mean()
-        q2_avg = q2_data['rendement_predit'].mean() 
-        year1_avg = year1_data['rendement_predit'].mean()
-        
-        q1_change = q1_avg - baseline_yield
-        q2_change = q2_avg - baseline_yield
-        year1_change = year1_avg - baseline_yield
-        
-        q1_volatility = q1_data['rendement_predit'].std()
-        max_deviation = max(abs(q1_change), abs(q2_change), abs(year1_change))
-        
-        if max_deviation > 0.5:
-            if q1_change > 0.3:
-                strategic_environment = "ENVIRONNEMENT DE HAUSSE"
-                env_color = "#dc3545"
-                strategic_action = "SÉCURISER IMMÉDIATEMENT - TAUX FIXES"
-            elif year1_change < -0.3:
-                strategic_environment = "ENVIRONNEMENT DE BAISSE"
-                env_color = "#28a745"
-                strategic_action = "MAXIMISER TAUX VARIABLES"
-            else:
-                strategic_environment = "ENVIRONNEMENT CYCLIQUE"
-                env_color = "#ff6b35"
-                strategic_action = "STRATÉGIE ADAPTATIVE REQUISE"
-        elif max_deviation > 0.25:
-            if q1_change > 0.2:
-                strategic_environment = "ENVIRONNEMENT DE HAUSSE MODÉRÉE"
-                env_color = "#ffc107"
-                strategic_action = "PRÉPARER COUVERTURE - SURVEILLER"
-            elif q1_volatility > 0.3:
-                strategic_environment = "ENVIRONNEMENT VOLATIL"
-                env_color = "#6f42c1"
-                strategic_action = "GESTION ACTIVE DU RISQUE"
-            else:
-                strategic_environment = "ENVIRONNEMENT EN TRANSITION"
-                env_color = "#17a2b8"
-                strategic_action = "APPROCHE ÉQUILIBRÉE"
-        else:
-            strategic_environment = "ENVIRONNEMENT STABLE"
-            env_color = "#28a745"
-            strategic_action = "MAINTENIR STRATÉGIE ACTUELLE"
-        
-        trend_6m = q2_avg - baseline_yield
-        volatility_6m = q2_data['rendement_predit'].std()
-        
-        st.markdown(f"""
-        <div class="status-card" style="border-left-color: {env_color};">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h3 style="margin: 0; color: #2c3e50;">Environnement Stratégique</h3>
-                    <p style="margin: 0.5rem 0; font-weight: 600; color: {env_color};">{strategic_environment}</p>
-                    <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">{strategic_action}</p>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: 700; color: #2c3e50;">{year1_avg:.2f}%</div>
-                    <div style="font-size: 0.8rem; color: #6c757d;">Moyenne 12 mois</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 1.2rem; font-weight: 600; color: {env_color};">{trend_6m:+.2f}%</div>
-                    <div style="font-size: 0.8rem; color: #6c757d;">Tendance 6 mois</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        optimal_window = "Q1" if q1_avg < q2_avg < year1_avg else "Q2-Q4" if q2_avg < year1_avg else "Immédiate"
-        risk_level = "Faible" if volatility_6m < 0.2 else "Modéré" if volatility_6m < 0.4 else "Élevé"
-        
-        with col1:
-            st.markdown(f"""
-            <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 3 MOIS</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q1_avg:.2f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 6 MOIS</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q2_avg:.2f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f"""
-            <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">STABILITÉ 6M</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{risk_level}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown(f"""
-            <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">FENÊTRE OPTIMALE</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{optimal_window}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        q1_trend = q1_avg - baseline_yield
-        q2_trend = q2_avg - baseline_yield
-        year1_trend = year1_avg - baseline_yield
-        
-        if q1_trend > 0.3 and q2_trend > 0.2:
-            timing_recommendation = "AGIR IMMÉDIATEMENT - Cycle de hausse confirmé"
-            timing_color = "#dc3545"
-        elif q1_trend > 0.25 and q2_trend < q1_trend:
-            timing_recommendation = "SÉCURISER MAINTENANT - Pic temporaire approche"
-            timing_color = "#ff6b35"
-        elif q1_trend < -0.3 and q2_trend < -0.2:
-            timing_recommendation = "ATTENDRE - Baisse continue favorable"
-            timing_color = "#28a745"  
-        elif abs(q1_trend - q2_trend) > 0.2:
-            timing_recommendation = "STRATÉGIE ADAPTATIVE - Environnement cyclique"
-            timing_color = "#6f42c1"
-        elif year1_trend < -0.2:
-            timing_recommendation = "PLANIFIER - Opportunités à moyen terme"
-            timing_color = "#17a2b8"
-        else:
-            timing_recommendation = "SURVEILLER - Signaux mixtes"
-            timing_color = "#ffc107"
-        
-        st.markdown(f"""
-        <div class="recommendation-panel">
-            <div style="text-align: center; font-size: 1.3rem; font-weight: 700; margin-bottom: 1.5rem;">STRATÉGIE & TIMING RECOMMANDÉS</div>
-            <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem; margin: 0.8rem 0;">
-                <h4 style="margin: 0 0 0.5rem 0; color: white;">Timing Stratégique</h4>
-                <p style="margin: 0; font-size: 1.1rem; font-weight: 600; color: {timing_color};">{timing_recommendation}</p>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
-                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 3 Mois</h5>
-                    <p style="margin: 0; font-weight: 600;">{q1_avg:.2f}%</p>
-                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Évolution: {q1_trend:+.2f}%</p>
-                </div>
-                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
-                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 12 Mois</h5>
-                    <p style="margin: 0; font-weight: 600;">{year1_avg:.2f}%</p>
-                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Tendance: {year1_trend:+.2f}%</p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.subheader("Évolution des Rendements")
-        
-        fig = go.Figure()
-        
-        df_hist = st.session_state.df.tail(8)
-        fig.add_trace(go.Scatter(
-            x=df_hist['Date'],
-            y=df_hist['Rendement_52s'],
-            mode='lines+markers',
-            name='Historique',
-            line=dict(color='#2a5298', width=4),
-            marker=dict(size=8)
-        ))
-        
-        colors = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
-        for scenario, pred_df in st.session_state.predictions.items():
-            sample_indices = list(range(0, len(pred_df), 7))
-            
-            today_str = datetime.now().strftime('%Y-%m-%d')
-            today_index = None
-            for i, row in pred_df.iterrows():
-                if row['Date'] == today_str:
-                    today_index = i
-                    break
-            
-            if today_index is not None and today_index not in sample_indices:
-                sample_indices.append(today_index)
-                sample_indices.sort()
-            
-            sample_data = pred_df.iloc[sample_indices]
-            
-            fig.add_trace(go.Scatter(
-                x=sample_data['Date'],
-                y=sample_data['rendement_predit'],
-                mode='lines+markers',
-                name=scenario,
-                line=dict(color=colors[scenario], width=3),
-                marker=dict(size=5)
-            ))
-        
-        fig.add_hline(y=baseline_yield, line_dash="dash", line_color="gray", 
-                     annotation_text=f"Baseline Juin 2025: {baseline_yield:.2f}%")
-        
-        fig.update_layout(
-            height=450,
-            template="plotly_white",
-            xaxis_title="Période",
-            yaxis_title="Rendement (%)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
-        )
-        
-        st.plotly_chart(fig_yearly, use_container_width=True)
-        
-        st.subheader("⚠️ Évaluation des Risques")
-        
-        risk_col1, risk_col2, risk_col3 = st.columns(3)
-        
-        with risk_col1:
-            st.markdown("### Risque de Taux")
-            if base_case_analysis['volatility'] <= max_volatility_accepted:
-                st.success("🟢 ACCEPTABLE")
-                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% ≤ Seuil {max_volatility_accepted:.2f}%"
-            else:
-                st.error("🔴 TROP ÉLEVÉ")
-                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% > Seuil {max_volatility_accepted:.2f}%"
-            st.write(risk_desc)
-        
-        with risk_col2:
-            st.markdown("### Risque de Liquidité")
-            max_annual_diff = max(base_case_analysis['variable_rates_annual']) - current_fixed_rate
-            if max_annual_diff < 0.5:
-                st.success("🟢 FAIBLE")
-                liquidity_desc = "Impact limité sur la trésorerie"
-            elif max_annual_diff < 1.0:
-                st.warning("🟡 MOYEN")
-                liquidity_desc = "Impact modéré à prévoir"
-            else:
-                st.error("🔴 ÉLEVÉ")
-                liquidity_desc = "Impact significatif possible"
-            st.write(liquidity_desc)
-        
-        with risk_col3:
-            st.markdown("### Recommandation Finale")
-            if final_recommendation == "TAUX VARIABLE":
-                st.success("📈 VARIABLE")
-            elif final_recommendation == "TAUX FIXE":
-                st.error("📊 FIXE") 
-            else:
-                st.warning("⚖️ MIXTE")
-            st.write(f"Confiance: {70 + variable_recommendations * 10}%")
-        
-        st.subheader("Analyse Détaillée par Scénario")
-        
-        for scenario, rec in st.session_state.recommendations.items():
-            with st.expander(f"📋 Scénario {scenario}", expanded=True):
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    scenario_analysis = scenarios_analysis[scenario]
-                    st.markdown(f"""
-                    **Recommandation:** {rec['recommandation']}
-                    
-                    **Analyse Financière:**
-                    - Taux variable moyen: {scenario_analysis['avg_variable_rate']:.2f}%
-                    - Fourchette: {scenario_analysis['min_rate']:.2f}% - {scenario_analysis['max_rate']:.2f}%
-                    - Coût total (variable): {scenario_analysis['variable_cost_total']:,.0f} MAD
-                    - Différence vs fixe: {scenario_analysis['cost_difference']:+,.0f} MAD ({scenario_analysis['cost_difference_percentage']:+.1f}%)
-                    
-                    **Métriques de Risque:**
-                    - Volatilité: {scenario_analysis['volatility']:.2f}%
-                    - Amplitude: {scenario_analysis['rate_range']:.2f}%
-                    - Niveau de risque: {rec['niveau_risque']}
-                    """)
-                
-                with col2:
-                    pred_mini = st.session_state.predictions[scenario][::30]
-                    
-                    fig_mini = go.Figure()
-                    fig_mini.add_hline(y=current_fixed_rate, line_dash="dash", line_color="red", 
-                                     annotation_text=f"Taux Fixe: {current_fixed_rate:.2f}%")
-                    fig_mini.add_trace(go.Scatter(
-                        x=pred_mini['Date'],
-                        y=pred_mini['rendement_predit'],
-                        mode='lines+markers',
-                        line=dict(color=colors[scenario], width=2),
-                        name="Taux Variable"
-                    ))
-                    
-                    fig_mini.update_layout(
-                        height=200,
-                        showlegend=False,
-                        template="plotly_white",
-                        margin=dict(l=20, r=20, t=20, b=20),
-                        title=f"Évolution - {scenario}"
-                    )
-                    
-                    st.plotly_chart(fig_mini, use_container_width=True)
-
-    st.markdown("---")
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        logo_svg = create_sofac_logo_svg()
-        st.markdown(f'<div style="text-align: center; margin-bottom: 1rem;">{logo_svg}</div>', unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div style="text-align: center; color: #666; font-size: 0.8rem;">
-            <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
-            <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
-            <p style="margin: 0.5rem 0;">Baseline: {baseline_date} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
-            <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
-        </div>
-        """, unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    main()(fig, use_container_width=True)
-    
-    with tab2:
-        st.header("Prédictions Détaillées")
-        
-        scenario_choice = st.selectbox("Choisissez un scénario:", ['Cas_de_Base', 'Conservateur', 'Optimiste'])
-        
-        pred_data = st.session_state.predictions[scenario_choice]
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Rendement Moyen", f"{pred_data['rendement_predit'].mean():.2f}%")
-        with col2:
-            st.metric("Rendement Min", f"{pred_data['rendement_predit'].min():.2f}%")
-        with col3:
-            st.metric("Rendement Max", f"{pred_data['rendement_predit'].max():.2f}%")
-        with col4:
-            change = pred_data['rendement_predit'].mean() - baseline_yield
-            st.metric("Écart vs Juin 2025", f"{change:+.2f}%")
-        
-        st.subheader(f"Prédictions Quotidiennes - {scenario_choice}")
-        
-        sample_detailed = pred_data[::7]
-        
-        fig_detail = go.Figure()
-        fig_detail.add_trace(go.Scatter(
-            x=sample_detailed['Date'],
-            y=sample_detailed['rendement_predit'],
-            mode='lines+markers',
-            name='Prédiction',
-            line=dict(color=colors[scenario_choice], width=3)
-        ))
-        
-        fig_detail.add_hline(y=baseline_yield, line_dash="dash", line_color="blue",
-                           annotation_text=f"Juin 2025: {baseline_yield:.2f}%")
-        
-        fig_detail.update_layout(
-            height=500,
-            template="plotly_white",
-            xaxis_title="Date",
-            yaxis_title="Rendement (%)"
-        )
-        
-        st.plotly_chart(fig_detail, use_container_width=True)
-        
-        if st.button("Télécharger les Prédictions"):
-            csv = pred_data.to_csv(index=False)
-            st.download_button(
-                label="Télécharger CSV",
-                data=csv,
-                file_name=f"sofac_predictions_{scenario_choice.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv"
-            )
-    
-    with tab3:
-        st.header("Recommandations Stratégiques")
-        
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-                    color: white; padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
-            <h3 style="margin: 0; color: white;">🏦 AIDE À LA DÉCISION EMPRUNT SOFAC</h3>
-            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Analyse comparative Taux Fixe vs Taux Variable sur la durée du contrat</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.subheader("⚙️ Paramètres de l'Emprunt")
-        
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            loan_amount = st.slider("Montant (millions MAD):", 1, 500, 50)
-        with col2:
-            loan_duration = st.slider("Durée (années):", 1, 10, 5)
-        with col3:
-            current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
-        with col4:
-            risk_premium = st.number_input("Prime de risque (%):", min_value=0.5, max_value=3.0, value=1.3, step=0.1, help="Marge bancaire sur taux de référence")
-        with col5:
-            max_volatility_accepted = st.number_input("Volatilité Max (%):", min_value=0.1, max_value=1.0, value=0.40, step=0.05, help="Volatilité maximale acceptable")
-        
-        st.markdown("""
-        <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #1976d2;">
-            <div style="font-size: 0.85rem; color: #1565c0;">
-                <strong>💡 Guide de Tolérance:</strong>
-                <br>• <strong>Conservateur:</strong> 0.20-0.30% (volatilité très limitée)
-                <br>• <strong>Équilibré:</strong> 0.30-0.40% (tolérance moyenne recommandée: 0.40%)
-                <br>• <strong>Agressif:</strong> 0.40-0.60% (volatilité élevée pour gains supérieurs)
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        banking_spread = risk_premium
-        
-        scenarios_analysis = {}
-        
-        for scenario_name, pred_df in st.session_state.predictions.items():
-            loan_duration_days = loan_duration * 365
-            relevant_predictions = pred_df.head(loan_duration_days)
-            
-            variable_rates_annual = []
-            
-            for year in range(loan_duration):
-                start_day = year * 365
-                end_day = min((year + 1) * 365, len(relevant_predictions))
-                
-                if end_day <= len(relevant_predictions):
-                    year_data = relevant_predictions.iloc[start_day:end_day]
-                    reference_rate = year_data['rendement_predit'].mean()
-                else:
-                    last_year_data = relevant_predictions.iloc[-365:]
-                    reference_rate = last_year_data['rendement_predit'].mean()
-                
-                effective_rate = reference_rate + banking_spread
-                variable_rates_annual.append(effective_rate)
-            
-            fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
-            variable_cost_total = sum([(rate / 100) * loan_amount * 1_000_000 for rate in variable_rates_annual])
-            
-            cost_difference = variable_cost_total - fixed_cost_total
-            cost_difference_percentage = (cost_difference / fixed_cost_total) * 100
-            
-            volatility = relevant_predictions['rendement_predit'].std()
-            max_rate = max(variable_rates_annual)
-            min_rate = min(variable_rates_annual)
-            rate_range = max_rate - min_rate
-            
-            scenarios_analysis[scenario_name] = {
-                'variable_rates_annual': variable_rates_annual,
-                'avg_variable_rate': np.mean(variable_rates_annual),
-                'fixed_cost_total': fixed_cost_total,
-                'variable_cost_total': variable_cost_total,
-                'cost_difference': cost_difference,
-                'cost_difference_percentage': cost_difference_percentage,
-                'volatility': volatility,
-                'max_rate': max_rate,
-                'min_rate': min_rate,
-                'rate_range': rate_range
-            }
-        
-        st.subheader("📊 Matrice de Décision par Scénario")
-        
-        decision_data = []
-        for scenario_name, analysis in scenarios_analysis.items():
-            if analysis['cost_difference'] < 0:
-                recommendation = "TAUX VARIABLE"
-                savings = abs(analysis['cost_difference'])
-                decision_text = f"Économie de {savings:,.0f} MAD"
-            else:
-                recommendation = "TAUX FIXE" 
-                extra_cost = analysis['cost_difference']
-                decision_text = f"Éviter surcoût de {extra_cost:,.0f} MAD"
-            
-            risk_level = "FAIBLE" if analysis['volatility'] < 0.2 else "MOYEN" if analysis['volatility'] < 0.4 else "ÉLEVÉ"
-            
-            decision_data.append({
-                'Scénario': scenario_name,
-                'Taux Variable Effectif': f"{analysis['avg_variable_rate']:.2f}%",
-                'Fourchette Effectif': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
-                'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
-                'Différence vs Fixe': decision_text,
-                'Recommandation': recommendation,
-                'Niveau Risque': risk_level,
-                'Volatilité': f"{analysis['volatility']:.2f}%"
-            })
-        
-        decision_df = pd.DataFrame(decision_data)
-        st.dataframe(decision_df, use_container_width=True, hide_index=True)
-        
-        variable_recommendations = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
-        total_scenarios = len(scenarios_analysis)
-        
-        avg_cost_difference = np.mean([analysis['cost_difference'] for analysis in scenarios_analysis.values()])
-        max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
-        
-        avg_savings = abs(avg_cost_difference)
-        volatility_tolerance_margin = 0.05
-        effective_max_volatility = max_volatility_accepted + volatility_tolerance_margin
-        
-        if variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= effective_max_volatility:
-            final_recommendation = "TAUX VARIABLE"
-            final_reason = f"Économies favorables ({avg_savings:,.0f} MAD) avec volatilité acceptable ({max_volatility:.2f}% ≤ {max_volatility_accepted:.2f}%)"
-            final_color = "#28a745"
-        elif variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted * 1.5:
-            final_recommendation = "STRATÉGIE MIXTE"
-            final_reason = f"Économies probables ({avg_savings:,.0f} MAD) mais volatilité élevée ({max_volatility:.2f}% > {max_volatility_accepted:.2f}%)"
-            final_color = "#ffc107"
-        elif avg_cost_difference >= 0:
-            final_recommendation = "TAUX FIXE"
-            final_reason = f"Taux fixe plus avantageux - évite surcoût de {avg_savings:,.0f} MAD"
-            final_color = "#dc3545"
-        else:
-            final_recommendation = "TAUX FIXE"
-            final_reason = f"Volatilité excessive ({max_volatility:.2f}% >> {max_volatility_accepted:.2f}%) malgré économies potentielles"
-            final_color = "#dc3545"
-        
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, {final_color}, {final_color}AA); 
-                    color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; text-align: center;">
-            <h2>🎯 DÉCISION FINALE SOFAC</h2>
-            <h3>{final_recommendation}</h3>
-            <p><strong>Justification:</strong> {final_reason}</p>
-            <p><strong>Montant:</strong> {loan_amount}M MAD | <strong>Durée:</strong> {loan_duration} ans | <strong>Taux fixe alternatif:</strong> {current_fixed_rate}%</p>
-            <hr style="margin: 1rem 0; opacity: 0.3;">
-            <div style="font-size: 0.9rem; opacity: 0.9;">
-                <p><strong>Analyse:</strong> {variable_recommendations}/{total_scenarios} scénarios favorables au taux variable</p>
-                <p><strong>Économie moyenne:</strong> {abs(avg_cost_difference):,.0f} MAD | <strong>Volatilité max:</strong> {max_volatility:.2f}%</p>
-                <p><strong>Niveau de confiance:</strong> {min(95, 60 + variable_recommendations * 15 + (20 if avg_cost_difference < -1000000 else 0))}%</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.subheader("💰 Analyse Détaillée des Coûts")
-        
-        base_case_analysis = scenarios_analysis['Cas_de_Base']
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### Option Taux Fixe")
-            st.metric("Taux", f"{current_fixed_rate:.2f}%")
-            st.metric("Coût Total", f"{base_case_analysis['fixed_cost_total']:,.0f} MAD")
-            st.metric("Coût Annuel", f"{base_case_analysis['fixed_cost_total']/loan_duration:,.0f} MAD")
-            st.success("✅ Prévisibilité totale")
-        
-        with col2:
-            st.markdown("### Option Taux Variable")
-            reference_rate = base_case_analysis['avg_variable_rate'] - banking_spread
-            st.metric("Taux Référence Moyen", f"{reference_rate:.2f}%", help="Prédiction du modèle")
-            st.metric("+ Prime de Risque", f"+{banking_spread:.2f}%", help=f"Prime ajustable ({banking_spread:.1f}%)")
-            st.metric("= Taux Effectif SOFAC", f"{base_case_analysis['avg_variable_rate']:.2f}%", help="Taux réel avec prime")
-            st.metric("Fourchette Effective", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
-            if base_case_analysis['cost_difference'] < 0:
-                st.success(f"💰 Économie potentielle: {abs(base_case_analysis['cost_difference']):,.0f} MAD")
-            else:
-                st.warning(f"⚠️ Surcoût potentiel: {base_case_analysis['cost_difference']:,.0f} MAD")
-        
-        st.subheader("📈 Évolution Annuelle des Taux (Cas de Base)")
-        
-        years = list(range(1, loan_duration + 1))
-        fig_yearly = go.Figure()
-        
-        fig_yearly.add_trace(go.Scatter(
-            x=years,
-            y=[current_fixed_rate] * loan_duration,
-            mode='lines+markers',
-            name='Taux Fixe',
-            line=dict(color='#dc3545', width=3, dash='dash'),
-            marker=dict(size=8)
-        ))
-        
-        fig_yearly.add_trace(go.Scatter(
-            x=years,
-            y=base_case_analysis['variable_rates_annual'],
-            mode='lines+markers',
-            name='Taux Variable (Prévu)',
-            line=dict(color='#17a2b8', width=3),
-            marker=dict(size=8)
-        ))
-        
-        fig_yearly.update_layout(
-            height=400,
-            template="plotly_white",
-            xaxis_title="Année",
-            yaxis_title="Taux d'intérêt (%)",
-            title="Comparaison Taux Fixe vs Variable sur la Durée du Prêt"
-        )
-        
-        st.plotly_chartimport streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -619,13 +6,7 @@ from datetime import datetime, timedelta
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 from sklearn.model_selection import cross_val_score
-import requests
-from bs4 import BeautifulSoup
-import re
 import warnings
-import base64
-from PIL import Image
-import io
 warnings.filterwarnings('ignore')
 
 st.set_page_config(
@@ -634,11 +15,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-def get_base64_of_bin_file(bin_file):
-    with open(bin_file, 'rb') as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
 
 def create_sofac_logo_svg():
     return '''
@@ -651,54 +27,40 @@ def create_sofac_logo_svg():
     </svg>
     '''
 
-st.markdown(f"""
+st.markdown("""
 <style>
-    .main-header {{
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3d5aa3 100%);
-        padding: 2rem;
-        border-radius: 12px;
-        color: white;
-        text-align: center;
-        margin-bottom: 2rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-        position: relative;
-    }}
-    .executive-dashboard {{
+    .executive-dashboard {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border: 2px solid #dee2e6;
         border-radius: 16px;
         padding: 2rem;
         margin: 2rem 0;
         box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    }}
-    .status-card {{
+    }
+    .status-card {
         background: white;
         border-radius: 12px;
         padding: 1.5rem;
         margin: 0.8rem 0;
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         border-left: 4px solid #2a5298;
-    }}
-    .metric-box {{
+    }
+    .metric-box {
         background: white;
         border-radius: 10px;
         padding: 1.2rem;
         text-align: center;
         box-shadow: 0 3px 15px rgba(0,0,0,0.08);
         border-top: 3px solid #2a5298;
-    }}
-    .recommendation-panel {{
+    }
+    .recommendation-panel {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 16px;
         padding: 2rem;
         color: white;
         margin: 2rem 0;
         box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-    }}
-    .stMetric label {{ font-size: 0.75rem !important; }}
-    h1 {{ font-size: 1.4rem !important; }}
-    h2 {{ font-size: 1.2rem !important; }}
-    p {{ font-size: 0.82rem !important; }}
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -767,7 +129,6 @@ def create_dataset():
     
     date_debut = datetime(2020, 1, 1)
     date_fin = datetime(2025, 6, 30)
-    
     donnees_mensuelles = []
     date_courante = date_debut
     
@@ -1131,4 +492,471 @@ def main():
         if three_month_avg < current_vs_historical - 0.3:
             strategic_window = "🟢 Fenêtre favorable taux variable"
         elif three_month_avg > current_vs_historical + 0.3:
-            strategic_window = "
+            strategic_window = "🔴 Privilégier taux fixe"
+        else:
+            strategic_window = "🟡 Période de transition"
+        
+        st.sidebar.success(strategic_window)
+        
+        if st.sidebar.button("Actualiser"):
+            st.cache_data.clear()
+            st.rerun()
+        
+        st.markdown("### Performance du Modèle")
+        st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Qualité de l'ajustement sur données historiques")
+        st.metric("Précision Historique", f"±{st.session_state.mae:.2f}%", help="Erreur moyenne sur données historiques")
+        st.metric("Incertitude 5 ans", f"±{st.session_state.mae_cv:.2f}%", help="Marge d'erreur pour prédictions à 5 ans")
+        st.metric("Fiabilité Pondérée", f"{st.session_state.accuracy:.0f}%", help="Fiabilité ajustée selon l'horizon temporel")
+        
+        confidence_level = max(50, min(85, 90 - st.session_state.prediction_std * 20))
+        st.metric("Niveau de Confiance", f"{confidence_level:.0f}%", help="Confiance globale du modèle sur 5 ans")
+        
+        if st.session_state.accuracy >= 60:
+            st.success("✅ Modèle calibré avec précision")  
+        elif st.session_state.accuracy >= 45:
+            st.warning("⚠️ Modèle avec incertitude modérée")
+        else:
+            st.error("❌ Prédictions à long terme incertaines")
+    
+    tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
+    
+    with tab1:
+        st.markdown('<div class="executive-dashboard">', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">Tableau de Bord Stratégique</div>', unsafe_allow_html=True)
+        
+        cas_de_base_predictions = st.session_state.predictions['Cas_de_Base']
+        
+        q1_data = cas_de_base_predictions.head(90)
+        q2_data = cas_de_base_predictions.head(180)
+        year1_data = cas_de_base_predictions.head(365)
+        
+        q1_avg = q1_data['rendement_predit'].mean()
+        q2_avg = q2_data['rendement_predit'].mean() 
+        year1_avg = year1_data['rendement_predit'].mean()
+        
+        q1_change = q1_avg - baseline_yield
+        q2_change = q2_avg - baseline_yield
+        year1_change = year1_avg - baseline_yield
+        
+        q1_volatility = q1_data['rendement_predit'].std()
+        max_deviation = max(abs(q1_change), abs(q2_change), abs(year1_change))
+        
+        if max_deviation > 0.5:
+            if q1_change > 0.3:
+                strategic_environment = "ENVIRONNEMENT DE HAUSSE"
+                env_color = "#dc3545"
+                strategic_action = "SÉCURISER IMMÉDIATEMENT - TAUX FIXES"
+            elif year1_change < -0.3:
+                strategic_environment = "ENVIRONNEMENT DE BAISSE"
+                env_color = "#28a745"
+                strategic_action = "MAXIMISER TAUX VARIABLES"
+            else:
+                strategic_environment = "ENVIRONNEMENT CYCLIQUE"
+                env_color = "#ff6b35"
+                strategic_action = "STRATÉGIE ADAPTATIVE REQUISE"
+        elif max_deviation > 0.25:
+            if q1_change > 0.2:
+                strategic_environment = "ENVIRONNEMENT DE HAUSSE MODÉRÉE"
+                env_color = "#ffc107"
+                strategic_action = "PRÉPARER COUVERTURE - SURVEILLER"
+            elif q1_volatility > 0.3:
+                strategic_environment = "ENVIRONNEMENT VOLATIL"
+                env_color = "#6f42c1"
+                strategic_action = "GESTION ACTIVE DU RISQUE"
+            else:
+                strategic_environment = "ENVIRONNEMENT EN TRANSITION"
+                env_color = "#17a2b8"
+                strategic_action = "APPROCHE ÉQUILIBRÉE"
+        else:
+            strategic_environment = "ENVIRONNEMENT STABLE"
+            env_color = "#28a745"
+            strategic_action = "MAINTENIR STRATÉGIE ACTUELLE"
+        
+        trend_6m = q2_avg - baseline_yield
+        volatility_6m = q2_data['rendement_predit'].std()
+        
+        st.markdown(f"""
+        <div class="status-card" style="border-left-color: {env_color};">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="margin: 0; color: #2c3e50;">Environnement Stratégique</h3>
+                    <p style="margin: 0.5rem 0; font-weight: 600; color: {env_color};">{strategic_environment}</p>
+                    <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">{strategic_action}</p>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; font-weight: 700; color: #2c3e50;">{year1_avg:.2f}%</div>
+                    <div style="font-size: 0.8rem; color: #6c757d;">Moyenne 12 mois</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 1.2rem; font-weight: 600; color: {env_color};">{trend_6m:+.2f}%</div>
+                    <div style="font-size: 0.8rem; color: #6c757d;">Tendance 6 mois</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        optimal_window = "Q1" if q1_avg < q2_avg < year1_avg else "Q2-Q4" if q2_avg < year1_avg else "Immédiate"
+        risk_level = "Faible" if volatility_6m < 0.2 else "Modéré" if volatility_6m < 0.4 else "Élevé"
+        
+        with col1:
+            st.markdown(f"""
+            <div class="metric-box">
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 3 MOIS</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q1_avg:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="metric-box">
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 6 MOIS</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q2_avg:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div class="metric-box">
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">STABILITÉ 6M</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{risk_level}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f"""
+            <div class="metric-box">
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">FENÊTRE OPTIMALE</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{optimal_window}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        q1_trend = q1_avg - baseline_yield
+        q2_trend = q2_avg - baseline_yield
+        year1_trend = year1_avg - baseline_yield
+        
+        if q1_trend > 0.3 and q2_trend > 0.2:
+            timing_recommendation = "AGIR IMMÉDIATEMENT - Cycle de hausse confirmé"
+            timing_color = "#dc3545"
+        elif q1_trend > 0.25 and q2_trend < q1_trend:
+            timing_recommendation = "SÉCURISER MAINTENANT - Pic temporaire approche"
+            timing_color = "#ff6b35"
+        elif q1_trend < -0.3 and q2_trend < -0.2:
+            timing_recommendation = "ATTENDRE - Baisse continue favorable"
+            timing_color = "#28a745"  
+        elif abs(q1_trend - q2_trend) > 0.2:
+            timing_recommendation = "STRATÉGIE ADAPTATIVE - Environnement cyclique"
+            timing_color = "#6f42c1"
+        elif year1_trend < -0.2:
+            timing_recommendation = "PLANIFIER - Opportunités à moyen terme"
+            timing_color = "#17a2b8"
+        else:
+            timing_recommendation = "SURVEILLER - Signaux mixtes"
+            timing_color = "#ffc107"
+        
+        st.markdown(f"""
+        <div class="recommendation-panel">
+            <div style="text-align: center; font-size: 1.3rem; font-weight: 700; margin-bottom: 1.5rem;">STRATÉGIE & TIMING RECOMMANDÉS</div>
+            <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem; margin: 0.8rem 0;">
+                <h4 style="margin: 0 0 0.5rem 0; color: white;">Timing Stratégique</h4>
+                <p style="margin: 0; font-size: 1.1rem; font-weight: 600; color: {timing_color};">{timing_recommendation}</p>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
+                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 3 Mois</h5>
+                    <p style="margin: 0; font-weight: 600;">{q1_avg:.2f}%</p>
+                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Évolution: {q1_trend:+.2f}%</p>
+                </div>
+                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
+                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 12 Mois</h5>
+                    <p style="margin: 0; font-weight: 600;">{year1_avg:.2f}%</p>
+                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Tendance: {year1_trend:+.2f}%</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.subheader("Évolution des Rendements")
+        
+        fig = go.Figure()
+        
+        df_hist = st.session_state.df.tail(8)
+        fig.add_trace(go.Scatter(
+            x=df_hist['Date'],
+            y=df_hist['Rendement_52s'],
+            mode='lines+markers',
+            name='Historique',
+            line=dict(color='#2a5298', width=4),
+            marker=dict(size=8)
+        ))
+        
+        colors = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
+        for scenario, pred_df in st.session_state.predictions.items():
+            sample_indices = list(range(0, len(pred_df), 7))
+            
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            today_index = None
+            for i, row in pred_df.iterrows():
+                if row['Date'] == today_str:
+                    today_index = i
+                    break
+            
+            if today_index is not None and today_index not in sample_indices:
+                sample_indices.append(today_index)
+                sample_indices.sort()
+            
+            sample_data = pred_df.iloc[sample_indices]
+            
+            fig.add_trace(go.Scatter(
+                x=sample_data['Date'],
+                y=sample_data['rendement_predit'],
+                mode='lines+markers',
+                name=scenario,
+                line=dict(color=colors[scenario], width=3),
+                marker=dict(size=5)
+            ))
+        
+        fig.add_hline(y=baseline_yield, line_dash="dash", line_color="gray", 
+                     annotation_text=f"Baseline Juin 2025: {baseline_yield:.2f}%")
+        
+        fig.update_layout(
+            height=450,
+            template="plotly_white",
+            xaxis_title="Période",
+            yaxis_title="Rendement (%)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        st.header("Prédictions Détaillées")
+        
+        scenario_choice = st.selectbox("Choisissez un scénario:", ['Cas_de_Base', 'Conservateur', 'Optimiste'])
+        
+        pred_data = st.session_state.predictions[scenario_choice]
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Rendement Moyen", f"{pred_data['rendement_predit'].mean():.2f}%")
+        with col2:
+            st.metric("Rendement Min", f"{pred_data['rendement_predit'].min():.2f}%")
+        with col3:
+            st.metric("Rendement Max", f"{pred_data['rendement_predit'].max():.2f}%")
+        with col4:
+            change = pred_data['rendement_predit'].mean() - baseline_yield
+            st.metric("Écart vs Juin 2025", f"{change:+.2f}%")
+        
+        st.subheader(f"Prédictions Quotidiennes - {scenario_choice}")
+        
+        sample_detailed = pred_data[::7]
+        
+        fig_detail = go.Figure()
+        fig_detail.add_trace(go.Scatter(
+            x=sample_detailed['Date'],
+            y=sample_detailed['rendement_predit'],
+            mode='lines+markers',
+            name='Prédiction',
+            line=dict(color=colors[scenario_choice], width=3)
+        ))
+        
+        fig_detail.add_hline(y=baseline_yield, line_dash="dash", line_color="blue",
+                           annotation_text=f"Juin 2025: {baseline_yield:.2f}%")
+        
+        fig_detail.update_layout(
+            height=500,
+            template="plotly_white",
+            xaxis_title="Date",
+            yaxis_title="Rendement (%)"
+        )
+        
+        st.plotly_chart(fig_detail, use_container_width=True)
+        
+        if st.button("Télécharger les Prédictions"):
+            csv = pred_data.to_csv(index=False)
+            st.download_button(
+                label="Télécharger CSV",
+                data=csv,
+                file_name=f"sofac_predictions_{scenario_choice.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+    
+    with tab3:
+        st.header("Recommandations Stratégiques")
+        
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+                    color: white; padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
+            <h3 style="margin: 0; color: white;">🏦 AIDE À LA DÉCISION EMPRUNT SOFAC</h3>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Analyse comparative Taux Fixe vs Taux Variable sur la durée du contrat</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.subheader("⚙️ Paramètres de l'Emprunt")
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            loan_amount = st.slider("Montant (millions MAD):", 1, 500, 50)
+        with col2:
+            loan_duration = st.slider("Durée (années):", 1, 10, 5)
+        with col3:
+            current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
+        with col4:
+            risk_premium = st.number_input("Prime de risque (%):", min_value=0.5, max_value=3.0, value=1.3, step=0.1, help="Marge bancaire sur taux de référence")
+        with col5:
+            max_volatility_accepted = st.number_input("Volatilité Max (%):", min_value=0.1, max_value=1.0, value=0.40, step=0.05, help="Volatilité maximale acceptable")
+        
+        st.markdown("""
+        <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #1976d2;">
+            <div style="font-size: 0.85rem; color: #1565c0;">
+                <strong>💡 Guide de Tolérance:</strong>
+                <br>• <strong>Conservateur:</strong> 0.20-0.30% (volatilité très limitée)
+                <br>• <strong>Équilibré:</strong> 0.30-0.40% (tolérance moyenne recommandée: 0.40%)
+                <br>• <strong>Agressif:</strong> 0.40-0.60% (volatilité élevée pour gains supérieurs)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        banking_spread = risk_premium
+        
+        scenarios_analysis = {}
+        
+        for scenario_name, pred_df in st.session_state.predictions.items():
+            loan_duration_days = loan_duration * 365
+            relevant_predictions = pred_df.head(loan_duration_days)
+            
+            variable_rates_annual = []
+            
+            for year in range(loan_duration):
+                start_day = year * 365
+                end_day = min((year + 1) * 365, len(relevant_predictions))
+                
+                if end_day <= len(relevant_predictions):
+                    year_data = relevant_predictions.iloc[start_day:end_day]
+                    reference_rate = year_data['rendement_predit'].mean()
+                else:
+                    last_year_data = relevant_predictions.iloc[-365:]
+                    reference_rate = last_year_data['rendement_predit'].mean()
+                
+                effective_rate = reference_rate + banking_spread
+                variable_rates_annual.append(effective_rate)
+            
+            fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
+            variable_cost_total = sum([(rate / 100) * loan_amount * 1_000_000 for rate in variable_rates_annual])
+            
+            cost_difference = variable_cost_total - fixed_cost_total
+            cost_difference_percentage = (cost_difference / fixed_cost_total) * 100
+            
+            volatility = relevant_predictions['rendement_predit'].std()
+            max_rate = max(variable_rates_annual)
+            min_rate = min(variable_rates_annual)
+            rate_range = max_rate - min_rate
+            
+            scenarios_analysis[scenario_name] = {
+                'variable_rates_annual': variable_rates_annual,
+                'avg_variable_rate': np.mean(variable_rates_annual),
+                'fixed_cost_total': fixed_cost_total,
+                'variable_cost_total': variable_cost_total,
+                'cost_difference': cost_difference,
+                'cost_difference_percentage': cost_difference_percentage,
+                'volatility': volatility,
+                'max_rate': max_rate,
+                'min_rate': min_rate,
+                'rate_range': rate_range
+            }
+        
+        st.subheader("📊 Matrice de Décision par Scénario")
+        
+        decision_data = []
+        for scenario_name, analysis in scenarios_analysis.items():
+            if analysis['cost_difference'] < 0:
+                recommendation = "TAUX VARIABLE"
+                savings = abs(analysis['cost_difference'])
+                decision_text = f"Économie de {savings:,.0f} MAD"
+            else:
+                recommendation = "TAUX FIXE" 
+                extra_cost = analysis['cost_difference']
+                decision_text = f"Éviter surcoût de {extra_cost:,.0f} MAD"
+            
+            risk_level = "FAIBLE" if analysis['volatility'] < 0.2 else "MOYEN" if analysis['volatility'] < 0.4 else "ÉLEVÉ"
+            
+            decision_data.append({
+                'Scénario': scenario_name,
+                'Taux Variable Effectif': f"{analysis['avg_variable_rate']:.2f}%",
+                'Fourchette Effectif': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
+                'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
+                'Différence vs Fixe': decision_text,
+                'Recommandation': recommendation,
+                'Niveau Risque': risk_level,
+                'Volatilité': f"{analysis['volatility']:.2f}%"
+            })
+        
+        decision_df = pd.DataFrame(decision_data)
+        st.dataframe(decision_df, use_container_width=True, hide_index=True)
+        
+        variable_recommendations = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
+        total_scenarios = len(scenarios_analysis)
+        
+        avg_cost_difference = np.mean([analysis['cost_difference'] for analysis in scenarios_analysis.values()])
+        max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
+        
+        avg_savings = abs(avg_cost_difference)
+        volatility_tolerance_margin = 0.05
+        effective_max_volatility = max_volatility_accepted + volatility_tolerance_margin
+        
+        if variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= effective_max_volatility:
+            final_recommendation = "TAUX VARIABLE"
+            final_reason = f"Économies favorables ({avg_savings:,.0f} MAD) avec volatilité acceptable ({max_volatility:.2f}% ≤ {max_volatility_accepted:.2f}%)"
+            final_color = "#28a745"
+        elif variable_recommendations >= 2 and avg_cost_difference < 0 and max_volatility <= max_volatility_accepted * 1.5:
+            final_recommendation = "STRATÉGIE MIXTE"
+            final_reason = f"Économies probables ({avg_savings:,.0f} MAD) mais volatilité élevée ({max_volatility:.2f}% > {max_volatility_accepted:.2f}%)"
+            final_color = "#ffc107"
+        elif avg_cost_difference >= 0:
+            final_recommendation = "TAUX FIXE"
+            final_reason = f"Taux fixe plus avantageux - évite surcoût de {avg_savings:,.0f} MAD"
+            final_color = "#dc3545"
+        else:
+            final_recommendation = "TAUX FIXE"
+            final_reason = f"Volatilité excessive ({max_volatility:.2f}% >> {max_volatility_accepted:.2f}%) malgré économies potentielles"
+            final_color = "#dc3545"
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {final_color}, {final_color}AA); 
+                    color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; text-align: center;">
+            <h2>🎯 DÉCISION FINALE SOFAC</h2>
+            <h3>{final_recommendation}</h3>
+            <p><strong>Justification:</strong> {final_reason}</p>
+            <p><strong>Montant:</strong> {loan_amount}M MAD | <strong>Durée:</strong> {loan_duration} ans | <strong>Taux fixe alternatif:</strong> {current_fixed_rate}%</p>
+            <hr style="margin: 1rem 0; opacity: 0.3;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">
+                <p><strong>Analyse:</strong> {variable_recommendations}/{total_scenarios} scénarios favorables au taux variable</p>
+                <p><strong>Économie moyenne:</strong> {abs(avg_cost_difference):,.0f} MAD | <strong>Volatilité max:</strong> {max_volatility:.2f}%</p>
+                <p><strong>Niveau de confiance:</strong> {min(95, 60 + variable_recommendations * 15 + (20 if avg_cost_difference < -1000000 else 0))}%</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        logo_svg = create_sofac_logo_svg()
+        st.markdown(f'<div style="text-align: center; margin-bottom: 1rem;">{logo_svg}</div>', unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="text-align: center; color: #666; font-size: 0.8rem;">
+            <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
+            <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
+            <p style="margin: 0.5rem 0;">Baseline: {baseline_date} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+            <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
+        </div>
+        """, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()
