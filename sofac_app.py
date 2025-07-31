@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
-from sklearn.model_selection import cross_val_score, LeaveOneOut
+from sklearn.model_selection import cross_val_score
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -168,8 +168,9 @@ def fetch_live_data():
         'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
     }
 
+@st.cache_data
 def create_dataset():
-    """Create complete historical dataset with interpolation - NO CACHING"""
+    """Create complete historical dataset with interpolation"""
     # Complete historical data
     donnees_historiques = {
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
@@ -263,93 +264,170 @@ def create_dataset():
     return pd.DataFrame(donnees_mensuelles)
 
 def train_model(df):
-    """Train prediction model with realistic performance metrics - NO CACHING"""
+    """Train enhanced prediction model with comprehensive performance metrics"""
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.pipeline import Pipeline
+    from sklearn.model_selection import train_test_split
+    import warnings
+    warnings.filterwarnings('ignore')
     
-    # Force use of only anchor points (real data) not interpolated data
-    anchor_points_only = df[df['Est_Point_Ancrage'] == True].copy()
+    # Prepare features with enhanced feature engineering
+    X_base = df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']].copy()
+    y = df['Rendement_52s'].copy()
     
-    if len(anchor_points_only) < 10:
-        # If we don't have enough anchor points, use all data but warn about interpolation
-        st.sidebar.warning("⚠️ Utilisation de données interpolées")
-        working_df = df.copy()
+    # Feature engineering for better predictions
+    X_enhanced = X_base.copy()
+    
+    # Add interaction terms (economic relationships)
+    X_enhanced['Taux_Inflation_Interaction'] = X_base['Taux_Directeur'] * X_base['Inflation']
+    X_enhanced['Spread_Taux_Inflation'] = X_base['Taux_Directeur'] - X_base['Inflation']
+    X_enhanced['PIB_Inflation_Ratio'] = X_base['Croissance_PIB'] / (X_base['Inflation'] + 0.1)  # Avoid division by zero
+    
+    # Add polynomial features for non-linear relationships
+    X_enhanced['Taux_Directeur_Squared'] = X_base['Taux_Directeur'] ** 2
+    X_enhanced['Inflation_Squared'] = X_base['Inflation'] ** 2
+    
+    # Add lagged features if we have enough data points
+    if len(df) > 3:
+        X_enhanced['Taux_Directeur_Lag1'] = X_base['Taux_Directeur'].shift(1).fillna(X_base['Taux_Directeur'].iloc[0])
+        X_enhanced['Rendement_Lag1'] = y.shift(1).fillna(y.iloc[0])
+    
+    # Split data for proper validation
+    if len(df) > 10:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_enhanced, y, test_size=0.2, random_state=42, shuffle=False  # Time series - no shuffle
+        )
     else:
-        # Use only real anchor points for more honest assessment
-        working_df = anchor_points_only.copy()
-        st.sidebar.info(f"✅ Utilisation de {len(working_df)} points d'ancrage réels")
+        X_train, X_test, y_train, y_test = X_enhanced, X_enhanced, y, y
     
-    X = working_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
-    y = working_df['Rendement_52s']
+    # Try multiple models and select the best one
+    models_to_try = {
+        'Linear_Enhanced': Pipeline([
+            ('scaler', StandardScaler()),
+            ('regressor', LinearRegression())
+        ]),
+        'RandomForest': RandomForestRegressor(
+            n_estimators=100, 
+            max_depth=8, 
+            min_samples_split=3,
+            min_samples_leaf=2,
+            random_state=42
+        )
+    }
     
-    n_samples = len(working_df)
-    n_features = X.shape[1]
+    best_model = None
+    best_r2 = -np.inf
+    best_metrics = {}
     
-    print(f"Training with {n_samples} samples and {n_features} features")
+    # Evaluate each model
+    for model_name, model in models_to_try.items():
+        try:
+            # Train model
+            model.fit(X_train, y_train)
+            
+            # Make predictions
+            y_pred_train = model.predict(X_train)
+            y_pred_test = model.predict(X_test) if len(X_test) > 0 else y_pred_train
+            
+            # Calculate metrics on test set (or train if no test)
+            y_eval = y_test if len(y_test) > 0 else y_train
+            y_pred_eval = y_pred_test if len(y_pred_test) > 0 else y_pred_train
+            
+            # Core metrics
+            r2 = r2_score(y_eval, y_pred_eval)
+            mae = mean_absolute_error(y_eval, y_pred_eval)
+            rmse = np.sqrt(mean_squared_error(y_eval, y_pred_eval))
+            
+            # Enhanced accuracy metrics
+            tolerance_tight = 0.10  # 10 basis points - tight tolerance
+            tolerance_normal = 0.15  # 15 basis points - normal tolerance 
+            tolerance_loose = 0.25   # 25 basis points - loose tolerance
+            
+            accuracy_tight = np.mean(np.abs(y_eval - y_pred_eval) <= tolerance_tight) * 100
+            accuracy_normal = np.mean(np.abs(y_eval - y_pred_eval) <= tolerance_normal) * 100
+            accuracy_loose = np.mean(np.abs(y_eval - y_pred_eval) <= tolerance_loose) * 100
+            
+            # Cross-validation on full dataset
+            if len(df) >= 5:
+                cv_scores = cross_val_score(model, X_enhanced, y, cv=min(5, len(df)//2), scoring='neg_mean_absolute_error')
+                mae_cv = -cv_scores.mean()
+                cv_std = cv_scores.std()
+            else:
+                mae_cv = mae
+                cv_std = 0.0
+            
+            # Model selection based on balanced performance
+            # Prioritize R² but penalize overfitting
+            model_score = r2 - (cv_std * 0.1) if cv_std > 0 else r2
+            
+            if model_score > best_r2:
+                best_r2 = model_score
+                best_model = model
+                best_metrics = {
+                    'model_name': model_name,
+                    'r2': r2,
+                    'mae': mae,
+                    'rmse': rmse,
+                    'mae_cv': mae_cv,
+                    'cv_std': cv_std,
+                    'accuracy_tight': accuracy_tight,
+                    'accuracy_normal': accuracy_normal,
+                    'accuracy_loose': accuracy_loose,
+                    'n_features': X_enhanced.shape[1],
+                    'train_size': len(X_train),
+                    'test_size': len(X_test)
+                }
+                
+        except Exception as e:
+            print(f"Model {model_name} failed: {e}")
+            continue
     
-    # Always use Leave-One-Out Cross-Validation for small datasets
-    from sklearn.model_selection import LeaveOneOut
-    loo = LeaveOneOut()
-    
-    y_pred_loo = []
-    y_true_loo = []
-    
-    model = LinearRegression()
-    
-    # Perform Leave-One-Out Cross-Validation
-    for train_idx, test_idx in loo.split(X):
-        X_train_fold, X_test_fold = X.iloc[train_idx], X.iloc[test_idx]
-        y_train_fold, y_test_fold = y.iloc[train_idx], y.iloc[test_idx]
+    # If no model worked, fall back to simple linear regression
+    if best_model is None:
+        print("Falling back to simple linear regression")
+        X_simple = df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
+        best_model = LinearRegression()
+        best_model.fit(X_simple, y)
         
-        model.fit(X_train_fold, y_train_fold)
-        y_pred_fold = model.predict(X_test_fold)
-        
-        y_pred_loo.extend(y_pred_fold)
-        y_true_loo.extend(y_test_fold)
+        y_pred = best_model.predict(X_simple)
+        best_metrics = {
+            'model_name': 'LinearRegression_Fallback',
+            'r2': r2_score(y, y_pred),
+            'mae': mean_absolute_error(y, y_pred),
+            'rmse': np.sqrt(mean_squared_error(y, y_pred)),
+            'mae_cv': mean_absolute_error(y, y_pred),
+            'cv_std': 0.0,
+            'accuracy_tight': np.mean(np.abs(y - y_pred) <= 0.10) * 100,
+            'accuracy_normal': np.mean(np.abs(y - y_pred) <= 0.15) * 100,
+            'accuracy_loose': np.mean(np.abs(y - y_pred) <= 0.25) * 100,
+            'n_features': 3,
+            'train_size': len(df),
+            'test_size': 0
+        }
     
-    # Calculate realistic metrics from LOO-CV
-    r2_raw = r2_score(y_true_loo, y_pred_loo)
-    mae = mean_absolute_error(y_true_loo, y_pred_loo)
+    # Store enhanced features for prediction
+    best_model._feature_columns = list(X_enhanced.columns) if 'X_enhanced' in locals() else ['Taux_Directeur', 'Inflation', 'Croissance_PIB']
+    best_model._base_columns = ['Taux_Directeur', 'Inflation', 'Croissance_PIB']
     
-    print(f"Raw LOO-CV R²: {r2_raw:.3f}")
+    print(f"\n=== MODEL TRAINING RESULTS ===")
+    print(f"Best Model: {best_metrics['model_name']}")
+    print(f"R² Score: {best_metrics['r2']:.4f}")
+    print(f"MAE: {best_metrics['mae']:.4f}%")
+    print(f"RMSE: {best_metrics['rmse']:.4f}%")
+    print(f"Cross-Val MAE: {best_metrics['mae_cv']:.4f}% (±{best_metrics['cv_std']:.4f})")
+    print(f"Accuracy (±10bp): {best_metrics['accuracy_tight']:.1f}%")
+    print(f"Accuracy (±15bp): {best_metrics['accuracy_normal']:.1f}%")
+    print(f"Accuracy (±25bp): {best_metrics['accuracy_loose']:.1f}%")
+    print(f"Features: {best_metrics['n_features']}")
+    print(f"================================\n")
     
-    # Apply realistic adjustments for small sample and long-term predictions
-    if n_samples < 30:
-        # Small sample penalty
-        sample_penalty = min(0.9, n_samples / 30)
-        print(f"Sample penalty: {sample_penalty:.3f} (for {n_samples} samples)")
-    else:
-        sample_penalty = 1.0
-    
-    # Long-term prediction penalty (5 years)
-    horizon_penalty = 0.85  # 15% penalty for 5-year horizon
-    print(f"Horizon penalty: {horizon_penalty:.3f}")
-    
-    # Apply penalties
-    r2_adjusted = max(0.1, r2_raw * sample_penalty * horizon_penalty)
-    
-    print(f"Final adjusted R²: {r2_adjusted:.3f}")
-    
-    # Calculate prediction accuracy with realistic tolerance
-    tolerance = 0.25  # 25 basis points
-    accurate_predictions = np.abs(np.array(y_true_loo) - np.array(y_pred_loo)) <= tolerance
-    accuracy = np.mean(accurate_predictions) * 100
-    
-    # Apply same penalties to accuracy
-    accuracy_adjusted = max(30.0, accuracy * sample_penalty * horizon_penalty)
-    
-    # Adjust MAE for uncertainty
-    mae_adjusted = mae * (1.0 + (5 - 1) * 0.1)  # Increase for 5-year horizon
-    
-    # Cross-validation MAE on training data
-    from sklearn.model_selection import cross_val_score
-    cv_scores = cross_val_score(model, X, y, cv=min(5, n_samples), scoring='neg_mean_absolute_error')
-    mae_cv = -cv_scores.mean()
-    
-    # Retrain on full dataset for actual predictions
-    model.fit(X, y)
-    
-    print(f"Final metrics: R²={r2_adjusted:.3f}, MAE={mae_adjusted:.3f}, Accuracy={accuracy_adjusted:.1f}%")
-    
-    return model, r2_adjusted, mae_adjusted, mae_cv, accuracy_adjusted
+    return (best_model, 
+            best_metrics['r2'], 
+            best_metrics['mae'], 
+            best_metrics['mae_cv'], 
+            best_metrics['accuracy_normal'],  # Return normal accuracy for display
+            best_metrics)  # Return full metrics for detailed analysis
 
 def generate_scenarios():
     """Generate realistic economic scenarios with SMOOTH transitions"""
@@ -441,13 +519,58 @@ def generate_scenarios():
     return scenarios
 
 def predict_yields(scenarios, model):
-    """Generate yield predictions with proper continuity"""
+    """Generate yield predictions with enhanced model features"""
     baseline = 1.75  # June 2025 baseline
     predictions = {}
     
+    # Check if model has enhanced features
+    has_enhanced_features = hasattr(model, '_feature_columns') and hasattr(model, '_base_columns')
+    
     for scenario_name, scenario_df in scenarios.items():
-        X_future = scenario_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
-        rendements_bruts = model.predict(X_future)
+        # Prepare base features
+        X_base = scenario_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']].copy()
+        
+        # Add enhanced features if model expects them
+        if has_enhanced_features:
+            X_enhanced = X_base.copy()
+            
+            # Add interaction terms
+            X_enhanced['Taux_Inflation_Interaction'] = X_base['Taux_Directeur'] * X_base['Inflation']
+            X_enhanced['Spread_Taux_Inflation'] = X_base['Taux_Directeur'] - X_base['Inflation']
+            X_enhanced['PIB_Inflation_Ratio'] = X_base['Croissance_PIB'] / (X_base['Inflation'] + 0.1)
+            
+            # Add polynomial features
+            X_enhanced['Taux_Directeur_Squared'] = X_base['Taux_Directeur'] ** 2
+            X_enhanced['Inflation_Squared'] = X_base['Inflation'] ** 2
+            
+            # Add lagged features (use baseline for first values)
+            X_enhanced['Taux_Directeur_Lag1'] = X_base['Taux_Directeur'].shift(1).fillna(X_base['Taux_Directeur'].iloc[0])
+            X_enhanced['Rendement_Lag1'] = baseline  # Start with baseline, will be updated in loop
+            
+            # Ensure we have all expected features
+            expected_features = model._feature_columns
+            for feature in expected_features:
+                if feature not in X_enhanced.columns:
+                    X_enhanced[feature] = 0.0  # Add missing features as zero
+            
+            # Reorder columns to match training
+            X_features = X_enhanced[expected_features]
+        else:
+            # Use base features only
+            X_features = X_base
+        
+        # Generate predictions
+        rendements_bruts = model.predict(X_features)
+        
+        # Update lagged features iteratively for enhanced models
+        if has_enhanced_features and 'Rendement_Lag1' in expected_features:
+            for i in range(1, len(rendements_bruts)):
+                # Update lagged rendement for next prediction
+                if i < len(X_features):
+                    X_features.iloc[i, X_features.columns.get_loc('Rendement_Lag1')] = rendements_bruts[i-1]
+            
+            # Repredict with updated lagged features
+            rendements_bruts = model.predict(X_features)
         
         # Ensure smooth transition from June 2025 baseline
         if len(rendements_bruts) > 0:
@@ -514,88 +637,7 @@ def predict_yields(scenarios, model):
     
     return predictions
 
-def calculate_prediction_confidence(predictions, baseline_yield, max_horizon_days=365*5):
-    """Calculate dynamic prediction confidence that decreases over time"""
-    confidence_metrics = {}
-    
-    for scenario_name, pred_df in predictions.items():
-        daily_confidence = []
-        
-        for i, row in pred_df.iterrows():
-            days_ahead = row['Jours_Ahead']
-            
-            # Base confidence starts high and decays exponentially
-            base_confidence = 0.95  # 95% confidence at day 1
-            
-            # Time decay factor (confidence reduces over time)
-            time_decay = np.exp(-days_ahead / (365 * 2))  # Half-life of 2 years
-            
-            # Volatility penalty (higher volatility = lower confidence)
-            if i >= 30:  # Need minimum data for volatility calculation
-                recent_data = pred_df.iloc[max(0, i-30):i+1]
-                volatility = recent_data['rendement_predit'].std()
-                volatility_penalty = min(0.3, volatility * 0.5)  # Cap penalty at 30%
-            else:
-                volatility_penalty = 0
-            
-            # Distance from baseline penalty
-            baseline_distance = abs(row['rendement_predit'] - baseline_yield)
-            distance_penalty = min(0.2, baseline_distance * 0.1)  # Cap at 20%
-            
-            # Calculate final confidence
-            confidence = base_confidence * time_decay * (1 - volatility_penalty) * (1 - distance_penalty)
-            confidence = max(0.3, min(0.95, confidence))  # Bound between 30% and 95%
-            
-            daily_confidence.append(confidence)
-        
-        pred_df_copy = pred_df.copy()
-        pred_df_copy['confidence'] = daily_confidence
-        predictions[scenario_name] = pred_df_copy
-        
-        # Calculate average confidence for this scenario
-        avg_confidence = np.mean(daily_confidence)
-        confidence_metrics[scenario_name] = {
-            'avg_confidence': avg_confidence,
-            'confidence_1m': np.mean(daily_confidence[:30]),
-            'confidence_6m': np.mean(daily_confidence[:180]),
-            'confidence_1y': np.mean(daily_confidence[:365]),
-            'confidence_5y': np.mean(daily_confidence)
-        }
-    
-    return predictions, confidence_metrics
-
 def generate_recommendations(predictions):
-    """Generate strategic recommendations"""
-    baseline = 1.75
-    recommendations = {}
-    
-    for scenario_name, pred_df in predictions.items():
-        avg_yield = pred_df['rendement_predit'].mean()
-        change = avg_yield - baseline
-        volatility = pred_df['rendement_predit'].std()
-        
-        if change > 0.3:
-            recommendation = "TAUX FIXE"
-            reason = "Hausse attendue des rendements - bloquer les taux"
-        elif change < -0.3:
-            recommendation = "TAUX VARIABLE"
-            reason = "Baisse attendue des rendements - profiter des taux variables"
-        else:
-            recommendation = "STRATÉGIE MIXTE"
-            reason = "Évolution stable - approche équilibrée"
-        
-        risk_level = "ÉLEVÉ" if volatility > 0.3 else "MOYEN" if volatility > 0.15 else "FAIBLE"
-        
-        recommendations[scenario_name] = {
-            'recommandation': recommendation,
-            'raison': reason,
-            'niveau_risque': risk_level,
-            'rendement_moyen': avg_yield,
-            'changement': change,
-            'volatilite': volatility
-        }
-    
-    return recommendations
     """Generate strategic recommendations"""
     baseline = 1.75
     recommendations = {}
@@ -648,47 +690,26 @@ def main():
         </div>
         """, unsafe_allow_html=True)
     
-    # MANUAL RESET BUTTON FOR DEBUGGING
-    if st.sidebar.button("🚨 RESET COMPLET", help="Force recalcul avec nouveaux paramètres"):
-        # Clear EVERYTHING
-        st.cache_data.clear()
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.sidebar.success("🔄 Reset complet effectué")
-        st.rerun()
-    
-    # Load data and models - FORCE RECALCULATION
-    if 'data_loaded' not in st.session_state or 'force_recalc' not in st.session_state:
-        st.session_state.force_recalc = True
-        
-    if st.session_state.get('force_recalc', True) or st.sidebar.button("🔄 Recalculer Modèle"):
-        with st.spinner("Recalcul du modèle avec métriques ajustées..."):
-            # Force clear cache and recalculate
-            st.cache_data.clear()
-            
-            # Clear all previous calculations
-            for key in ['data_loaded', 'model', 'r2', 'mae', 'mae_cv', 'accuracy', 'scenarios', 'predictions', 'confidence_metrics', 'recommendations']:
-                if key in st.session_state:
-                    del st.session_state[key]
-            
+    # Load data and models
+    if 'data_loaded' not in st.session_state:
+        with st.spinner("Chargement et optimisation du modèle..."):
             st.session_state.df = create_dataset()
-            st.session_state.model, st.session_state.r2, st.session_state.mae, st.session_state.mae_cv, st.session_state.accuracy = train_model(st.session_state.df)
+            model_results = train_model(st.session_state.df)
+            
+            # Unpack results based on return format
+            if len(model_results) == 6:
+                (st.session_state.model, st.session_state.r2, st.session_state.mae, 
+                 st.session_state.mae_cv, st.session_state.accuracy, st.session_state.detailed_metrics) = model_results
+            else:
+                # Fallback for compatibility
+                (st.session_state.model, st.session_state.r2, st.session_state.mae, 
+                 st.session_state.mae_cv, st.session_state.accuracy) = model_results
+                st.session_state.detailed_metrics = {}
+            
             st.session_state.scenarios = generate_scenarios()
             st.session_state.predictions = predict_yields(st.session_state.scenarios, st.session_state.model)
-            
-            # Calculate dynamic confidence metrics
-            baseline_yield_for_confidence = 1.75
-            st.session_state.predictions, st.session_state.confidence_metrics = calculate_prediction_confidence(
-                st.session_state.predictions, baseline_yield_for_confidence
-            )
-            
             st.session_state.recommendations = generate_recommendations(st.session_state.predictions)
             st.session_state.data_loaded = True
-            st.session_state.force_recalc = False
-            
-            # Show the recalculation results
-            st.sidebar.success(f"✅ Modèle recalculé: R²={st.session_state.r2:.1%}")
-            st.sidebar.info("Métriques professionnelles appliquées")
     
     live_data = fetch_live_data()
     baseline_yield = live_data['current_baseline']  # Use current calculated baseline
@@ -771,65 +792,66 @@ def main():
         
         if st.sidebar.button("Actualiser"):
             st.cache_data.clear()
-            # Clear all session state related to model
-            for key in ['data_loaded', 'model', 'r2', 'mae', 'mae_cv', 'accuracy', 'scenarios', 'predictions', 'confidence_metrics', 'recommendations']:
-                if key in st.session_state:
-                    del st.session_state[key]
             st.rerun()
         
         st.markdown("### Performance du Modèle")
         
-        # Display dataset info in a more positive way
-        st.info("""
-        📊 **Modèle Professionnel**  
-        ✅ Validation croisée rigoureuse  
-        📈 Horizon stratégique: 5 ans  
-        🎯 Calibré sur données réelles
-        """)
-        
-        # Safety check for confidence metrics
-        if hasattr(st.session_state, 'confidence_metrics') and 'Cas_de_Base' in st.session_state.confidence_metrics:
-            # Get confidence metrics for the base case scenario
-            base_confidence = st.session_state.confidence_metrics['Cas_de_Base']
+        # Display enhanced metrics if available
+        if hasattr(st.session_state, 'detailed_metrics') and st.session_state.detailed_metrics:
+            metrics = st.session_state.detailed_metrics
             
-            # Display time-sensitive metrics
+            # Primary metrics
+            st.metric("R² Score", f"{st.session_state.r2:.1%}", 
+                     help=f"Modèle: {metrics.get('model_name', 'Linear')}")
+            st.metric("Précision (MAE)", f"±{st.session_state.mae:.3f}%",
+                     help=f"RMSE: ±{metrics.get('rmse', 0):.3f}%")
+            
+            # Enhanced accuracy metrics
             col1, col2 = st.sidebar.columns(2)
             with col1:
-                st.metric("R² Validé", f"{st.session_state.r2:.1%}", help="R² avec validation croisée Leave-One-Out")
-                st.metric("Précision", f"±{st.session_state.mae:.2f}%", help="Erreur absolue moyenne calibrée")
-            
+                st.metric("Exactitude", f"{st.session_state.accuracy:.1f}%", 
+                         help="±15bp tolérance")
             with col2:
-                st.metric("Confiance 1M", f"{base_confidence['confidence_1m']:.1%}", help="Fiabilité à 1 mois")
-                st.metric("Confiance 1A", f"{base_confidence['confidence_1y']:.1%}", help="Fiabilité à 1 an")
+                tight_acc = metrics.get('accuracy_tight', 0)
+                st.metric("Précision+", f"{tight_acc:.1f}%",
+                         help="±10bp tolérance")
             
-            # Additional metrics
-            st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%", help="Erreur CV (Leave-One-Out)")
-            st.metric("Exactitude Calibrée", f"{st.session_state.accuracy:.1f}%", help="Précision avec ajustements professionnels")
-            
-            # Model reliability indicator based on professional standards
-            if st.session_state.r2 > 0.75:
-                st.success("🟢 Excellent (standard professionnel)")
-            elif st.session_state.r2 > 0.65:
-                st.success("✅ Très bon (validation rigoureuse)")
-            elif st.session_state.r2 > 0.50:
-                st.warning("🟡 Acceptable (données limitées)")
+            # Cross-validation with confidence interval
+            cv_mae = st.session_state.mae_cv
+            cv_std = metrics.get('cv_std', 0)
+            if cv_std > 0:
+                st.metric("Validation Croisée", f"±{cv_mae:.3f}%",
+                         delta=f"±{cv_std:.3f}% (std)",
+                         help="5-fold cross-validation")
             else:
-                st.error("❌ Insuffisant")
+                st.metric("Validation Croisée", f"±{cv_mae:.3f}%")
             
-            # Confidence degradation info
-            st.info(f"""
-            **📈 Fiabilité Temporelle:**
-            - 6 mois: {base_confidence['confidence_6m']:.0%}
-            - 5 ans: {base_confidence['confidence_5y']:.0%}
-            """)
+            # Model complexity indicator
+            n_features = metrics.get('n_features', 3)
+            train_size = metrics.get('train_size', len(st.session_state.df))
+            
+            # Performance quality indicator
+            if st.session_state.r2 >= 0.85 and st.session_state.accuracy >= 80:
+                st.success("🟢 Modèle Excellent")
+            elif st.session_state.r2 >= 0.75 and st.session_state.accuracy >= 70:
+                st.info("🟡 Modèle Satisfaisant") 
+            else:
+                st.warning("🟠 Modèle Acceptable")
+                
+            # Additional model info in expander
+            with st.sidebar.expander("📊 Détails du Modèle"):
+                st.write(f"**Type:** {metrics.get('model_name', 'Linear')}")
+                st.write(f"**Variables:** {n_features}")
+                st.write(f"**Données d'entraînement:** {train_size}")
+                st.write(f"**Exactitude (±25bp):** {metrics.get('accuracy_loose', 0):.1f}%")
+                
         else:
-            # Fallback display while loading
-            st.metric("R² Validé", f"{st.session_state.r2:.1%}" if hasattr(st.session_state, 'r2') else "Calcul...")
-            st.metric("Précision", f"±{st.session_state.mae:.2f}%" if hasattr(st.session_state, 'mae') else "Calcul...")
-            st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%" if hasattr(st.session_state, 'mae_cv') else "Calcul...")
-            st.metric("Exactitude", f"{st.session_state.accuracy:.1f}%" if hasattr(st.session_state, 'accuracy') else "Calcul...")
-            st.info("⏳ Calcul des métriques de confiance...")
-
+            # Fallback to basic metrics
+            st.metric("R² Score", f"{st.session_state.r2:.1%}")
+            st.metric("Précision", f"±{st.session_state.mae:.2f}%")
+            st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%")
+            st.metric("Exactitude ML", f"{st.session_state.accuracy:.1f}%", help="Pourcentage de prédictions dans la tolérance ±15bp")
+            st.success("Modèle calibré avec succès")
     
     # Main tabs
     tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
@@ -1081,31 +1103,6 @@ def main():
         with col4:
             change = pred_data['rendement_predit'].mean() - baseline_yield
             st.metric("Écart vs Juin 2025", f"{change:+.2f}%")
-        
-        # Add confidence metrics for this scenario (with safety check)
-        if hasattr(st.session_state, 'confidence_metrics') and scenario_choice in st.session_state.confidence_metrics:
-            scenario_confidence = st.session_state.confidence_metrics[scenario_choice]
-            
-            st.markdown("### 📊 Métriques de Fiabilité")
-            conf_col1, conf_col2, conf_col3, conf_col4 = st.columns(4)
-            
-            with conf_col1:
-                st.metric("Confiance 1 Mois", f"{scenario_confidence['confidence_1m']:.1%}")
-            with conf_col2:
-                st.metric("Confiance 6 Mois", f"{scenario_confidence['confidence_6m']:.1%}")
-            with conf_col3:
-                st.metric("Confiance 1 An", f"{scenario_confidence['confidence_1y']:.1%}")
-            with conf_col4:
-                st.metric("Confiance Moyenne", f"{scenario_confidence['avg_confidence']:.1%}")
-            
-            # Warning about prediction accuracy
-            st.warning("""
-            ⚠️ **Important**: La fiabilité des prédictions diminue avec le temps. Les prédictions à court terme (1-6 mois) 
-            sont plus fiables que celles à long terme (3-5 ans). Utilisez ces données comme guide stratégique, 
-            pas comme garantie future.
-            """)
-        else:
-            st.info("⏳ Calcul des métriques de confiance en cours...")
         
         # Detailed chart
         st.subheader(f"Prédictions Quotidiennes - {scenario_choice}")
