@@ -132,40 +132,205 @@ st.markdown(f"""
 
 @st.cache_data(ttl=3600)
 def fetch_live_data():
-    """Fetch live economic data with stable baseline management"""
+    """Fetch live economic data directly from Bank Al-Maghrib and HCP websites"""
+    import requests
+    from bs4 import BeautifulSoup
+    import re
+    
     # Get current date
     today = datetime.now()
     
-    # Define baseline anchor points (would be updated manually/quarterly in production)
-    baseline_anchors = {
-        '2025-06-30': 1.75,  # Last historical data point
-        '2025-07-31': 1.72,  # July month-end (estimated/forecasted)
-        '2025-08-31': 1.69,  # August month-end (estimated/forecasted)
-        # In production: these would be updated based on actual market data
+    # Initialize with fallback values
+    policy_rate = 2.25
+    inflation = 1.1
+    gdp_growth = 4.8
+    baseline_rate = 1.75  # Bank Al-Maghrib baseline
+    
+    # Data sources
+    data_sources = {
+        'policy_rate_fetched': False,
+        'inflation_fetched': False,
+        'baseline_fetched': False,
+        'fetch_errors': []
     }
     
-    # Find the current baseline (most recent anchor point before today)
-    current_baseline = 1.75  # Default
-    baseline_date = '2025-06-30'  # Default
+    try:
+        # Fetch Bank Al-Maghrib policy rate
+        bam_url = "https://www.bkam.ma"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        print("Fetching Bank Al-Maghrib data...")
+        response = requests.get(bam_url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Look for policy rate (taux directeur)
+            # Common patterns in Bank Al-Maghrib website
+            rate_patterns = [
+                r'taux\s+directeur[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+                r'policy\s+rate[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+                r'([0-9]+[,.]?[0-9]*)\s*%.*directeur',
+                r'directeur.*?([0-9]+[,.]?[0-9]*)\s*%'
+            ]
+            
+            text_content = soup.get_text().lower()
+            for pattern in rate_patterns:
+                match = re.search(pattern, text_content, re.IGNORECASE)
+                if match:
+                    rate_str = match.group(1).replace(',', '.')
+                    try:
+                        policy_rate = float(rate_str)
+                        data_sources['policy_rate_fetched'] = True
+                        print(f"✅ Policy rate found: {policy_rate}%")
+                        break
+                    except ValueError:
+                        continue
+            
+            # Look for variable rate baseline
+            baseline_patterns = [
+                r'taux\s+variable[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+                r'variable\s+rate[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+                r'référence.*?([0-9]+[,.]?[0-9]*)\s*%'
+            ]
+            
+            for pattern in baseline_patterns:
+                match = re.search(pattern, text_content, re.IGNORECASE)
+                if match:
+                    rate_str = match.group(1).replace(',', '.')
+                    try:
+                        baseline_rate = float(rate_str)
+                        data_sources['baseline_fetched'] = True
+                        print(f"✅ Baseline rate found: {baseline_rate}%")
+                        break
+                    except ValueError:
+                        continue
+        
+    except Exception as e:
+        error_msg = f"Bank Al-Maghrib fetch error: {str(e)}"
+        data_sources['fetch_errors'].append(error_msg)
+        print(f"❌ {error_msg}")
     
-    for date_str, rate in sorted(baseline_anchors.items()):
-        anchor_date = datetime.strptime(date_str, '%Y-%m-%d')
-        if anchor_date <= today:
-            current_baseline = rate
-            baseline_date = date_str
+    try:
+        # Fetch HCP inflation data
+        hcp_urls = [
+            "https://www.hcp.ma",
+            "https://www.hcp.ma/Indice-des-prix-a-la-consommation_a363.html"
+        ]
+        
+        print("Fetching HCP inflation data...")
+        for hcp_url in hcp_urls:
+            try:
+                response = requests.get(hcp_url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    
+                    # Look for inflation rate
+                    inflation_patterns = [
+                        r'inflation[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+                        r'ipc[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+                        r'([0-9]+[,.]?[0-9]*)\s*%.*inflation',
+                        r'prix.*consommation[:\s]*([0-9]+[,.]?[0-9]*)\s*%'
+                    ]
+                    
+                    text_content = soup.get_text().lower()
+                    for pattern in inflation_patterns:
+                        match = re.search(pattern, text_content, re.IGNORECASE)
+                        if match:
+                            rate_str = match.group(1).replace(',', '.')
+                            try:
+                                inflation = float(rate_str)
+                                data_sources['inflation_fetched'] = True
+                                print(f"✅ Inflation found: {inflation}%")
+                                break
+                            except ValueError:
+                                continue
+                    
+                    if data_sources['inflation_fetched']:
+                        break
+                        
+            except Exception as e:
+                continue
+                
+    except Exception as e:
+        error_msg = f"HCP fetch error: {str(e)}"
+        data_sources['fetch_errors'].append(error_msg)
+        print(f"❌ {error_msg}")
     
-    # Format baseline date for display
-    baseline_display = datetime.strptime(baseline_date, '%Y-%m-%d').strftime('%B %Y')
+    try:
+        # Try to fetch GDP growth from additional sources
+        print("Fetching GDP data...")
+        # HCP sometimes publishes GDP data
+        gdp_patterns = [
+            r'pib[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+            r'croissance[:\s]*([0-9]+[,.]?[0-9]*)\s*%',
+            r'gdp[:\s]*([0-9]+[,.]?[0-9]*)\s*%'
+        ]
+        
+        # Could expand to other official sources if available
+        
+    except Exception as e:
+        error_msg = f"GDP fetch error: {str(e)}"
+        data_sources['fetch_errors'].append(error_msg)
+        print(f"❌ {error_msg}")
+    
+    # Determine baseline status and date
+    if data_sources['baseline_fetched']:
+        baseline_status = 'Temps Réel'
+        baseline_date = today.strftime('%B %Y')
+        baseline_source = 'Bank Al-Maghrib - Temps Réel'
+    else:
+        baseline_status = 'Officiel (Juin 2025)'
+        baseline_date = 'Juin 2025'
+        baseline_source = 'Bank Al-Maghrib - Dernière Publication'
+    
+    # Create comprehensive data status
+    fetch_status = {
+        'policy_rate': '🟢 Temps Réel' if data_sources['policy_rate_fetched'] else '🟡 Fallback',
+        'inflation': '🟢 Temps Réel' if data_sources['inflation_fetched'] else '🟡 Fallback',
+        'baseline': '🟢 Temps Réel' if data_sources['baseline_fetched'] else '🟡 Dernière Publication',
+        'gdp': '🟡 Estimation',
+        'errors': data_sources['fetch_errors']
+    }
+    
+    print(f"\n=== DATA FETCH SUMMARY ===")
+    print(f"Policy Rate: {policy_rate}% ({fetch_status['policy_rate']})")
+    print(f"Inflation: {inflation}% ({fetch_status['inflation']})")
+    print(f"Baseline: {baseline_rate}% ({fetch_status['baseline']})")
+    print(f"GDP Growth: {gdp_growth}% ({fetch_status['gdp']})")
+    if data_sources['fetch_errors']:
+        print(f"Errors: {len(data_sources['fetch_errors'])}")
+    print("============================\n")
     
     return {
-        'policy_rate': 2.25,
-        'inflation': 1.1,
-        'gdp_growth': 4.8,
-        'current_baseline': current_baseline,
-        'baseline_date': baseline_display,
-        'baseline_date_raw': baseline_date,
-        'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP'},
-        'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
+        'policy_rate': policy_rate,
+        'inflation': inflation,
+        'gdp_growth': gdp_growth,
+        'current_baseline': baseline_rate,
+        'baseline_date': baseline_date,
+        'baseline_date_raw': today.strftime('%Y-%m-%d') if data_sources['baseline_fetched'] else '2025-06-30',
+        'baseline_info': {
+            'rate': baseline_rate,
+            'publication_month': baseline_date,
+            'source': baseline_source,
+            'status': baseline_status
+        },
+        'fetch_status': fetch_status,
+        'data_quality': {
+            'live_sources': sum([data_sources['policy_rate_fetched'], data_sources['inflation_fetched'], data_sources['baseline_fetched']]),
+            'total_sources': 3,
+            'last_successful_fetch': today.strftime('%Y-%m-%d %H:%M:%S')
+        },
+        'sources': {
+            'policy_rate': 'Bank Al-Maghrib' + (' - Temps Réel' if data_sources['policy_rate_fetched'] else ' - Fallback'),
+            'inflation': 'HCP' + (' - Temps Réel' if data_sources['inflation_fetched'] else ' - Fallback'),
+            'baseline': baseline_source,
+            'gdp': 'Estimation Économique'
+        },
+        'last_updated': today.strftime('%Y-%m-%d %H:%M:%S'),
+        'next_expected_publication': 'Temps Réel (si disponible)',
+        'fetch_errors': data_sources['fetch_errors']
     }
 
 @st.cache_data
@@ -520,7 +685,7 @@ def generate_scenarios():
 
 def predict_yields(scenarios, model):
     """Generate yield predictions with enhanced model features"""
-    baseline = 1.75  # June 2025 baseline
+    baseline = 1.75  # Bank Al-Maghrib baseline (Juin 2025): 1.75%
     predictions = {}
     
     # Check if model has enhanced features
@@ -724,27 +889,92 @@ def main():
         st.header("Informations du Modèle")
         
         st.markdown("### Données en Temps Réel")
+        
+        # Show fetch status for each metric
+        fetch_status = live_data.get('fetch_status', {})
+        
         col1, col2 = st.sidebar.columns(2)
         
         with col1:
-            st.metric("Taux Directeur", f"{live_data['policy_rate']:.2f}%")
-            st.metric("Inflation", f"{live_data['inflation']:.2f}%")
+            policy_status = fetch_status.get('policy_rate', '🟡 Fallback')
+            st.metric("Taux Directeur", f"{live_data['policy_rate']:.2f}%", 
+                     help=f"Source: {policy_status}")
+            
+            inflation_status = fetch_status.get('inflation', '🟡 Fallback') 
+            st.metric("Inflation", f"{live_data['inflation']:.2f}%",
+                     help=f"Source: {inflation_status}")
         
         with col2:
-            st.metric("Baseline Actuelle", f"{baseline_yield:.2f}%", help=f"Point d'ancrage: {baseline_date}")
-            st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
+            baseline_status = fetch_status.get('baseline', '🟡 Dernière Publication')
+            st.metric("Baseline Actuelle", f"{baseline_yield:.2f}%", 
+                     help=f"Source: {baseline_status}")
+            
+            gdp_status = fetch_status.get('gdp', '🟡 Estimation')
+            st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%",
+                     help=f"Source: {gdp_status}")
         
-        st.info(f"Dernière MAJ: {live_data['last_updated']}")
+        # Data quality indicator
+        data_quality = live_data.get('data_quality', {})
+        live_sources = data_quality.get('live_sources', 0)
+        total_sources = data_quality.get('total_sources', 3)
         
-        # Baseline explanation
+        if live_sources == total_sources:
+            quality_color = "#28a745"
+            quality_text = f"🟢 Excellente ({live_sources}/{total_sources} temps réel)"
+        elif live_sources >= total_sources // 2:
+            quality_color = "#ffc107" 
+            quality_text = f"🟡 Bonne ({live_sources}/{total_sources} temps réel)"
+        else:
+            quality_color = "#dc3545"
+            quality_text = f"🟠 Limitée ({live_sources}/{total_sources} temps réel)"
+        
         st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 6px; border-left: 3px solid #2a5298; margin: 0.5rem 0;">
-            <div style="font-size: 0.75rem; color: #6c757d;">
-                <strong>📍 Baseline:</strong> {baseline_date} ({baseline_yield:.2f}%)<br>
-                <strong>📊 Référence:</strong> Dernière ancre de marché confirmée
+        <div style="background: {quality_color}22; padding: 0.5rem; border-radius: 4px; margin: 0.5rem 0; border-left: 3px solid {quality_color};">
+            <div style="font-size: 0.8rem; color: {quality_color}; font-weight: 600;">
+                Qualité des données: {quality_text}
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        st.info(f"Dernière MAJ: {live_data['last_updated']}")
+        
+        # Show fetch errors if any (in expander to not clutter)
+        fetch_errors = live_data.get('fetch_errors', [])
+        if fetch_errors:
+            with st.sidebar.expander(f"⚠️ Erreurs de récupération ({len(fetch_errors)})"):
+                for error in fetch_errors[:3]:  # Show max 3 errors
+                    st.text(error[:100] + "..." if len(error) > 100 else error)
+        
+        # Bank Al-Maghrib baseline explanation with real-time status
+        baseline_info = live_data.get('baseline_info', {})
+        fetch_status = live_data.get('fetch_status', {})
+        baseline_status = fetch_status.get('baseline', '🟡 Dernière Publication')
+        
+        # Determine background color based on data freshness
+        if '🟢 Temps Réel' in baseline_status:
+            bg_color = "#e8f5e8"
+            text_color = "#2d5a2d"
+        else:
+            bg_color = "#fff3cd" 
+            text_color = "#856404"
+        
+        st.markdown(f"""
+        <div style="background: {bg_color}; padding: 0.8rem; border-radius: 6px; border-left: 3px solid #2a5298; margin: 0.5rem 0;">
+            <div style="font-size: 0.75rem; color: {text_color};">
+                <strong>🏛️ Baseline Bank Al-Maghrib:</strong> {baseline_date}<br>
+                <strong>📊 Taux Variable:</strong> {baseline_yield:.2f}%<br>
+                <strong>🔍 Statut:</strong> {baseline_info.get('status', 'Officiel')}<br>
+                <strong>🔄 Source:</strong> {baseline_status}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Add update notification based on data freshness
+        if '🟡' in baseline_status:
+            st.sidebar.info("ℹ️ Utilise dernière publication officielle")
+        elif '🟢' in baseline_status:
+            st.sidebar.success("✅ Données Bank Al-Maghrib à jour")
+        
         
         # STRATEGIC OUTLOOK SECTION
         st.sidebar.markdown("---")
@@ -1073,7 +1303,7 @@ def main():
             ))
         
         fig.add_hline(y=baseline_yield, line_dash="dash", line_color="gray", 
-                     annotation_text=f"Baseline Juin 2025: {baseline_yield:.2f}%")
+                     annotation_text=f"Baseline Bank Al-Maghrib ({baseline_date}): {baseline_yield:.2f}%")
         
         fig.update_layout(
             height=450,
@@ -1102,7 +1332,8 @@ def main():
             st.metric("Rendement Max", f"{pred_data['rendement_predit'].max():.2f}%")
         with col4:
             change = pred_data['rendement_predit'].mean() - baseline_yield
-            st.metric("Écart vs Juin 2025", f"{change:+.2f}%")
+            st.metric("Écart vs Bank Al-Maghrib", f"{change:+.2f}%", 
+                     help=f"Comparaison avec baseline {baseline_date}")
         
         # Detailed chart
         st.subheader(f"Prédictions Quotidiennes - {scenario_choice}")
@@ -1119,7 +1350,7 @@ def main():
         ))
         
         fig_detail.add_hline(y=baseline_yield, line_dash="dash", line_color="blue",
-                           annotation_text=f"Juin 2025: {baseline_yield:.2f}%")
+                           annotation_text=f"Bank Al-Maghrib ({baseline_date}): {baseline_yield:.2f}%")
         
         fig_detail.update_layout(
             height=500,
@@ -1551,11 +1782,13 @@ def main():
         st.markdown(f'<div style="text-align: center; margin-bottom: 1rem;">{logo_svg}</div>', unsafe_allow_html=True)
         
         # Footer text
+        baseline_info = live_data.get('baseline_info', {})
         st.markdown(f"""
         <div style="text-align: center; color: #666; font-size: 0.8rem;">
             <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
             <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
-            <p style="margin: 0.5rem 0;">Baseline: {baseline_date} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+            <p style="margin: 0.5rem 0;">Baseline Bank Al-Maghrib: {baseline_date} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
+            <p style="margin: 0;"><em>Référence: {baseline_info.get('source', 'Bank Al-Maghrib - Taux Variable Officiel')}</em></p>
             <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
         </div>
         """, unsafe_allow_html=True)
