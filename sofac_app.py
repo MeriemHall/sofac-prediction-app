@@ -648,6 +648,15 @@ def main():
         </div>
         """, unsafe_allow_html=True)
     
+    # MANUAL RESET BUTTON FOR DEBUGGING
+    if st.sidebar.button("🚨 RESET COMPLET", help="Force recalcul avec nouveaux paramètres"):
+        # Clear EVERYTHING
+        st.cache_data.clear()
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.sidebar.success("🔄 Reset complet effectué")
+        st.rerun()
+    
     # Load data and models - FORCE RECALCULATION
     if 'data_loaded' not in st.session_state or 'force_recalc' not in st.session_state:
         st.session_state.force_recalc = True
