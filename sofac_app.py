@@ -517,77 +517,20 @@ def main():
             st.rerun()
         
         st.markdown("### Performance du Modèle")
-        
-        # Métriques avec labels clarifiés et contexte
-        st.metric("R² Score (Historique)", f"{st.session_state.r2:.1%}", help="Qualité de l'ajustement sur données historiques 2020-2025")
-        st.metric("Précision Historique", f"±{st.session_state.mae:.2f}%", help="Erreur moyenne sur données connues (2020-2025)")
-        st.metric("Incertitude 5 ans", f"±{st.session_state.mae_cv:.2f}%", help="Marge d'erreur étendue pour prédictions 2025-2030")
-        st.metric("Fiabilité Dégradée", f"{st.session_state.accuracy:.0f}%", help="Précision pondérée incluant dégradation temporelle sur 5 ans")
+        st.metric("R² Score", f"{st.session_state.r2:.1%}", help="Qualité de l'ajustement sur données historiques")
+        st.metric("Précision Historique", f"±{st.session_state.mae:.2f}%", help="Erreur moyenne sur données historiques")
+        st.metric("Incertitude 5 ans", f"±{st.session_state.mae_cv:.2f}%", help="Marge d'erreur pour prédictions à 5 ans")
+        st.metric("Fiabilité Pondérée", f"{st.session_state.accuracy:.0f}%", help="Fiabilité ajustée selon l'horizon temporel")
         
         confidence_level = max(50, min(85, 90 - st.session_state.prediction_std * 20))
-        st.metric("Niveau de Confiance", f"{confidence_level:.0f}%", help="Confiance globale du modèle sur horizon 5 ans")
+        st.metric("Niveau de Confiance", f"{confidence_level:.0f}%", help="Confiance globale du modèle sur 5 ans")
         
-        # Indicateur de statut avec contexte amélioré
         if st.session_state.accuracy >= 60:
-            st.success("✅ Modèle avec haute fiabilité")  
+            st.success("✅ Modèle calibré avec précision")  
         elif st.session_state.accuracy >= 45:
             st.warning("⚠️ Modèle avec incertitude modérée")
         else:
-            st.error("❌ Prédictions à long terme très incertaines")
-        
-        # 🆕 Ajouter une section d'interprétation des métriques
-        with st.sidebar.expander("🔍 Interprétation des Métriques"):
-            st.markdown("""
-            **📊 Guide de Lecture:**
-            
-            **R² Historique (95%+):**
-            - Excellente qualité sur données passées
-            - Modèle capture bien les relations historiques
-            
-            **Fiabilité Dégradée (50-65%):**
-            - Estimation réaliste pour 5 ans
-            - Inclut la dégradation naturelle dans le temps
-            - Comparable aux standards professionnels
-            
-            **Incertitude 5 ans:**
-            - Marge d'erreur étendue pour long terme
-            - Plus élevée que précision historique (normal)
-            
-            **Niveau de Confiance:**
-            - Confiance globale sur toute la période
-            - Diminue avec l'horizon temporel
-            """)
-        
-        # 🆕 Section de validation du modèle
-        with st.sidebar.expander("🔬 Validation du Modèle"):
-            st.markdown(f"""
-            **📈 Données d'Entraînement:**
-            - Période: 2020-2025 (5.5 années)
-            - Sources: Bank Al-Maghrib, HCP
-            - Variables: Taux directeur, Inflation, PIB
-            
-            **🔮 Période de Prédiction:**
-            - Horizon: 2025-2030 (5 années)
-            - Méthode: Régression avec dégradation temporelle
-            - Scénarios: 3 (Conservateur, Base, Optimiste)
-            
-            **⚙️ Méthodologie:**
-            - Algorithme: Régression Linéaire Multiple
-            - Validation: Cross-validation 5-fold
-            - Ajustements: Lissage et continuité
-            
-            **📅 Dernière Mise à Jour:**
-            - Modèle: {datetime.now().strftime('%B %Y')}
-            - Données: {live_data['last_updated'][:10]}
-            """)
-        
-        # 🆕 Avertissement professionnel
-        st.sidebar.info("""
-        ⚠️ **Avertissement:**
-        Les prédictions à 5 ans sont des estimations basées sur des modèles statistiques. 
-        Elles ne constituent pas des conseils financiers et doivent être utilisées comme 
-        aide à la décision uniquement.
-        """)
+            st.error("❌ Prédictions à long terme incertaines")
     
     tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
     
@@ -810,44 +753,22 @@ def main():
         
         pred_data = st.session_state.predictions[scenario_choice]
         
-        # 🆕 Calcul des intervalles de confiance
-        mean_prediction = pred_data['rendement_predit'].mean()
-        uncertainty = st.session_state.mae_cv  # Utiliser l'incertitude étendue
-        
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Rendement Moyen", f"{mean_prediction:.2f}%")
-            st.caption(f"Intervalle: {mean_prediction-uncertainty:.2f}% - {mean_prediction+uncertainty:.2f}%")
+            st.metric("Rendement Moyen", f"{pred_data['rendement_predit'].mean():.2f}%")
         with col2:
             st.metric("Rendement Min", f"{pred_data['rendement_predit'].min():.2f}%")
-            st.caption("Valeur la plus basse prédite")
         with col3:
             st.metric("Rendement Max", f"{pred_data['rendement_predit'].max():.2f}%")
-            st.caption("Valeur la plus haute prédite")
         with col4:
             change = pred_data['rendement_predit'].mean() - baseline_yield
             st.metric("Écart vs Juin 2025", f"{change:+.2f}%")
-            st.caption(f"Référence: {baseline_yield:.2f}%")
-        
-        # 🆕 Ajouter des informations sur la fiabilité par période
-        st.markdown("### 📊 Fiabilité par Horizon Temporel")
-        
-        horizons_data = {
-            "Horizon": ["3 mois", "6 mois", "1 an", "2 ans", "3 ans", "4 ans", "5 ans"],
-            "Fiabilité Estimée": ["85%", "78%", "70%", "60%", "52%", "45%", "40%"],
-            "Incertitude": ["±0.15%", "±0.20%", "±0.25%", "±0.35%", "±0.45%", "±0.55%", "±0.65%"]
-        }
-        
-        horizons_df = pd.DataFrame(horizons_data)
-        st.dataframe(horizons_df, use_container_width=True, hide_index=True)
         
         st.subheader(f"Prédictions Quotidiennes - {scenario_choice}")
         
         sample_detailed = pred_data[::7]
         
         fig_detail = go.Figure()
-        
-        # Ligne principale de prédiction
         fig_detail.add_trace(go.Scatter(
             x=sample_detailed['Date'],
             y=sample_detailed['rendement_predit'],
@@ -856,64 +777,22 @@ def main():
             line=dict(color=colors[scenario_choice], width=3)
         ))
         
-        # 🆕 Ajouter les bandes d'incertitude
-        upper_bound = sample_detailed['rendement_predit'] + uncertainty
-        lower_bound = sample_detailed['rendement_predit'] - uncertainty
-        
-        fig_detail.add_trace(go.Scatter(
-            x=sample_detailed['Date'],
-            y=upper_bound,
-            mode='lines',
-            name='Limite Supérieure',
-            line=dict(color=colors[scenario_choice], width=1, dash='dot'),
-            opacity=0.5
-        ))
-        
-        fig_detail.add_trace(go.Scatter(
-            x=sample_detailed['Date'],
-            y=lower_bound,
-            mode='lines',
-            name='Limite Inférieure',
-            line=dict(color=colors[scenario_choice], width=1, dash='dot'),
-            fill='tonexty',
-            fillcolor=f'rgba({",".join([str(int(colors[scenario_choice][i:i+2], 16)) for i in (1, 3, 5)])}, 0.1)',
-            opacity=0.5
-        ))
-        
         fig_detail.add_hline(y=baseline_yield, line_dash="dash", line_color="blue",
-                           annotation_text=f"Baseline Juin 2025: {baseline_yield:.2f}%")
+                           annotation_text=f"Juin 2025: {baseline_yield:.2f}%")
         
         fig_detail.update_layout(
             height=500,
             template="plotly_white",
             xaxis_title="Date",
-            yaxis_title="Rendement (%)",
-            title=f"Prédictions avec Intervalles de Confiance - {scenario_choice}"
+            yaxis_title="Rendement (%)"
         )
         
         st.plotly_chart(fig_detail, use_container_width=True)
         
-        # 🆕 Ajouter contexte d'interprétation
-        st.info(f"""
-        📊 **Interprétation des Prédictions:**
-        
-        - **Ligne centrale**: Valeur la plus probable selon le modèle
-        - **Zone colorée**: Intervalle de confiance (±{uncertainty:.2f}%)
-        - **Fiabilité décroissante**: Plus on s'éloigne dans le temps, plus l'incertitude augmente
-        - **Scénario {scenario_choice}**: Basé sur des hypothèses {scenario_choice.lower()}s d'évolution économique
-        """)
-        
         if st.button("Télécharger les Prédictions"):
-            # 🆕 Enrichir le CSV avec intervalles de confiance
-            export_data = pred_data.copy()
-            export_data['Limite_Superieure'] = export_data['rendement_predit'] + uncertainty
-            export_data['Limite_Inferieure'] = export_data['rendement_predit'] - uncertainty
-            export_data['Scenario'] = scenario_choice
-            export_data['Incertitude'] = uncertainty
-            
-            csv = export_data.to_csv(index=False)
+            csv = pred_data.to_csv(index=False)
             st.download_button(
-                label="Télécharger CSV (avec intervalles)",
+                label="Télécharger CSV",
                 data=csv,
                 file_name=f"sofac_predictions_{scenario_choice.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
