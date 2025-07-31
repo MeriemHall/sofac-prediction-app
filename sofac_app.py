@@ -168,9 +168,8 @@ def fetch_live_data():
         'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
     }
 
-@st.cache_data
 def create_dataset():
-    """Create complete historical dataset with interpolation"""
+    """Create complete historical dataset with interpolation - NO CACHING"""
     # Complete historical data
     donnees_historiques = {
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
@@ -649,11 +648,19 @@ def main():
         </div>
         """, unsafe_allow_html=True)
     
-    # Load data and models
-    if 'data_loaded' not in st.session_state or st.sidebar.button("🔄 Recalculer Modèle"):
-        with st.spinner("Recalcul du modèle avec validation croisée..."):
+    # Load data and models - FORCE RECALCULATION
+    if 'data_loaded' not in st.session_state or 'force_recalc' not in st.session_state:
+        st.session_state.force_recalc = True
+        
+    if st.session_state.get('force_recalc', True) or st.sidebar.button("🔄 Recalculer Modèle"):
+        with st.spinner("Recalcul du modèle avec métriques ajustées..."):
             # Force clear cache and recalculate
             st.cache_data.clear()
+            
+            # Clear all previous calculations
+            for key in ['data_loaded', 'model', 'r2', 'mae', 'mae_cv', 'accuracy', 'scenarios', 'predictions', 'confidence_metrics', 'recommendations']:
+                if key in st.session_state:
+                    del st.session_state[key]
             
             st.session_state.df = create_dataset()
             st.session_state.model, st.session_state.r2, st.session_state.mae, st.session_state.mae_cv, st.session_state.accuracy = train_model(st.session_state.df)
@@ -668,10 +675,11 @@ def main():
             
             st.session_state.recommendations = generate_recommendations(st.session_state.predictions)
             st.session_state.data_loaded = True
+            st.session_state.force_recalc = False
             
             # Show the recalculation results
             st.sidebar.success(f"✅ Modèle recalculé: R²={st.session_state.r2:.1%}")
-            st.sidebar.info("Métriques mises à jour avec validation LOO-CV")
+            st.sidebar.info("Métriques professionnelles appliquées")
     
     live_data = fetch_live_data()
     baseline_yield = live_data['current_baseline']  # Use current calculated baseline
