@@ -939,6 +939,201 @@ def main():
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Detailed cost breakdown
+        st.subheader("💰 Analyse Détaillée des Coûts")
+        
+        base_case_analysis = scenarios_analysis['Cas_de_Base']
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### Option Taux Fixe")
+            st.metric("Taux", f"{current_fixed_rate:.2f}%")
+            st.metric("Coût Total", f"{base_case_analysis['fixed_cost_total']:,.0f} MAD")
+            st.metric("Coût Annuel", f"{base_case_analysis['fixed_cost_total']/loan_duration:,.0f} MAD")
+            st.success("✅ Prévisibilité totale")
+        
+        with col2:
+            st.markdown("### Option Taux Variable")
+            reference_rate = base_case_analysis['avg_variable_rate'] - banking_spread
+            st.metric("Taux Référence Moyen", f"{reference_rate:.2f}%", help="Prédiction du modèle")
+            st.metric("+ Prime de Risque", f"+{banking_spread:.2f}%", help=f"Prime ajustable ({banking_spread:.1f}%)")
+            st.metric("= Taux Effectif SOFAC", f"{base_case_analysis['avg_variable_rate']:.2f}%", help="Taux réel avec prime")
+            st.metric("Fourchette Effective", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
+            if base_case_analysis['cost_difference'] < 0:
+                st.success(f"💰 Économie potentielle: {abs(base_case_analysis['cost_difference']):,.0f} MAD")
+            else:
+                st.warning(f"⚠️ Surcoût potentiel: {base_case_analysis['cost_difference']:,.0f} MAD")
+        
+        # Yearly breakdown chart - PRINCIPAL GRAPHIQUE MANQUANT
+        st.subheader("📈 Évolution Annuelle des Taux (Cas de Base)")
+        
+        years = list(range(1, loan_duration + 1))
+        fig_yearly = go.Figure()
+        
+        # Fixed rate line
+        fig_yearly.add_trace(go.Scatter(
+            x=years,
+            y=[current_fixed_rate] * loan_duration,
+            mode='lines+markers',
+            name='Taux Fixe',
+            line=dict(color='#dc3545', width=3, dash='dash'),
+            marker=dict(size=8)
+        ))
+        
+        # Variable rate line (base case)
+        fig_yearly.add_trace(go.Scatter(
+            x=years,
+            y=base_case_analysis['variable_rates_annual'],
+            mode='lines+markers',
+            name='Taux Variable (Prévu)',
+            line=dict(color='#17a2b8', width=3),
+            marker=dict(size=8)
+        ))
+        
+        fig_yearly.update_layout(
+            height=400,
+            template="plotly_white",
+            xaxis_title="Année",
+            yaxis_title="Taux d'intérêt (%)",
+            title="Comparaison Taux Fixe vs Variable sur la Durée du Prêt"
+        )
+        
+        st.plotly_chart(fig_yearly, use_container_width=True)
+        
+        # GRAPHIQUE COMPARATIF DES 3 SCÉNARIOS - NOUVELLE SECTION
+        st.subheader("📊 Comparaison des Scénarios de Taux Variables")
+        
+        fig_scenarios = go.Figure()
+        
+        # Add fixed rate reference line
+        fig_scenarios.add_trace(go.Scatter(
+            x=years,
+            y=[current_fixed_rate] * loan_duration,
+            mode='lines',
+            name='Taux Fixe (Référence)',
+            line=dict(color='#dc3545', width=2, dash='dash'),
+            opacity=0.7
+        ))
+        
+        scenario_colors = {'Conservateur': '#ffc107', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
+        
+        for scenario_name, analysis in scenarios_analysis.items():
+            fig_scenarios.add_trace(go.Scatter(
+                x=years,
+                y=analysis['variable_rates_annual'],
+                mode='lines+markers',
+                name=f'Variable - {scenario_name}',
+                line=dict(color=scenario_colors[scenario_name], width=3),
+                marker=dict(size=6)
+            ))
+        
+        fig_scenarios.update_layout(
+            height=450,
+            template="plotly_white",
+            xaxis_title="Année du Prêt",
+            yaxis_title="Taux d'Intérêt Effectif (%)",
+            title=f"Évolution des Taux Variables par Scénario - Prêt {loan_amount}M MAD sur {loan_duration} ans",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+        )
+        
+        st.plotly_chart(fig_scenarios, use_container_width=True)
+        
+        # Risk assessment
+        st.subheader("⚠️ Évaluation des Risques")
+        
+        risk_col1, risk_col2, risk_col3 = st.columns(3)
+        
+        with risk_col1:
+            st.markdown("### Risque de Taux")
+            if base_case_analysis['volatility'] <= max_volatility_accepted:
+                st.success("🟢 ACCEPTABLE")
+                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% ≤ Seuil {max_volatility_accepted:.2f}%"
+            else:
+                st.error("🔴 TROP ÉLEVÉ")
+                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% > Seuil {max_volatility_accepted:.2f}%"
+            st.write(risk_desc)
+        
+        with risk_col2:
+            st.markdown("### Risque de Liquidité")
+            max_annual_diff = max(base_case_analysis['variable_rates_annual']) - current_fixed_rate
+            if max_annual_diff < 0.5:
+                st.success("🟢 FAIBLE")
+                liquidity_desc = "Impact limité sur la trésorerie"
+            elif max_annual_diff < 1.0:
+                st.warning("🟡 MOYEN")
+                liquidity_desc = "Impact modéré à prévoir"
+            else:
+                st.error("🔴 ÉLEVÉ")
+                liquidity_desc = "Impact significatif possible"
+            st.write(liquidity_desc)
+        
+        with risk_col3:
+            st.markdown("### Recommandation Finale")
+            if final_recommendation == "TAUX VARIABLE":
+                st.success("📈 VARIABLE")
+            elif final_recommendation == "TAUX FIXE":
+                st.error("📊 FIXE") 
+            else:
+                st.warning("⚖️ MIXTE")
+            st.write(f"Confiance: {70 + variable_recommendations * 10}%")
+        
+        # Detailed analysis by scenario
+        st.subheader("📋 Analyse Détaillée par Scénario")
+        
+        for scenario, rec in st.session_state.recommendations.items():
+            with st.expander(f"📊 Scénario {scenario}", expanded=True):
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    scenario_analysis = scenarios_analysis[scenario]
+                    st.markdown(f"""
+                    **Recommandation:** {rec['recommandation']}
+                    
+                    **Analyse Financière:**
+                    - Taux variable moyen: {scenario_analysis['avg_variable_rate']:.2f}%
+                    - Fourchette: {scenario_analysis['min_rate']:.2f}% - {scenario_analysis['max_rate']:.2f}%
+                    - Coût total (variable): {scenario_analysis['variable_cost_total']:,.0f} MAD
+                    - Différence vs fixe: {scenario_analysis['cost_difference']:+,.0f} MAD ({scenario_analysis['cost_difference_percentage']:+.1f}%)
+                    
+                    **Métriques de Risque:**
+                    - Volatilité: {scenario_analysis['volatility']:.2f}%
+                    - Amplitude: {scenario_analysis['rate_range']:.2f}%
+                    - Niveau de risque: {rec['niveau_risque']}
+                    """)
+                
+                with col2:
+                    # Mini chart for each scenario with BOTH fixed and variable rates
+                    pred_mini = st.session_state.predictions[scenario][::30]  # Sample every 30 days
+                    
+                    fig_mini = go.Figure()
+                    
+                    # Add fixed rate reference
+                    fig_mini.add_hline(y=current_fixed_rate, line_dash="dash", line_color="red", 
+                                     annotation_text=f"Taux Fixe: {current_fixed_rate:.2f}%")
+                    
+                    # Add variable rate prediction
+                    fig_mini.add_trace(go.Scatter(
+                        x=pred_mini['Date'],
+                        y=pred_mini['rendement_predit'] + banking_spread,  # Add banking spread to show effective rate
+                        mode='lines+markers',
+                        line=dict(color=colors[scenario], width=2),
+                        name=f"Taux Variable {scenario}",
+                        showlegend=False
+                    ))
+                    
+                    fig_mini.update_layout(
+                        height=200,
+                        template="plotly_white",
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        title=f"Évolution - {scenario}",
+                        title_font_size=12,
+                        xaxis_title="",
+                        yaxis_title="Taux (%)"
+                    )
+                    
+                    st.plotly_chart(fig_mini, use_container_width=True)
 
     st.markdown("---")
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
