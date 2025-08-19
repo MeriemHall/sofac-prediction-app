@@ -1,394 +1,4 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
-from sklearn.model_selection import cross_val_score
-import requests
-from bs4 import BeautifulSoup
-import re
-import warnings
-import base64
-from PIL import Image
-import io
-warnings.filterwarnings('ignore')
-
-st.set_page_config(
-    page_title="SOFAC - Prédiction Rendements 52-Semaines Enhanced",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Function to create the SOFAC logo as SVG
-def create_sofac_logo_svg():
-    return '''
-    <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="20" cy="20" r="6" fill="#FFD700"/>
-        <path d="M12 28 Q24 20 36 28 Q48 36 60 28 Q72 20 84 28" 
-              stroke="#1e3c72" stroke-width="3" fill="none"/>
-        <text x="12" y="45" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1e3c72">SOFAC</text>
-        <text x="12" y="57" font-family="Arial, sans-serif" font-size="8" fill="#FF6B35">Dites oui au super crédit</text>
-    </svg>
-    '''
-
-# Enhanced CSS with new features highlight
-st.markdown(f"""
-<style>
-    .main-header {{
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3d5aa3 100%);
-        padding: 2rem;
-        border-radius: 12px;
-        color: white;
-        text-align: center;
-        margin-bottom: 2rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-        position: relative;
-    }}
-    .logo-container {{
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 1rem;
-    }}
-    .logo-svg {{
-        margin-right: 2rem;
-        background: white;
-        padding: 10px;
-        border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }}
-    .header-text {{
-        text-align: left;
-    }}
-    .enhanced-badge {{
-        background: linear-gradient(45deg, #ff6b35, #ff8c42);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.7rem;
-        font-weight: bold;
-        display: inline-block;
-        margin: 0.5rem 0;
-        animation: pulse 2s infinite;
-    }}
-    @keyframes pulse {{
-        0% {{ box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.4); }}
-        70% {{ box-shadow: 0 0 0 10px rgba(255, 107, 53, 0); }}
-        100% {{ box-shadow: 0 0 0 0 rgba(255, 107, 53, 0); }}
-    }}
-    .correlation-matrix {{
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border: 2px solid #28a745;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.15);
-    }}
-    .model-performance {{
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 16px;
-        padding: 2rem;
-        margin: 1rem 0;
-        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-    }}
-    .executive-dashboard {{
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border: 2px solid #dee2e6;
-        border-radius: 16px;
-        padding: 2rem;
-        margin: 2rem 0;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    }}
-    .status-card {{
-        background: white;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin: 0.8rem 0;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        border-left: 4px solid #2a5298;
-    }}
-    .metric-box {{
-        background: white;
-        border-radius: 10px;
-        padding: 1.2rem;
-        text-align: center;
-        box-shadow: 0 3px 15px rgba(0,0,0,0.08);
-        border-top: 3px solid #2a5298;
-    }}
-    .recommendation-panel {{
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 16px;
-        padding: 2rem;
-        color: white;
-        margin: 2rem 0;
-        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-    }}
-    .sidebar-logo {{
-        text-align: center;
-        margin-bottom: 1rem;
-        padding: 1rem;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }}
-    .stMetric label {{ font-size: 0.75rem !important; }}
-    h1 {{ font-size: 1.4rem !important; }}
-    h2 {{ font-size: 1.2rem !important; }}
-    p {{ font-size: 0.82rem !important; }}
-    
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {{
-        .logo-container {{
-            flex-direction: column;
-        }}
-        .logo-svg {{
-            margin-right: 0;
-            margin-bottom: 1rem;
-        }}
-        .header-text {{
-            text-align: center;
-        }}
-    }}
-</style>
-""", unsafe_allow_html=True)
-
-@st.cache_data(ttl=3600)
-def fetch_live_data():
-    """Fetch live economic data with official BAM baseline management"""
-    today = datetime.now()
-    
-    # Official BAM (Bank Al-Maghrib) published rates
-    official_bam_rates = {
-        '2025-06-30': 1.75,  # Last official BAM published rate - JUNE 2025
-    }
-    
-    # Find the most recent official BAM rate
-    current_baseline = 1.75  # Default to June 2025
-    baseline_date_raw = '2025-06-30'  # Default
-    baseline_source = "BAM Juin 2025 (Dernière publication officielle)"
-    
-    for date_str, rate in sorted(official_bam_rates.items(), reverse=True):
-        rate_date = datetime.strptime(date_str, '%Y-%m-%d')
-        if rate is not None and rate_date <= today:
-            current_baseline = rate
-            baseline_date_raw = date_str
-            baseline_month_year = rate_date.strftime('%B %Y')
-            baseline_source = f"BAM {baseline_month_year} (Publication officielle)"
-            break
-    
-    # Check if we're waiting for new BAM data
-    last_bam_date = datetime.strptime(baseline_date_raw, '%Y-%m-%d')
-    days_since_last_bam = (today - last_bam_date).days
-    
-    if days_since_last_bam > 45:
-        update_status = f"⏳ En attente publication BAM ({days_since_last_bam} jours)"
-    elif days_since_last_bam > 35:
-        update_status = f"🔄 Publication BAM attendue prochainement"
-    else:
-        update_status = f"✅ Données BAM à jour"
-    
-    return {
-        'policy_rate': 2.25,  # Current BAM policy rate
-        'inflation': 1.1,
-        'gdp_growth': 4.8,
-        'current_baseline': current_baseline,
-        'baseline_date': baseline_month_year if 'baseline_month_year' in locals() else "Juin 2025",
-        'baseline_date_raw': baseline_date_raw,
-        'baseline_source': baseline_source,
-        'update_status': update_status,
-        'days_since_bam': days_since_last_bam,
-        'treasury_13w': 1.775,  # Latest 13-week Treasury from data
-        'bdt_5y': -0.69,        # Latest 5-year BDT from data
-        'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP', 'treasury': 'Trésor Maroc'},
-        'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
-    }
-
-@st.cache_data
-def load_treasury_data():
-    """Load and process Treasury data from uploaded files"""
-    # Treasury 13-week data (sample based on uploaded file)
-    treasury_13w_data = {
-        '2025-06': 1.775, '2025-03': 2.200, '2025-02': 2.323, '2025-01': 2.280,
-        '2024-12': 2.280, '2024-10': 2.423, '2024-09': 2.468, '2024-08': 2.580,
-        '2024-07': 2.699, '2024-06': 2.743, '2024-05': 2.811, '2024-04': 2.797,
-        '2024-03': 2.822, '2024-02': 2.849, '2024-01': 2.903, '2023-12': 2.961,
-        '2023-11': 3.007, '2023-10': 3.055, '2023-09': 3.101, '2023-08': 3.155,
-        '2023-07': 3.207, '2023-06': 3.256, '2023-05': 3.302, '2023-04': 3.351,
-        '2023-03': 3.404, '2023-02': 3.459, '2023-01': 3.511, '2022-12': 3.565,
-        '2022-11': 3.615, '2022-10': 3.667, '2022-09': 3.722, '2022-08': 3.775,
-        '2022-07': 3.829, '2022-06': 3.885, '2022-05': 3.941, '2022-04': 3.995,
-        '2022-03': 4.051, '2022-02': 4.108, '2022-01': 4.165, '2021-12': 4.222,
-        '2021-11': 4.280, '2021-10': 4.338, '2021-09': 4.397, '2021-08': 4.456,
-        '2021-07': 4.516, '2021-06': 4.576, '2021-05': 4.637, '2021-04': 4.698,
-        '2021-03': 4.760, '2021-02': 4.823, '2021-01': 4.886, '2020-12': 4.950,
-        '2020-11': 5.014, '2020-10': 5.079, '2020-09': 5.145, '2020-08': 5.211,
-        '2020-07': 5.278, '2020-06': 5.346, '2020-05': 5.414, '2020-04': 5.483,
-        '2020-03': 5.553, '2020-02': 5.623, '2020-01': 5.694, '2019-12': 5.766,
-        '2019-11': 5.838, '2019-10': 5.911, '2019-09': 5.985, '2019-08': 6.060,
-        '2019-07': 6.135, '2019-06': 6.211, '2019-05': 6.288, '2019-04': 6.366,
-        '2019-03': 6.444, '2019-02': 6.523, '2019-01': 6.603, '2018-12': 6.684,
-        '2018-11': 6.765, '2018-10': 6.847, '2018-09': 6.930, '2018-08': 7.014,
-        '2018-07': 7.098, '2018-06': 7.183, '2018-05': 7.269, '2018-04': 7.356,
-        '2018-03': 7.444, '2018-02': 7.532, '2018-01': 7.621, '2017-12': 7.711,
-        '2017-11': 7.802, '2017-10': 7.894, '2017-09': 7.987, '2017-08': 8.080,
-        '2017-07': 8.175, '2017-06': 8.270, '2017-05': 8.366, '2017-04': 8.463,
-        '2017-03': 8.561, '2017-02': 8.660, '2017-01': 8.760, '2016-12': 8.861,
-        '2016-11': 8.963, '2016-10': 9.066, '2016-09': 9.170, '2016-08': 9.275,
-        '2016-07': 9.381, '2016-06': 9.488, '2016-05': 9.596, '2016-04': 9.705,
-        '2016-03': 9.815, '2016-02': 9.926, '2016-01': 10.038, '2015-12': 10.151,
-        '2015-11': 10.265, '2015-10': 10.380, '2015-09': 10.496, '2015-08': 10.613,
-        '2015-07': 10.731, '2015-06': 10.850, '2015-05': 10.970, '2015-04': 11.091,
-        '2015-03': 11.213, '2015-02': 11.336, '2015-01': 2.490
-    }
-    
-    # 5-year BDT data (sample based on uploaded file)
-    bdt_5y_data = {
-        '2025-08': -0.70, '2025-07': -0.65, '2025-06': -0.69, '2025-05': -0.79,
-        '2025-04': -0.75, '2025-03': -0.78, '2025-02': -0.77, '2025-01': -0.80,
-        '2024-12': -0.82, '2024-11': -0.78, '2024-10': -0.75, '2024-09': -0.72,
-        '2024-08': -0.69, '2024-07': -0.66, '2024-06': -0.63, '2024-05': -0.60,
-        '2024-04': -0.57, '2024-03': -0.54, '2024-02': -0.51, '2024-01': -0.48,
-        '2023-12': -0.45, '2023-11': -0.42, '2023-10': -0.39, '2023-09': -0.36,
-        '2023-08': -0.33, '2023-07': -0.30, '2023-06': -0.27, '2023-05': -0.24,
-        '2023-04': -0.21, '2023-03': -0.18, '2023-02': -0.15, '2023-01': -0.12,
-        '2022-12': -0.09, '2022-11': -0.06, '2022-10': -0.03, '2022-09': 0.00,
-        '2022-08': 0.03, '2022-07': 0.06, '2022-06': 0.09, '2022-05': 0.12,
-        '2022-04': 0.15, '2022-03': 0.18, '2022-02': 0.21, '2022-01': 0.24,
-        '2021-12': 0.27, '2021-11': 0.30, '2021-10': 0.33, '2021-09': 0.36,
-        '2021-08': 0.39, '2021-07': 0.42, '2021-06': 0.45, '2021-05': 0.48,
-        '2021-04': 0.51, '2021-03': 0.54, '2021-02': 0.57, '2021-01': 0.60,
-        '2020-12': 0.63, '2020-11': 0.66, '2020-10': 0.69, '2020-09': 0.72,
-        '2020-08': 0.75, '2020-07': 0.78, '2020-06': 0.81, '2020-05': 0.84,
-        '2020-04': 0.87, '2020-03': 0.90, '2020-02': 0.93, '2020-01': 0.96,
-        '2019-12': 0.99, '2019-11': 1.02, '2019-10': 1.05, '2019-09': 1.08,
-        '2019-08': 1.11, '2019-07': 1.14, '2019-06': 1.17, '2019-05': 1.20,
-        '2019-04': 1.23, '2019-03': 1.26, '2019-02': 1.29, '2019-01': 1.32,
-        '2018-12': 1.35, '2018-11': 1.38, '2018-10': 1.41, '2018-09': 1.44,
-        '2018-08': 1.47, '2018-07': 1.50, '2018-06': 1.53, '2018-05': 1.56,
-        '2018-04': 1.59, '2018-03': 1.62, '2018-02': 1.65, '2018-01': 1.68,
-        '2017-12': 1.71, '2017-11': 1.74, '2017-10': 1.77, '2017-09': 1.80,
-        '2017-08': 1.83, '2017-07': 1.86, '2017-06': 1.89, '2017-05': 1.92,
-        '2017-04': 1.95, '2017-03': 1.98, '2017-02': 2.01, '2017-01': 2.04,
-        '2016-12': 2.07, '2016-11': 2.10, '2016-10': 2.13, '2016-09': 2.16,
-        '2016-08': 2.19, '2016-07': 2.22, '2016-06': 2.25, '2016-05': 2.28,
-        '2016-04': 2.31, '2016-03': 2.34, '2016-02': 2.37, '2016-01': 2.40,
-        '2015-12': 2.43, '2015-11': 2.46, '2015-10': 2.49, '2015-09': 2.52,
-        '2015-08': 2.55, '2015-07': 2.58, '2015-06': 2.61, '2015-05': 2.64,
-        '2015-04': 2.67, '2015-03': 2.70, '2015-02': 2.73, '2015-01': -0.80
-    }
-    
-    return treasury_13w_data, bdt_5y_data
-
-@st.cache_data
-def create_enhanced_dataset():
-    """Create enhanced dataset with Treasury variables (2015-2025)"""
-    # Load Treasury data
-    treasury_13w_data, bdt_5y_data = load_treasury_data()
-    
-    # Enhanced historical data from 2015-2025 with Treasury variables
-    donnees_historiques = {
-        '2015-03': {'taux_directeur': 2.50, 'inflation': 1.6, 'pib': 4.5, 'rendement_52s': 2.85},
-        '2015-06': {'taux_directeur': 2.50, 'inflation': 1.4, 'pib': 4.3, 'rendement_52s': 2.92},
-        '2015-09': {'taux_directeur': 2.50, 'inflation': 1.8, 'pib': 4.7, 'rendement_52s': 2.88},
-        '2015-12': {'taux_directeur': 2.50, 'inflation': 1.6, 'pib': 4.5, 'rendement_52s': 2.90},
-        '2016-03': {'taux_directeur': 2.25, 'inflation': 1.7, 'pib': 1.2, 'rendement_52s': 2.65},
-        '2016-06': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 1.5, 'rendement_52s': 2.70},
-        '2016-09': {'taux_directeur': 2.25, 'inflation': 1.5, 'pib': 1.8, 'rendement_52s': 2.58},
-        '2016-12': {'taux_directeur': 2.25, 'inflation': 1.6, 'pib': 1.2, 'rendement_52s': 2.62},
-        '2017-03': {'taux_directeur': 2.25, 'inflation': 0.7, 'pib': 4.1, 'rendement_52s': 2.45},
-        '2017-06': {'taux_directeur': 2.25, 'inflation': 0.8, 'pib': 3.8, 'rendement_52s': 2.48},
-        '2017-09': {'taux_directeur': 2.25, 'inflation': 1.9, 'pib': 3.2, 'rendement_52s': 2.52},
-        '2017-12': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 4.1, 'rendement_52s': 2.50},
-        '2018-03': {'taux_directeur': 2.25, 'inflation': 2.1, 'pib': 2.8, 'rendement_52s': 2.58},
-        '2018-06': {'taux_directeur': 2.25, 'inflation': 1.9, 'pib': 3.1, 'rendement_52s': 2.55},
-        '2018-09': {'taux_directeur': 2.25, 'inflation': 2.0, 'pib': 3.0, 'rendement_52s': 2.57},
-        '2018-12': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 3.1, 'rendement_52s': 2.54},
-        '2019-03': {'taux_directeur': 2.25, 'inflation': 0.3, 'pib': 2.6, 'rendement_52s': 2.35},
-        '2019-06': {'taux_directeur': 2.25, 'inflation': 0.1, 'pib': 2.8, 'rendement_52s': 2.32},
-        '2019-09': {'taux_directeur': 2.25, 'inflation': 0.2, 'pib': 3.2, 'rendement_52s': 2.34},
-        '2019-12': {'taux_directeur': 2.25, 'inflation': 0.5, 'pib': 2.5, 'rendement_52s': 2.38},
-        '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
-        '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
-        '2020-09': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -7.2, 'rendement_52s': 1.68},
-        '2020-12': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -4.8, 'rendement_52s': 1.93},
-        '2021-03': {'taux_directeur': 1.50, 'inflation': 0.6, 'pib': 0.3, 'rendement_52s': 1.53},
-        '2021-06': {'taux_directeur': 1.50, 'inflation': 1.1, 'pib': 13.9, 'rendement_52s': 1.52},
-        '2021-12': {'taux_directeur': 1.50, 'inflation': 3.6, 'pib': 7.8, 'rendement_52s': 1.56},
-        '2022-03': {'taux_directeur': 1.50, 'inflation': 4.8, 'pib': 2.1, 'rendement_52s': 1.61},
-        '2022-06': {'taux_directeur': 1.50, 'inflation': 7.5, 'pib': 4.3, 'rendement_52s': 1.79},
-        '2022-09': {'taux_directeur': 2.00, 'inflation': 7.4, 'pib': 3.7, 'rendement_52s': 2.18},
-        '2023-03': {'taux_directeur': 3.00, 'inflation': 7.9, 'pib': 4.1, 'rendement_52s': 3.41},
-        '2023-06': {'taux_directeur': 3.00, 'inflation': 5.3, 'pib': 2.6, 'rendement_52s': 3.34},
-        '2023-09': {'taux_directeur': 3.00, 'inflation': 4.4, 'pib': 3.2, 'rendement_52s': 3.24},
-        '2024-03': {'taux_directeur': 3.00, 'inflation': 2.1, 'pib': 3.5, 'rendement_52s': 2.94},
-        '2024-09': {'taux_directeur': 2.75, 'inflation': 2.2, 'pib': 5.4, 'rendement_52s': 2.69},
-        '2024-12': {'taux_directeur': 2.50, 'inflation': 2.3, 'pib': 4.6, 'rendement_52s': 2.53},
-        '2025-03': {'taux_directeur': 2.25, 'inflation': 1.4, 'pib': 3.8, 'rendement_52s': 2.54},
-        '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
-    }
-    
-    def interpolation_lineaire(date_debut, date_fin, valeur_debut, valeur_fin, date_cible):
-        debut_num = date_debut.toordinal()
-        fin_num = date_fin.toordinal()
-        cible_num = date_cible.toordinal()
-        if fin_num == debut_num:
-            return valeur_debut
-        progression = (cible_num - debut_num) / (fin_num - debut_num)
-        return valeur_debut + progression * (valeur_fin - valeur_debut)
-    
-    # Generate monthly data from 2015 to June 2025
-    date_debut = datetime(2015, 1, 1)
-    date_fin = datetime(2025, 6, 30)
-    
-    donnees_mensuelles = []
-    date_courante = date_debut
-    
-    # Convert to datetime objects
-    dates_ancrage = {}
-    for date_str, valeurs in donnees_historiques.items():
-        date_obj = datetime.strptime(date_str + '-01', '%Y-%m-%d')
-        dates_ancrage[date_obj] = valeurs
-    
-    while date_courante <= date_fin:
-        date_str = date_courante.strftime('%Y-%m')
-        est_ancrage = date_courante in dates_ancrage
-        
-        if est_ancrage:
-            point_donnees = dates_ancrage[date_courante]
-        else:
-            # Find surrounding anchor points for interpolation
-            dates_avant = [d for d in dates_ancrage.keys() if d <= date_courante]
-            dates_apres = [d for d in dates_ancrage.keys() if d > date_courante]
-            
-            if dates_avant and dates_apres:
-                date_avant = max(dates_avant)
-                date_apres = min(dates_apres)
-                donnees_avant = dates_ancrage[date_avant]
-                donnees_apres = dates_ancrage[date_apres]
-                
-                point_donnees = {}
-                for variable in ['taux_directeur', 'inflation', 'pib', 'rendement_52s']:
-                    point_donnees[variable] = interpolation_lineaire(
-                        date_avant, date_apres,
-                        donnees_avant[variable], donnees_apres[variable],
-                        date_courante
-                    )
-            elif dates_avant:
-                date_avant = max(dates_avant)
-                point_donnees = dates_ancrage[date_avant].copy()
-            else:
-                date_apres = min(dates_apres)
-                point_donnees = dates_ancrage[date_apres].copy()
-        
-        # Add Treasury variables
-        treasury_13w = treasury_13w_data.get(date_str, 2.5)  # Default if missing
-        bdt_5y = bdt_5y_data.get(date_str, 0.0)  # Default if missing
-        
-        donnees_mensuelles.append({
+donnees_mensuelles.append({
             'Date': date_str,
             'Taux_Directeur': point_donnees['taux_directeur'],
             'Inflation': point_donnees['inflation'],
@@ -467,6 +77,50 @@ def generate_enhanced_scenarios():
             '2029-12': 2.25, '2030-12': 2.50
         },
         'Cas_de_Base': {
+            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75, '2026-03': 1.50, 
+            '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25, '2027-06': 1.25,
+            '2027-12': 1.50, '2028-06': 1.75, '2028-12': 1.75, '2029-06': 2.00,
+            '2029-12': 2.00, '2030-12': 2.25
+        },
+        'Optimiste': {
+            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50, '2026-03': 1.25, 
+            '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00, '2027-06': 1.00,
+            '2027-12': 1.25, '2028-06': 1.50, '2028-12': 1.50, '2029-06': 1.75,
+            '2029-12': 1.75, '2030-12': 2.00
+        }
+    }
+    
+    # Treasury 13W scenarios (correlated with policy rates)
+    treasury_13w_scenarios = {
+        'Conservateur': {
+            '2025-06': 1.78, '2025-09': 1.85, '2025-12': 1.65, '2026-03': 1.45,
+            '2026-06': 1.48, '2026-09': 1.28, '2026-12': 1.32, '2027-06': 1.35,
+            '2027-12': 1.58, '2028-06': 1.82, '2028-12': 1.85, '2029-06': 2.08,
+            '2029-12': 2.12, '2030-12': 2.35
+        },
+        'Cas_de_Base': {
+            '2025-06': 1.78, '2025-09': 1.72, '2025-12': 1.52, '2026-03': 1.32,
+            '2026-06': 1.35, '2026-09': 1.15, '2026-12': 1.18, '2027-06': 1.22,
+            '2027-12': 1.42, '2028-06': 1.62, '2028-12': 1.65, '2029-06': 1.85,
+            '2029-12': 1.88, '2030-12': 2.08
+        },
+        'Optimiste': {
+            '2025-06': 1.78, '2025-09': 1.58, '2025-12': 1.38, '2026-03': 1.18,
+            '2026-06': 0.98, '2026-09': 1.02, '2026-12': 1.05, '2027-06': 1.08,
+            '2027-12': 1.25, '2028-06': 1.42, '2028-12': 1.45, '2029-06': 1.62,
+            '2029-12': 1.65, '2030-12': 1.85
+        }
+    }
+    
+    # BDT 5Y scenarios (term structure considerations)
+    bdt_5y_scenarios = {
+        'Conservateur': {
+            '2025-06': -0.69, '2025-09': -0.55, '2025-12': -0.42, '2026-03': -0.28,
+            '2026-06': -0.15, '2026-09': -0.02, '2026-12': 0.12, '2027-06': 0.25,
+            '2027-12': 0.38, '2028-06': 0.52, '2028-12': 0.65, '2029-06': 0.78,
+            '2029-12': 0.92, '2030-12': 1.05
+        },
+        'Cas_de_Base': {
             '2025-06': -0.69, '2025-09': -0.58, '2025-12': -0.48, '2026-03': -0.38,
             '2026-06': -0.28, '2026-09': -0.18, '2026-12': -0.08, '2027-06': 0.02,
             '2027-12': 0.12, '2028-06': 0.22, '2028-12': 0.32, '2029-06': 0.42,
@@ -510,23 +164,21 @@ def generate_enhanced_scenarios():
                 if date_str >= date_bdt:
                     bdt_5y = taux
             
-            # Enhanced economic projections with full business cycle
+            # Enhanced economic projections
             np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
             
             mois_depuis_debut = (date.year - 2025) * 12 + date.month - 7
-            
-            # Full business cycle modeling (5.5 year cycle)
-            cycle_position = (mois_depuis_debut % 66) / 66  # 66 months = 5.5 years
+            cycle_position = (mois_depuis_debut % 66) / 66
             
             if nom_scenario == 'Conservateur':
-                inflation_cycle = 1.8 + 0.6 * np.sin(2 * np.pi * cycle_position) + 0.3 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_cycle = 3.5 + 1.2 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                inflation_cycle = 1.8 + 0.6 * np.sin(2 * np.pi * cycle_position)
+                pib_cycle = 3.5 + 1.2 * np.sin(2 * np.pi * cycle_position + np.pi/4)
             elif nom_scenario == 'Cas_de_Base':
-                inflation_cycle = 1.6 + 0.4 * np.sin(2 * np.pi * cycle_position) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_cycle = 3.8 + 1.0 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                inflation_cycle = 1.6 + 0.4 * np.sin(2 * np.pi * cycle_position)
+                pib_cycle = 3.8 + 1.0 * np.sin(2 * np.pi * cycle_position + np.pi/4)
             else:  # Optimiste
-                inflation_cycle = 1.4 + 0.3 * np.sin(2 * np.pi * cycle_position) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
-                pib_cycle = 4.2 + 0.8 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
+                inflation_cycle = 1.4 + 0.3 * np.sin(2 * np.pi * cycle_position)
+                pib_cycle = 4.2 + 0.8 * np.sin(2 * np.pi * cycle_position + np.pi/4)
             
             # Add realistic noise
             inflation = max(0.5, min(4.0, inflation_cycle + np.random.normal(0, 0.02)))
@@ -587,20 +239,12 @@ def predict_enhanced_yields(scenarios, model):
             elif scenario_name == 'Optimiste':
                 ajustement -= 0.05
             
-            # Time-based uncertainty
             jours_ahead = ligne['Jours_Ahead']
             incertitude = (jours_ahead / 365) * 0.02
             if scenario_name == 'Conservateur':
                 ajustement += incertitude
             elif scenario_name == 'Optimiste':
                 ajustement -= incertitude * 0.5
-            
-            # Day of week effects
-            effets_jours = {
-                'Monday': 0.005, 'Tuesday': 0.00, 'Wednesday': -0.005,
-                'Thursday': 0.00, 'Friday': 0.01, 'Saturday': -0.005, 'Sunday': -0.005
-            }
-            ajustement += effets_jours.get(ligne['Jour_Semaine'], 0)
             
             ajustements.append(ajustement)
         
@@ -698,7 +342,6 @@ def main():
         
         # Enhanced model performance
         st.markdown("### 🚀 Performance Enhanced")
-        st.markdown('<div class="model-performance">', unsafe_allow_html=True)
         
         col1, col2 = st.sidebar.columns(2)
         with col1:
@@ -710,8 +353,6 @@ def main():
         with col2:
             st.metric("RMSE", f"±{st.session_state.enhanced_rmse:.2f}%")
             st.metric("Validation Croisée", f"±{st.session_state.enhanced_mae_cv:.2f}%")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
         
         # Variable importance
         st.markdown("### 📊 Importance des Variables")
@@ -1068,7 +709,7 @@ def main():
             mode='lines',
             line_color='rgba(0,0,0,0)',
             name=f'Bande de confiance ±{st.session_state.enhanced_mae:.2f}%',
-            fillcolor=f'rgba({colors[scenario_choice][1:3]}, {colors[scenario_choice][3:5]}, {colors[scenario_choice][5:7]}, 0.2)'
+            fillcolor='rgba(128,128,128,0.2)'
         ))
         
         fig_detail.add_hline(y=baseline_yield, line_dash="dash", line_color="blue",
@@ -1083,59 +724,6 @@ def main():
         )
         
         st.plotly_chart(fig_detail, use_container_width=True)
-        
-        # Variable contributions analysis
-        st.subheader("🔍 Analyse des Contributions Variables")
-        
-        # Calculate average values for each variable in predictions
-        avg_values = {
-            'Taux_Directeur': pred_data['Taux_Directeur'].mean(),
-            'Inflation': pred_data['Inflation'].mean(),
-            'Croissance_PIB': pred_data['Croissance_PIB'].mean(),
-            'Treasury_13W': pred_data['Treasury_13W'].mean(),
-            'BDT_5Y': pred_data['BDT_5Y'].mean()
-        }
-        
-        # Calculate contributions
-        contributions = {}
-        for var, coef in st.session_state.coefficients.items():
-            contributions[var] = coef * avg_values[var]
-        
-        # Display contributions
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### 📊 Contributions Variables")
-            total_contribution = sum(contributions.values())
-            
-            for var, contrib in contributions.items():
-                percentage = (contrib / total_contribution) * 100 if total_contribution != 0 else 0
-                color = "#28a745" if contrib > 0 else "#dc3545"
-                
-                st.markdown(f"""
-                <div style="background: white; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid {color};">
-                    <strong>{var.replace('_', ' ')}</strong><br>
-                    Contribution: <span style="color: {color}; font-weight: bold;">{contrib:+.3f}</span><br>
-                    Poids: <span style="color: {color};">{percentage:+.1f}%</span>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        with col2:
-            # Pie chart of absolute contributions
-            abs_contributions = {k: abs(v) for k, v in contributions.items()}
-            
-            fig_pie = go.Figure(data=[go.Pie(
-                labels=[k.replace('_', ' ') for k in abs_contributions.keys()],
-                values=list(abs_contributions.values()),
-                hole=0.4
-            )])
-            
-            fig_pie.update_layout(
-                title="Répartition des Contributions (Valeur Absolue)",
-                height=400
-            )
-            
-            st.plotly_chart(fig_pie, use_container_width=True)
         
         # Export enhanced data
         if st.button("📥 Télécharger Prédictions Enhanced"):
@@ -1158,13 +746,13 @@ def main():
         st.header("🎯 Recommandations Stratégiques Enhanced")
         
         # Enhanced loan decision section
-        st.markdown("""
+        st.markdown(f"""
         <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
                     color: white; padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
             <h3 style="margin: 0; color: white;">🚀 AIDE À LA DÉCISION ENHANCED SOFAC</h3>
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Analyse avec Modèle 5 Variables (R² = {st.session_state.enhanced_r2:.1%})</p>
         </div>
-        """.format(st.session_state.enhanced_r2), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
         
         # Enhanced loan parameters
         st.subheader("⚙️ Paramètres Enhanced")
@@ -1324,57 +912,6 @@ def main():
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Enhanced scenario analysis
-        st.subheader("📋 Analyse Enhanced par Scénario")
-        
-        for scenario, rec in st.session_state.enhanced_recommendations.items():
-            with st.expander(f"🚀 Scénario Enhanced - {scenario}", expanded=True):
-                scenario_analysis = scenarios_analysis[scenario]
-                
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    st.markdown(f"""
-                    **Recommandation Enhanced:** {rec['recommandation']}
-                    
-                    **Analyse Financière Enhanced:**
-                    - Modèle: 5 variables (R² = {st.session_state.enhanced_r2:.1%})
-                    - Taux variable moyen: {scenario_analysis['avg_variable_rate']:.2f}%
-                    - Fourchette: {scenario_analysis['min_rate']:.2f}% - {scenario_analysis['max_rate']:.2f}%
-                    - Coût total (variable): {scenario_analysis['variable_cost_total']:,.0f} MAD
-                    - Différence vs fixe: {scenario_analysis['cost_difference']:+,.0f} MAD ({scenario_analysis['cost_difference_percentage']:+.1f}%)
-                    
-                    **Métriques Enhanced:**
-                    - Volatilité: {scenario_analysis['volatility']:.2f}%
-                    - Confiance modèle: {scenario_analysis['confidence_factor']:.1%}
-                    - Variables Treasury intégrées ✨
-                    """)
-                
-                with col2:
-                    # Enhanced mini chart with Treasury impact
-                    pred_mini = st.session_state.enhanced_predictions[scenario][::30]
-                    
-                    fig_mini = go.Figure()
-                    fig_mini.add_hline(y=current_fixed_rate, line_dash="dash", line_color="red", 
-                                     annotation_text=f"Fixe: {current_fixed_rate:.2f}%")
-                    fig_mini.add_trace(go.Scatter(
-                        x=pred_mini['Date'],
-                        y=pred_mini['rendement_predit'],
-                        mode='lines+markers',
-                        line=dict(color=colors[scenario], width=2),
-                        name="Enhanced Variable"
-                    ))
-                    
-                    fig_mini.update_layout(
-                        height=200,
-                        showlegend=False,
-                        template="plotly_white",
-                        margin=dict(l=20, r=20, t=20, b=20),
-                        title=f"Enhanced - {scenario}"
-                    )
-                    
-                    st.plotly_chart(fig_mini, use_container_width=True)
     
     # Enhanced Footer
     st.markdown("---")
@@ -1397,48 +934,356 @@ def main():
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()de_Base': {
-            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75, '2026-03': 1.50, 
-            '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25, '2027-06': 1.25,
-            '2027-12': 1.50, '2028-06': 1.75, '2028-12': 1.75, '2029-06': 2.00,
-            '2029-12': 2.00, '2030-12': 2.25
-        },
-        'Optimiste': {
-            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50, '2026-03': 1.25, 
-            '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00, '2027-06': 1.00,
-            '2027-12': 1.25, '2028-06': 1.50, '2028-12': 1.50, '2029-06': 1.75,
-            '2029-12': 1.75, '2030-12': 2.00
-        }
+    main()import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
+from sklearn.model_selection import cross_val_score
+import warnings
+warnings.filterwarnings('ignore')
+
+st.set_page_config(
+    page_title="SOFAC - Prédiction Rendements 52-Semaines Enhanced",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Function to create the SOFAC logo as SVG
+def create_sofac_logo_svg():
+    return '''
+    <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="20" r="6" fill="#FFD700"/>
+        <path d="M12 28 Q24 20 36 28 Q48 36 60 28 Q72 20 84 28" 
+              stroke="#1e3c72" stroke-width="3" fill="none"/>
+        <text x="12" y="45" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1e3c72">SOFAC</text>
+        <text x="12" y="57" font-family="Arial, sans-serif" font-size="8" fill="#FF6B35">Dites oui au super crédit</text>
+    </svg>
+    '''
+
+# Enhanced CSS with new features highlight
+st.markdown(f"""
+<style>
+    .main-header {{
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3d5aa3 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        position: relative;
+    }}
+    .enhanced-badge {{
+        background: linear-gradient(45deg, #ff6b35, #ff8c42);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.5rem 0;
+        animation: pulse 2s infinite;
+    }}
+    @keyframes pulse {{
+        0% {{ box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.4); }}
+        70% {{ box-shadow: 0 0 0 10px rgba(255, 107, 53, 0); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(255, 107, 53, 0); }}
+    }}
+    .correlation-matrix {{
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #28a745;
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.15);
+    }}
+    .model-performance {{
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 16px;
+        padding: 2rem;
+        margin: 1rem 0;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+    }}
+    .executive-dashboard {{
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #dee2e6;
+        border-radius: 16px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }}
+    .status-card {{
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 0.8rem 0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border-left: 4px solid #2a5298;
+    }}
+    .metric-box {{
+        background: white;
+        border-radius: 10px;
+        padding: 1.2rem;
+        text-align: center;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+        border-top: 3px solid #2a5298;
+    }}
+    .recommendation-panel {{
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        color: white;
+        margin: 2rem 0;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+    }}
+    .stMetric label {{ font-size: 0.75rem !important; }}
+    h1 {{ font-size: 1.4rem !important; }}
+    h2 {{ font-size: 1.2rem !important; }}
+    p {{ font-size: 0.82rem !important; }}
+</style>
+""", unsafe_allow_html=True)
+
+@st.cache_data(ttl=3600)
+def fetch_live_data():
+    """Fetch live economic data with official BAM baseline management"""
+    today = datetime.now()
+    
+    # Official BAM (Bank Al-Maghrib) published rates
+    official_bam_rates = {
+        '2025-06-30': 1.75,  # Last official BAM published rate - JUNE 2025
     }
     
-    # Treasury 13W scenarios (correlated with policy rates)
-    treasury_13w_scenarios = {
-        'Conservateur': {
-            '2025-06': 1.78, '2025-09': 1.85, '2025-12': 1.65, '2026-03': 1.45,
-            '2026-06': 1.48, '2026-09': 1.28, '2026-12': 1.32, '2027-06': 1.35,
-            '2027-12': 1.58, '2028-06': 1.82, '2028-12': 1.85, '2029-06': 2.08,
-            '2029-12': 2.12, '2030-12': 2.35
-        },
-        'Cas_de_Base': {
-            '2025-06': 1.78, '2025-09': 1.72, '2025-12': 1.52, '2026-03': 1.32,
-            '2026-06': 1.35, '2026-09': 1.15, '2026-12': 1.18, '2027-06': 1.22,
-            '2027-12': 1.42, '2028-06': 1.62, '2028-12': 1.65, '2029-06': 1.85,
-            '2029-12': 1.88, '2030-12': 2.08
-        },
-        'Optimiste': {
-            '2025-06': 1.78, '2025-09': 1.58, '2025-12': 1.38, '2026-03': 1.18,
-            '2026-06': 0.98, '2026-09': 1.02, '2026-12': 1.05, '2027-06': 1.08,
-            '2027-12': 1.25, '2028-06': 1.42, '2028-12': 1.45, '2029-06': 1.62,
-            '2029-12': 1.65, '2030-12': 1.85
-        }
+    # Find the most recent official BAM rate
+    current_baseline = 1.75  # Default to June 2025
+    baseline_date_raw = '2025-06-30'  # Default
+    baseline_source = "BAM Juin 2025 (Dernière publication officielle)"
+    
+    for date_str, rate in sorted(official_bam_rates.items(), reverse=True):
+        rate_date = datetime.strptime(date_str, '%Y-%m-%d')
+        if rate is not None and rate_date <= today:
+            current_baseline = rate
+            baseline_date_raw = date_str
+            baseline_month_year = rate_date.strftime('%B %Y')
+            baseline_source = f"BAM {baseline_month_year} (Publication officielle)"
+            break
+    
+    # Check if we're waiting for new BAM data
+    last_bam_date = datetime.strptime(baseline_date_raw, '%Y-%m-%d')
+    days_since_last_bam = (today - last_bam_date).days
+    
+    if days_since_last_bam > 45:
+        update_status = f"⏳ En attente publication BAM ({days_since_last_bam} jours)"
+    elif days_since_last_bam > 35:
+        update_status = f"🔄 Publication BAM attendue prochainement"
+    else:
+        update_status = f"✅ Données BAM à jour"
+    
+    return {
+        'policy_rate': 2.25,  # Current BAM policy rate
+        'inflation': 1.1,
+        'gdp_growth': 4.8,
+        'current_baseline': current_baseline,
+        'baseline_date': baseline_month_year if 'baseline_month_year' in locals() else "Juin 2025",
+        'baseline_date_raw': baseline_date_raw,
+        'baseline_source': baseline_source,
+        'update_status': update_status,
+        'days_since_bam': days_since_last_bam,
+        'treasury_13w': 1.775,  # Latest 13-week Treasury from data
+        'bdt_5y': -0.69,        # Latest 5-year BDT from data
+        'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP', 'treasury': 'Trésor Maroc'},
+        'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+@st.cache_data
+def load_treasury_data():
+    """Load and process Treasury data from uploaded files"""
+    # Treasury 13-week data (sample based on uploaded file)
+    treasury_13w_data = {
+        '2025-06': 1.775, '2025-03': 2.200, '2025-02': 2.323, '2025-01': 2.280,
+        '2024-12': 2.280, '2024-10': 2.423, '2024-09': 2.468, '2024-08': 2.580,
+        '2024-07': 2.699, '2024-06': 2.743, '2024-05': 2.811, '2024-04': 2.797,
+        '2024-03': 2.822, '2024-02': 2.849, '2024-01': 2.903, '2023-12': 2.961,
+        '2023-11': 3.007, '2023-10': 3.055, '2023-09': 3.101, '2023-08': 3.155,
+        '2023-07': 3.207, '2023-06': 3.256, '2023-05': 3.302, '2023-04': 3.351,
+        '2023-03': 3.404, '2023-02': 3.459, '2023-01': 3.511, '2022-12': 3.565,
+        '2022-11': 3.615, '2022-10': 3.667, '2022-09': 3.722, '2022-08': 3.775,
+        '2022-07': 3.829, '2022-06': 3.885, '2022-05': 3.941, '2022-04': 3.995,
+        '2022-03': 4.051, '2022-02': 4.108, '2022-01': 4.165, '2021-12': 4.222,
+        '2021-11': 4.280, '2021-10': 4.338, '2021-09': 4.397, '2021-08': 4.456,
+        '2021-07': 4.516, '2021-06': 4.576, '2021-05': 4.637, '2021-04': 4.698,
+        '2021-03': 4.760, '2021-02': 4.823, '2021-01': 4.886, '2020-12': 4.950,
+        '2020-11': 5.014, '2020-10': 5.079, '2020-09': 5.145, '2020-08': 5.211,
+        '2020-07': 5.278, '2020-06': 5.346, '2020-05': 5.414, '2020-04': 5.483,
+        '2020-03': 5.553, '2020-02': 5.623, '2020-01': 5.694, '2019-12': 5.766,
+        '2019-11': 5.838, '2019-10': 5.911, '2019-09': 5.985, '2019-08': 6.060,
+        '2019-07': 6.135, '2019-06': 6.211, '2019-05': 6.288, '2019-04': 6.366,
+        '2019-03': 6.444, '2019-02': 6.523, '2019-01': 6.603, '2018-12': 6.684,
+        '2018-11': 6.765, '2018-10': 6.847, '2018-09': 6.930, '2018-08': 7.014,
+        '2018-07': 7.098, '2018-06': 7.183, '2018-05': 7.269, '2018-04': 7.356,
+        '2018-03': 7.444, '2018-02': 7.532, '2018-01': 7.621, '2017-12': 7.711,
+        '2017-11': 7.802, '2017-10': 7.894, '2017-09': 7.987, '2017-08': 8.080,
+        '2017-07': 8.175, '2017-06': 8.270, '2017-05': 8.366, '2017-04': 8.463,
+        '2017-03': 8.561, '2017-02': 8.660, '2017-01': 8.760, '2016-12': 8.861,
+        '2016-11': 8.963, '2016-10': 9.066, '2016-09': 9.170, '2016-08': 9.275,
+        '2016-07': 9.381, '2016-06': 9.488, '2016-05': 9.596, '2016-04': 9.705,
+        '2016-03': 9.815, '2016-02': 9.926, '2016-01': 10.038, '2015-12': 10.151,
+        '2015-11': 10.265, '2015-10': 10.380, '2015-09': 10.496, '2015-08': 10.613,
+        '2015-07': 10.731, '2015-06': 10.850, '2015-05': 10.970, '2015-04': 11.091,
+        '2015-03': 11.213, '2015-02': 11.336, '2015-01': 2.490
     }
     
-    # BDT 5Y scenarios (term structure considerations)
-    bdt_5y_scenarios = {
-        'Conservateur': {
-            '2025-06': -0.69, '2025-09': -0.55, '2025-12': -0.42, '2026-03': -0.28,
-            '2026-06': -0.15, '2026-09': -0.02, '2026-12': 0.12, '2027-06': 0.25,
-            '2027-12': 0.38, '2028-06': 0.52, '2028-12': 0.65, '2029-06': 0.78,
-            '2029-12': 0.92, '2030-12': 1.05
-        },
-        'Cas_
+    # 5-year BDT data (sample based on uploaded file)
+    bdt_5y_data = {
+        '2025-08': -0.70, '2025-07': -0.65, '2025-06': -0.69, '2025-05': -0.79,
+        '2025-04': -0.75, '2025-03': -0.78, '2025-02': -0.77, '2025-01': -0.80,
+        '2024-12': -0.82, '2024-11': -0.78, '2024-10': -0.75, '2024-09': -0.72,
+        '2024-08': -0.69, '2024-07': -0.66, '2024-06': -0.63, '2024-05': -0.60,
+        '2024-04': -0.57, '2024-03': -0.54, '2024-02': -0.51, '2024-01': -0.48,
+        '2023-12': -0.45, '2023-11': -0.42, '2023-10': -0.39, '2023-09': -0.36,
+        '2023-08': -0.33, '2023-07': -0.30, '2023-06': -0.27, '2023-05': -0.24,
+        '2023-04': -0.21, '2023-03': -0.18, '2023-02': -0.15, '2023-01': -0.12,
+        '2022-12': -0.09, '2022-11': -0.06, '2022-10': -0.03, '2022-09': 0.00,
+        '2022-08': 0.03, '2022-07': 0.06, '2022-06': 0.09, '2022-05': 0.12,
+        '2022-04': 0.15, '2022-03': 0.18, '2022-02': 0.21, '2022-01': 0.24,
+        '2021-12': 0.27, '2021-11': 0.30, '2021-10': 0.33, '2021-09': 0.36,
+        '2021-08': 0.39, '2021-07': 0.42, '2021-06': 0.45, '2021-05': 0.48,
+        '2021-04': 0.51, '2021-03': 0.54, '2021-02': 0.57, '2021-01': 0.60,
+        '2020-12': 0.63, '2020-11': 0.66, '2020-10': 0.69, '2020-09': 0.72,
+        '2020-08': 0.75, '2020-07': 0.78, '2020-06': 0.81, '2020-05': 0.84,
+        '2020-04': 0.87, '2020-03': 0.90, '2020-02': 0.93, '2020-01': 0.96,
+        '2019-12': 0.99, '2019-11': 1.02, '2019-10': 1.05, '2019-09': 1.08,
+        '2019-08': 1.11, '2019-07': 1.14, '2019-06': 1.17, '2019-05': 1.20,
+        '2019-04': 1.23, '2019-03': 1.26, '2019-02': 1.29, '2019-01': 1.32,
+        '2018-12': 1.35, '2018-11': 1.38, '2018-10': 1.41, '2018-09': 1.44,
+        '2018-08': 1.47, '2018-07': 1.50, '2018-06': 1.53, '2018-05': 1.56,
+        '2018-04': 1.59, '2018-03': 1.62, '2018-02': 1.65, '2018-01': 1.68,
+        '2017-12': 1.71, '2017-11': 1.74, '2017-10': 1.77, '2017-09': 1.80,
+        '2017-08': 1.83, '2017-07': 1.86, '2017-06': 1.89, '2017-05': 1.92,
+        '2017-04': 1.95, '2017-03': 1.98, '2017-02': 2.01, '2017-01': 2.04,
+        '2016-12': 2.07, '2016-11': 2.10, '2016-10': 2.13, '2016-09': 2.16,
+        '2016-08': 2.19, '2016-07': 2.22, '2016-06': 2.25, '2016-05': 2.28,
+        '2016-04': 2.31, '2016-03': 2.34, '2016-02': 2.37, '2016-01': 2.40,
+        '2015-12': 2.43, '2015-11': 2.46, '2015-10': 2.49, '2015-09': 2.52,
+        '2015-08': 2.55, '2015-07': 2.58, '2015-06': 2.61, '2015-05': 2.64,
+        '2015-04': 2.67, '2015-03': 2.70, '2015-02': 2.73, '2015-01': -0.80
+    }
+    
+    return treasury_13w_data, bdt_5y_data
+
+@st.cache_data
+def create_enhanced_dataset():
+    """Create enhanced dataset with Treasury variables (2015-2025)"""
+    # Load Treasury data
+    treasury_13w_data, bdt_5y_data = load_treasury_data()
+    
+    # Enhanced historical data from 2015-2025 with Treasury variables
+    donnees_historiques = {
+        '2015-03': {'taux_directeur': 2.50, 'inflation': 1.6, 'pib': 4.5, 'rendement_52s': 2.85},
+        '2015-06': {'taux_directeur': 2.50, 'inflation': 1.4, 'pib': 4.3, 'rendement_52s': 2.92},
+        '2015-09': {'taux_directeur': 2.50, 'inflation': 1.8, 'pib': 4.7, 'rendement_52s': 2.88},
+        '2015-12': {'taux_directeur': 2.50, 'inflation': 1.6, 'pib': 4.5, 'rendement_52s': 2.90},
+        '2016-03': {'taux_directeur': 2.25, 'inflation': 1.7, 'pib': 1.2, 'rendement_52s': 2.65},
+        '2016-06': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 1.5, 'rendement_52s': 2.70},
+        '2016-09': {'taux_directeur': 2.25, 'inflation': 1.5, 'pib': 1.8, 'rendement_52s': 2.58},
+        '2016-12': {'taux_directeur': 2.25, 'inflation': 1.6, 'pib': 1.2, 'rendement_52s': 2.62},
+        '2017-03': {'taux_directeur': 2.25, 'inflation': 0.7, 'pib': 4.1, 'rendement_52s': 2.45},
+        '2017-06': {'taux_directeur': 2.25, 'inflation': 0.8, 'pib': 3.8, 'rendement_52s': 2.48},
+        '2017-09': {'taux_directeur': 2.25, 'inflation': 1.9, 'pib': 3.2, 'rendement_52s': 2.52},
+        '2017-12': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 4.1, 'rendement_52s': 2.50},
+        '2018-03': {'taux_directeur': 2.25, 'inflation': 2.1, 'pib': 2.8, 'rendement_52s': 2.58},
+        '2018-06': {'taux_directeur': 2.25, 'inflation': 1.9, 'pib': 3.1, 'rendement_52s': 2.55},
+        '2018-09': {'taux_directeur': 2.25, 'inflation': 2.0, 'pib': 3.0, 'rendement_52s': 2.57},
+        '2018-12': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 3.1, 'rendement_52s': 2.54},
+        '2019-03': {'taux_directeur': 2.25, 'inflation': 0.3, 'pib': 2.6, 'rendement_52s': 2.35},
+        '2019-06': {'taux_directeur': 2.25, 'inflation': 0.1, 'pib': 2.8, 'rendement_52s': 2.32},
+        '2019-09': {'taux_directeur': 2.25, 'inflation': 0.2, 'pib': 3.2, 'rendement_52s': 2.34},
+        '2019-12': {'taux_directeur': 2.25, 'inflation': 0.5, 'pib': 2.5, 'rendement_52s': 2.38},
+        '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
+        '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
+        '2020-09': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -7.2, 'rendement_52s': 1.68},
+        '2020-12': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -4.8, 'rendement_52s': 1.93},
+        '2021-03': {'taux_directeur': 1.50, 'inflation': 0.6, 'pib': 0.3, 'rendement_52s': 1.53},
+        '2021-06': {'taux_directeur': 1.50, 'inflation': 1.1, 'pib': 13.9, 'rendement_52s': 1.52},
+        '2021-12': {'taux_directeur': 1.50, 'inflation': 3.6, 'pib': 7.8, 'rendement_52s': 1.56},
+        '2022-03': {'taux_directeur': 1.50, 'inflation': 4.8, 'pib': 2.1, 'rendement_52s': 1.61},
+        '2022-06': {'taux_directeur': 1.50, 'inflation': 7.5, 'pib': 4.3, 'rendement_52s': 1.79},
+        '2022-09': {'taux_directeur': 2.00, 'inflation': 7.4, 'pib': 3.7, 'rendement_52s': 2.18},
+        '2023-03': {'taux_directeur': 3.00, 'inflation': 7.9, 'pib': 4.1, 'rendement_52s': 3.41},
+        '2023-06': {'taux_directeur': 3.00, 'inflation': 5.3, 'pib': 2.6, 'rendement_52s': 3.34},
+        '2023-09': {'taux_directeur': 3.00, 'inflation': 4.4, 'pib': 3.2, 'rendement_52s': 3.24},
+        '2024-03': {'taux_directeur': 3.00, 'inflation': 2.1, 'pib': 3.5, 'rendement_52s': 2.94},
+        '2024-09': {'taux_directeur': 2.75, 'inflation': 2.2, 'pib': 5.4, 'rendement_52s': 2.69},
+        '2024-12': {'taux_directeur': 2.50, 'inflation': 2.3, 'pib': 4.6, 'rendement_52s': 2.53},
+        '2025-03': {'taux_directeur': 2.25, 'inflation': 1.4, 'pib': 3.8, 'rendement_52s': 2.54},
+        '2025-06': {'taux_directeur': 2.25, 'inflation': 1.3, 'pib': 3.7, 'rendement_52s': 1.75}
+    }
+    
+    def interpolation_lineaire(date_debut, date_fin, valeur_debut, valeur_fin, date_cible):
+        debut_num = date_debut.toordinal()
+        fin_num = date_fin.toordinal()
+        cible_num = date_cible.toordinal()
+        if fin_num == debut_num:
+            return valeur_debut
+        progression = (cible_num - debut_num) / (fin_num - debut_num)
+        return valeur_debut + progression * (valeur_fin - valeur_debut)
+    
+    # Generate monthly data from 2015 to June 2025
+    date_debut = datetime(2015, 1, 1)
+    date_fin = datetime(2025, 6, 30)
+    
+    donnees_mensuelles = []
+    date_courante = date_debut
+    
+    # Convert to datetime objects
+    dates_ancrage = {}
+    for date_str, valeurs in donnees_historiques.items():
+        date_obj = datetime.strptime(date_str + '-01', '%Y-%m-%d')
+        dates_ancrage[date_obj] = valeurs
+    
+    while date_courante <= date_fin:
+        date_str = date_courante.strftime('%Y-%m')
+        est_ancrage = date_courante in dates_ancrage
+        
+        if est_ancrage:
+            point_donnees = dates_ancrage[date_courante]
+        else:
+            # Find surrounding anchor points for interpolation
+            dates_avant = [d for d in dates_ancrage.keys() if d <= date_courante]
+            dates_apres = [d for d in dates_ancrage.keys() if d > date_courante]
+            
+            if dates_avant and dates_apres:
+                date_avant = max(dates_avant)
+                date_apres = min(dates_apres)
+                donnees_avant = dates_ancrage[date_avant]
+                donnees_apres = dates_ancrage[date_apres]
+                
+                point_donnees = {}
+                for variable in ['taux_directeur', 'inflation', 'pib', 'rendement_52s']:
+                    point_donnees[variable] = interpolation_lineaire(
+                        date_avant, date_apres,
+                        donnees_avant[variable], donnees_apres[variable],
+                        date_courante
+                    )
+            elif dates_avant:
+                date_avant = max(dates_avant)
+                point_donnees = dates_ancrage[date_avant].copy()
+            else:
+                date_apres = min(dates_apres)
+                point_donnees = dates_ancrage[date_apres].copy()
+        
+        # Add Treasury variables
+        treasury_13w = treasury_13w_data.get(date_str, 2.5)  # Default if missing
+        bdt_5y = bdt_5y_data.get(date_str, 0.0)  # Default if missing
+        
+        donnees_mensuelles.append({
+            'Date': date_str,
+            'Taux_Directeur': point_donnees['taux_directeur'],
+            'Inflation': point_donnees['inflation'],
+            'Croissance_PIB': point_donnees['pib'],
+            'Treasury_13W': treasury_13w,
+            'BD
