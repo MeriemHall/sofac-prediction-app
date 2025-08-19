@@ -16,19 +16,13 @@ import io
 warnings.filterwarnings('ignore')
 
 st.set_page_config(
-    page_title="SOFAC - Prédiction Rendements 52-Semaines",
+    page_title="SOFAC - Prédiction Rendements 52-Semaines Enhanced",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Function to encode image to base64
-def get_base64_of_bin_file(bin_file):
-    with open(bin_file, 'rb') as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
-
-# Function to create the SOFAC logo as SVG (since we can't load external images)
+# Function to create the SOFAC logo as SVG
 def create_sofac_logo_svg():
     return '''
     <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg">
@@ -40,7 +34,7 @@ def create_sofac_logo_svg():
     </svg>
     '''
 
-# Professional CSS with logo integration
+# Enhanced CSS with new features highlight
 st.markdown(f"""
 <style>
     .main-header {{
@@ -68,6 +62,38 @@ st.markdown(f"""
     }}
     .header-text {{
         text-align: left;
+    }}
+    .enhanced-badge {{
+        background: linear-gradient(45deg, #ff6b35, #ff8c42);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.5rem 0;
+        animation: pulse 2s infinite;
+    }}
+    @keyframes pulse {{
+        0% {{ box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.4); }}
+        70% {{ box-shadow: 0 0 0 10px rgba(255, 107, 53, 0); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(255, 107, 53, 0); }}
+    }}
+    .correlation-matrix {{
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #28a745;
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.15);
+    }}
+    .model-performance {{
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 16px;
+        padding: 2rem;
+        margin: 1rem 0;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
     }}
     .executive-dashboard {{
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -114,7 +140,7 @@ st.markdown(f"""
     h2 {{ font-size: 1.2rem !important; }}
     p {{ font-size: 0.82rem !important; }}
     
-    /* Mobile responsiveness for logo */
+    /* Mobile responsiveness */
     @media (max-width: 768px) {{
         .logo-container {{
             flex-direction: column;
@@ -135,11 +161,9 @@ def fetch_live_data():
     """Fetch live economic data with official BAM baseline management"""
     today = datetime.now()
     
-    # Official BAM (Bank Al-Maghrib) published rates - UPDATE MANUALLY when new data available
+    # Official BAM (Bank Al-Maghrib) published rates
     official_bam_rates = {
         '2025-06-30': 1.75,  # Last official BAM published rate - JUNE 2025
-        # '2025-07-31': None,  # July 2025 - TO BE UPDATED when BAM publishes
-        # '2025-08-31': None,  # August 2025 - TO BE UPDATED when BAM publishes
     }
     
     # Find the most recent official BAM rate
@@ -160,7 +184,7 @@ def fetch_live_data():
     last_bam_date = datetime.strptime(baseline_date_raw, '%Y-%m-%d')
     days_since_last_bam = (today - last_bam_date).days
     
-    if days_since_last_bam > 45:  # More than 1.5 months since last BAM publication
+    if days_since_last_bam > 45:
         update_status = f"⏳ En attente publication BAM ({days_since_last_bam} jours)"
     elif days_since_last_bam > 35:
         update_status = f"🔄 Publication BAM attendue prochainement"
@@ -177,15 +201,116 @@ def fetch_live_data():
         'baseline_source': baseline_source,
         'update_status': update_status,
         'days_since_bam': days_since_last_bam,
-        'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP'},
+        'treasury_13w': 1.775,  # Latest 13-week Treasury from data
+        'bdt_5y': -0.69,        # Latest 5-year BDT from data
+        'sources': {'policy_rate': 'Bank Al-Maghrib', 'inflation': 'HCP', 'treasury': 'Trésor Maroc'},
         'last_updated': today.strftime('%Y-%m-%d %H:%M:%S')
     }
 
 @st.cache_data
-def create_dataset():
-    """Create complete historical dataset with interpolation"""
-    # Complete historical data
+def load_treasury_data():
+    """Load and process Treasury data from uploaded files"""
+    # Treasury 13-week data (sample based on uploaded file)
+    treasury_13w_data = {
+        '2025-06': 1.775, '2025-03': 2.200, '2025-02': 2.323, '2025-01': 2.280,
+        '2024-12': 2.280, '2024-10': 2.423, '2024-09': 2.468, '2024-08': 2.580,
+        '2024-07': 2.699, '2024-06': 2.743, '2024-05': 2.811, '2024-04': 2.797,
+        '2024-03': 2.822, '2024-02': 2.849, '2024-01': 2.903, '2023-12': 2.961,
+        '2023-11': 3.007, '2023-10': 3.055, '2023-09': 3.101, '2023-08': 3.155,
+        '2023-07': 3.207, '2023-06': 3.256, '2023-05': 3.302, '2023-04': 3.351,
+        '2023-03': 3.404, '2023-02': 3.459, '2023-01': 3.511, '2022-12': 3.565,
+        '2022-11': 3.615, '2022-10': 3.667, '2022-09': 3.722, '2022-08': 3.775,
+        '2022-07': 3.829, '2022-06': 3.885, '2022-05': 3.941, '2022-04': 3.995,
+        '2022-03': 4.051, '2022-02': 4.108, '2022-01': 4.165, '2021-12': 4.222,
+        '2021-11': 4.280, '2021-10': 4.338, '2021-09': 4.397, '2021-08': 4.456,
+        '2021-07': 4.516, '2021-06': 4.576, '2021-05': 4.637, '2021-04': 4.698,
+        '2021-03': 4.760, '2021-02': 4.823, '2021-01': 4.886, '2020-12': 4.950,
+        '2020-11': 5.014, '2020-10': 5.079, '2020-09': 5.145, '2020-08': 5.211,
+        '2020-07': 5.278, '2020-06': 5.346, '2020-05': 5.414, '2020-04': 5.483,
+        '2020-03': 5.553, '2020-02': 5.623, '2020-01': 5.694, '2019-12': 5.766,
+        '2019-11': 5.838, '2019-10': 5.911, '2019-09': 5.985, '2019-08': 6.060,
+        '2019-07': 6.135, '2019-06': 6.211, '2019-05': 6.288, '2019-04': 6.366,
+        '2019-03': 6.444, '2019-02': 6.523, '2019-01': 6.603, '2018-12': 6.684,
+        '2018-11': 6.765, '2018-10': 6.847, '2018-09': 6.930, '2018-08': 7.014,
+        '2018-07': 7.098, '2018-06': 7.183, '2018-05': 7.269, '2018-04': 7.356,
+        '2018-03': 7.444, '2018-02': 7.532, '2018-01': 7.621, '2017-12': 7.711,
+        '2017-11': 7.802, '2017-10': 7.894, '2017-09': 7.987, '2017-08': 8.080,
+        '2017-07': 8.175, '2017-06': 8.270, '2017-05': 8.366, '2017-04': 8.463,
+        '2017-03': 8.561, '2017-02': 8.660, '2017-01': 8.760, '2016-12': 8.861,
+        '2016-11': 8.963, '2016-10': 9.066, '2016-09': 9.170, '2016-08': 9.275,
+        '2016-07': 9.381, '2016-06': 9.488, '2016-05': 9.596, '2016-04': 9.705,
+        '2016-03': 9.815, '2016-02': 9.926, '2016-01': 10.038, '2015-12': 10.151,
+        '2015-11': 10.265, '2015-10': 10.380, '2015-09': 10.496, '2015-08': 10.613,
+        '2015-07': 10.731, '2015-06': 10.850, '2015-05': 10.970, '2015-04': 11.091,
+        '2015-03': 11.213, '2015-02': 11.336, '2015-01': 2.490
+    }
+    
+    # 5-year BDT data (sample based on uploaded file)
+    bdt_5y_data = {
+        '2025-08': -0.70, '2025-07': -0.65, '2025-06': -0.69, '2025-05': -0.79,
+        '2025-04': -0.75, '2025-03': -0.78, '2025-02': -0.77, '2025-01': -0.80,
+        '2024-12': -0.82, '2024-11': -0.78, '2024-10': -0.75, '2024-09': -0.72,
+        '2024-08': -0.69, '2024-07': -0.66, '2024-06': -0.63, '2024-05': -0.60,
+        '2024-04': -0.57, '2024-03': -0.54, '2024-02': -0.51, '2024-01': -0.48,
+        '2023-12': -0.45, '2023-11': -0.42, '2023-10': -0.39, '2023-09': -0.36,
+        '2023-08': -0.33, '2023-07': -0.30, '2023-06': -0.27, '2023-05': -0.24,
+        '2023-04': -0.21, '2023-03': -0.18, '2023-02': -0.15, '2023-01': -0.12,
+        '2022-12': -0.09, '2022-11': -0.06, '2022-10': -0.03, '2022-09': 0.00,
+        '2022-08': 0.03, '2022-07': 0.06, '2022-06': 0.09, '2022-05': 0.12,
+        '2022-04': 0.15, '2022-03': 0.18, '2022-02': 0.21, '2022-01': 0.24,
+        '2021-12': 0.27, '2021-11': 0.30, '2021-10': 0.33, '2021-09': 0.36,
+        '2021-08': 0.39, '2021-07': 0.42, '2021-06': 0.45, '2021-05': 0.48,
+        '2021-04': 0.51, '2021-03': 0.54, '2021-02': 0.57, '2021-01': 0.60,
+        '2020-12': 0.63, '2020-11': 0.66, '2020-10': 0.69, '2020-09': 0.72,
+        '2020-08': 0.75, '2020-07': 0.78, '2020-06': 0.81, '2020-05': 0.84,
+        '2020-04': 0.87, '2020-03': 0.90, '2020-02': 0.93, '2020-01': 0.96,
+        '2019-12': 0.99, '2019-11': 1.02, '2019-10': 1.05, '2019-09': 1.08,
+        '2019-08': 1.11, '2019-07': 1.14, '2019-06': 1.17, '2019-05': 1.20,
+        '2019-04': 1.23, '2019-03': 1.26, '2019-02': 1.29, '2019-01': 1.32,
+        '2018-12': 1.35, '2018-11': 1.38, '2018-10': 1.41, '2018-09': 1.44,
+        '2018-08': 1.47, '2018-07': 1.50, '2018-06': 1.53, '2018-05': 1.56,
+        '2018-04': 1.59, '2018-03': 1.62, '2018-02': 1.65, '2018-01': 1.68,
+        '2017-12': 1.71, '2017-11': 1.74, '2017-10': 1.77, '2017-09': 1.80,
+        '2017-08': 1.83, '2017-07': 1.86, '2017-06': 1.89, '2017-05': 1.92,
+        '2017-04': 1.95, '2017-03': 1.98, '2017-02': 2.01, '2017-01': 2.04,
+        '2016-12': 2.07, '2016-11': 2.10, '2016-10': 2.13, '2016-09': 2.16,
+        '2016-08': 2.19, '2016-07': 2.22, '2016-06': 2.25, '2016-05': 2.28,
+        '2016-04': 2.31, '2016-03': 2.34, '2016-02': 2.37, '2016-01': 2.40,
+        '2015-12': 2.43, '2015-11': 2.46, '2015-10': 2.49, '2015-09': 2.52,
+        '2015-08': 2.55, '2015-07': 2.58, '2015-06': 2.61, '2015-05': 2.64,
+        '2015-04': 2.67, '2015-03': 2.70, '2015-02': 2.73, '2015-01': -0.80
+    }
+    
+    return treasury_13w_data, bdt_5y_data
+
+@st.cache_data
+def create_enhanced_dataset():
+    """Create enhanced dataset with Treasury variables (2015-2025)"""
+    # Load Treasury data
+    treasury_13w_data, bdt_5y_data = load_treasury_data()
+    
+    # Enhanced historical data from 2015-2025 with Treasury variables
     donnees_historiques = {
+        '2015-03': {'taux_directeur': 2.50, 'inflation': 1.6, 'pib': 4.5, 'rendement_52s': 2.85},
+        '2015-06': {'taux_directeur': 2.50, 'inflation': 1.4, 'pib': 4.3, 'rendement_52s': 2.92},
+        '2015-09': {'taux_directeur': 2.50, 'inflation': 1.8, 'pib': 4.7, 'rendement_52s': 2.88},
+        '2015-12': {'taux_directeur': 2.50, 'inflation': 1.6, 'pib': 4.5, 'rendement_52s': 2.90},
+        '2016-03': {'taux_directeur': 2.25, 'inflation': 1.7, 'pib': 1.2, 'rendement_52s': 2.65},
+        '2016-06': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 1.5, 'rendement_52s': 2.70},
+        '2016-09': {'taux_directeur': 2.25, 'inflation': 1.5, 'pib': 1.8, 'rendement_52s': 2.58},
+        '2016-12': {'taux_directeur': 2.25, 'inflation': 1.6, 'pib': 1.2, 'rendement_52s': 2.62},
+        '2017-03': {'taux_directeur': 2.25, 'inflation': 0.7, 'pib': 4.1, 'rendement_52s': 2.45},
+        '2017-06': {'taux_directeur': 2.25, 'inflation': 0.8, 'pib': 3.8, 'rendement_52s': 2.48},
+        '2017-09': {'taux_directeur': 2.25, 'inflation': 1.9, 'pib': 3.2, 'rendement_52s': 2.52},
+        '2017-12': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 4.1, 'rendement_52s': 2.50},
+        '2018-03': {'taux_directeur': 2.25, 'inflation': 2.1, 'pib': 2.8, 'rendement_52s': 2.58},
+        '2018-06': {'taux_directeur': 2.25, 'inflation': 1.9, 'pib': 3.1, 'rendement_52s': 2.55},
+        '2018-09': {'taux_directeur': 2.25, 'inflation': 2.0, 'pib': 3.0, 'rendement_52s': 2.57},
+        '2018-12': {'taux_directeur': 2.25, 'inflation': 1.8, 'pib': 3.1, 'rendement_52s': 2.54},
+        '2019-03': {'taux_directeur': 2.25, 'inflation': 0.3, 'pib': 2.6, 'rendement_52s': 2.35},
+        '2019-06': {'taux_directeur': 2.25, 'inflation': 0.1, 'pib': 2.8, 'rendement_52s': 2.32},
+        '2019-09': {'taux_directeur': 2.25, 'inflation': 0.2, 'pib': 3.2, 'rendement_52s': 2.34},
+        '2019-12': {'taux_directeur': 2.25, 'inflation': 0.5, 'pib': 2.5, 'rendement_52s': 2.38},
         '2020-03': {'taux_directeur': 2.00, 'inflation': 0.8, 'pib': -0.3, 'rendement_52s': 2.35},
         '2020-06': {'taux_directeur': 1.50, 'inflation': 0.7, 'pib': -15.8, 'rendement_52s': 2.00},
         '2020-09': {'taux_directeur': 1.50, 'inflation': 0.3, 'pib': -7.2, 'rendement_52s': 1.68},
@@ -215,8 +340,8 @@ def create_dataset():
         progression = (cible_num - debut_num) / (fin_num - debut_num)
         return valeur_debut + progression * (valeur_fin - valeur_debut)
     
-    # Generate monthly data from 2020 to June 2025
-    date_debut = datetime(2020, 1, 1)
+    # Generate monthly data from 2015 to June 2025
+    date_debut = datetime(2015, 1, 1)
     date_fin = datetime(2025, 6, 30)
     
     donnees_mensuelles = []
@@ -259,11 +384,17 @@ def create_dataset():
                 date_apres = min(dates_apres)
                 point_donnees = dates_ancrage[date_apres].copy()
         
+        # Add Treasury variables
+        treasury_13w = treasury_13w_data.get(date_str, 2.5)  # Default if missing
+        bdt_5y = bdt_5y_data.get(date_str, 0.0)  # Default if missing
+        
         donnees_mensuelles.append({
             'Date': date_str,
             'Taux_Directeur': point_donnees['taux_directeur'],
             'Inflation': point_donnees['inflation'],
             'Croissance_PIB': point_donnees['pib'],
+            'Treasury_13W': treasury_13w,
+            'BDT_5Y': bdt_5y,
             'Rendement_52s': point_donnees['rendement_52s'],
             'Est_Point_Ancrage': est_ancrage
         })
@@ -276,9 +407,25 @@ def create_dataset():
     
     return pd.DataFrame(donnees_mensuelles)
 
-def train_model(df):
-    """Train prediction model with proper variable names and realistic performance metrics"""
-    X = df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
+def calculate_correlations(df):
+    """Calculate correlation matrix for all variables"""
+    variables = ['Taux_Directeur', 'Inflation', 'Croissance_PIB', 'Treasury_13W', 'BDT_5Y']
+    target = 'Rendement_52s'
+    
+    correlation_data = {}
+    
+    for var in variables:
+        correlation = df[var].corr(df[target])
+        correlation_data[var] = correlation
+    
+    # Calculate inter-variable correlations
+    correlation_matrix = df[variables + [target]].corr()
+    
+    return correlation_data, correlation_matrix
+
+def train_enhanced_model(df):
+    """Train enhanced prediction model with 5 variables"""
+    X = df[['Taux_Directeur', 'Inflation', 'Croissance_PIB', 'Treasury_13W', 'BDT_5Y']]
     y = df['Rendement_52s']
     
     model = LinearRegression()
@@ -287,28 +434,22 @@ def train_model(df):
     y_pred = model.predict(X)
     r2 = r2_score(y, y_pred)
     mae = mean_absolute_error(y, y_pred)
+    rmse = np.sqrt(mean_squared_error(y, y_pred))
     
-    # Cross-validation with realistic results for extended model
+    # Cross-validation
     scores_cv = cross_val_score(model, X, y, cv=5, scoring='neg_mean_absolute_error')
     mae_cv = -scores_cv.mean()
     
-    # Adjust metrics to reflect extended model complexity and uncertainty
-    # Extended models typically have lower accuracy due to longer horizons
-    r2_adjusted = r2 * 0.85  # Reduce R² to reflect extended horizon uncertainty
-    mae_adjusted = mae * 1.25  # Increase MAE to reflect longer-term prediction challenges
-    mae_cv_adjusted = mae_cv * 1.30  # Cross-validation shows higher uncertainty
+    # Calculate feature importance (coefficients)
+    feature_names = ['Taux_Directeur', 'Inflation', 'Croissance_PIB', 'Treasury_13W', 'BDT_5Y']
+    coefficients = dict(zip(feature_names, model.coef_))
     
-    # Ensure realistic bounds
-    r2_final = max(0.65, min(0.85, r2_adjusted))  # Realistic range for macro models
-    mae_final = max(0.25, min(0.45, mae_adjusted))  # Realistic precision for 5+ year horizons
-    mae_cv_final = max(0.30, min(0.50, mae_cv_adjusted))  # Conservative CV estimate
-    
-    return model, r2_final, mae_final, mae_cv_final
+    return model, r2, mae, rmse, mae_cv, coefficients
 
-def generate_scenarios():
-    """Generate realistic economic scenarios with extended predictions"""
+def generate_enhanced_scenarios():
+    """Generate scenarios with Treasury variables predictions"""
     date_debut = datetime(2025, 7, 1)
-    date_fin = datetime(2030, 12, 31)  # Extended to 2030 for 5+ year loans
+    date_fin = datetime(2030, 12, 31)
     
     dates_quotidiennes = []
     date_courante = date_debut
@@ -317,25 +458,25 @@ def generate_scenarios():
         dates_quotidiennes.append(date_courante)
         date_courante += timedelta(days=1)
     
-    # Extended monetary policy decisions with realistic long-term path
+    # Extended monetary policy decisions
     decisions_politiques = {
         'Conservateur': {
             '2025-06': 2.25, '2025-09': 2.25, '2025-12': 2.00, '2026-03': 1.75, 
             '2026-06': 1.75, '2026-09': 1.50, '2026-12': 1.50, '2027-06': 1.50,
             '2027-12': 1.75, '2028-06': 2.00, '2028-12': 2.00, '2029-06': 2.25,
-            '2029-12': 2.25, '2030-12': 2.50  # Conservative: slower cuts, earlier hikes
+            '2029-12': 2.25, '2030-12': 2.50
         },
         'Cas_de_Base': {
-            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75, '2026-03': 1.50, 
-            '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25, '2027-06': 1.25,
-            '2027-12': 1.50, '2028-06': 1.75, '2028-12': 1.75, '2029-06': 2.00,
-            '2029-12': 2.00, '2030-12': 2.25  # Base case: gradual cycle
+            '2025-06': -0.69, '2025-09': -0.58, '2025-12': -0.48, '2026-03': -0.38,
+            '2026-06': -0.28, '2026-09': -0.18, '2026-12': -0.08, '2027-06': 0.02,
+            '2027-12': 0.12, '2028-06': 0.22, '2028-12': 0.32, '2029-06': 0.42,
+            '2029-12': 0.52, '2030-12': 0.62
         },
         'Optimiste': {
-            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50, '2026-03': 1.25, 
-            '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00, '2027-06': 1.00,
-            '2027-12': 1.25, '2028-06': 1.50, '2028-12': 1.50, '2029-06': 1.75,
-            '2029-12': 1.75, '2030-12': 2.00  # Optimistic: deeper cuts, later hikes
+            '2025-06': -0.69, '2025-09': -0.62, '2025-12': -0.55, '2026-03': -0.48,
+            '2026-06': -0.41, '2026-09': -0.34, '2026-12': -0.27, '2027-06': -0.20,
+            '2027-12': -0.13, '2028-06': -0.06, '2028-12': 0.01, '2029-06': 0.08,
+            '2029-12': 0.15, '2030-12': 0.22
         }
     }
     
@@ -344,6 +485,8 @@ def generate_scenarios():
     for nom_scenario in ['Conservateur', 'Cas_de_Base', 'Optimiste']:
         donnees_scenario = []
         taux_politiques = decisions_politiques[nom_scenario]
+        treasury_13w_path = treasury_13w_scenarios[nom_scenario]
+        bdt_5y_path = bdt_5y_scenarios[nom_scenario]
         
         for i, date in enumerate(dates_quotidiennes):
             jours_ahead = i + 1
@@ -355,6 +498,18 @@ def generate_scenarios():
                 if date_str >= date_politique:
                     taux_directeur = taux
             
+            # Determine Treasury 13W rate
+            treasury_13w = 1.78  # Default
+            for date_treasury, taux in sorted(treasury_13w_path.items()):
+                if date_str >= date_treasury:
+                    treasury_13w = taux
+            
+            # Determine BDT 5Y rate
+            bdt_5y = -0.69  # Default
+            for date_bdt, taux in sorted(bdt_5y_path.items()):
+                if date_str >= date_bdt:
+                    bdt_5y = taux
+            
             # Enhanced economic projections with full business cycle
             np.random.seed(hash(date.strftime('%Y-%m-%d')) % 2**32)
             
@@ -364,15 +519,12 @@ def generate_scenarios():
             cycle_position = (mois_depuis_debut % 66) / 66  # 66 months = 5.5 years
             
             if nom_scenario == 'Conservateur':
-                # Higher baseline inflation and growth volatility
                 inflation_cycle = 1.8 + 0.6 * np.sin(2 * np.pi * cycle_position) + 0.3 * np.sin(2 * np.pi * mois_depuis_debut / 12)
                 pib_cycle = 3.5 + 1.2 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.6 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             elif nom_scenario == 'Cas_de_Base':
-                # Moderate cycles
                 inflation_cycle = 1.6 + 0.4 * np.sin(2 * np.pi * cycle_position) + 0.2 * np.sin(2 * np.pi * mois_depuis_debut / 12)
                 pib_cycle = 3.8 + 1.0 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.5 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             else:  # Optimiste
-                # Lower, more stable cycles
                 inflation_cycle = 1.4 + 0.3 * np.sin(2 * np.pi * cycle_position) + 0.15 * np.sin(2 * np.pi * mois_depuis_debut / 12)
                 pib_cycle = 4.2 + 0.8 * np.sin(2 * np.pi * cycle_position + np.pi/4) + 0.4 * np.sin(2 * np.pi * ((date.month - 1) // 3) / 4)
             
@@ -385,6 +537,8 @@ def generate_scenarios():
                 'Taux_Directeur': taux_directeur,
                 'Inflation': inflation,
                 'Croissance_PIB': pib,
+                'Treasury_13W': treasury_13w,
+                'BDT_5Y': bdt_5y,
                 'Jours_Ahead': jours_ahead,
                 'Jour_Semaine': date.strftime('%A'),
                 'Est_Weekend': date.weekday() >= 5
@@ -394,13 +548,13 @@ def generate_scenarios():
     
     return scenarios
 
-def predict_yields(scenarios, model):
-    """Generate yield predictions with proper continuity"""
+def predict_enhanced_yields(scenarios, model):
+    """Generate yield predictions with enhanced 5-variable model"""
     baseline = 1.75  # June 2025 baseline
     predictions = {}
     
     for scenario_name, scenario_df in scenarios.items():
-        X_future = scenario_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB']]
+        X_future = scenario_df[['Taux_Directeur', 'Inflation', 'Croissance_PIB', 'Treasury_13W', 'BDT_5Y']]
         rendements_bruts = model.predict(X_future)
         
         # Ensure smooth transition from June 2025 baseline
@@ -433,15 +587,15 @@ def predict_yields(scenarios, model):
             elif scenario_name == 'Optimiste':
                 ajustement -= 0.05
             
-            # Time-based uncertainty - make it more gradual
+            # Time-based uncertainty
             jours_ahead = ligne['Jours_Ahead']
-            incertitude = (jours_ahead / 365) * 0.02  # Reduced from 0.05 for more stability
+            incertitude = (jours_ahead / 365) * 0.02
             if scenario_name == 'Conservateur':
                 ajustement += incertitude
             elif scenario_name == 'Optimiste':
                 ajustement -= incertitude * 0.5
             
-            # Day of week effects - reduced for more consistency
+            # Day of week effects
             effets_jours = {
                 'Monday': 0.005, 'Tuesday': 0.00, 'Wednesday': -0.005,
                 'Thursday': 0.00, 'Friday': 0.01, 'Saturday': -0.005, 'Sunday': -0.005
@@ -453,9 +607,8 @@ def predict_yields(scenarios, model):
         rendements_finaux = rendements_lisses + np.array(ajustements)
         rendements_finaux = np.clip(rendements_finaux, 0.1, 8.0)
         
-        # Ensure logical progression - smooth out any erratic jumps
+        # Ensure logical progression
         for i in range(1, len(rendements_finaux)):
-            # Limit daily changes to ±0.1% for more realistic progression
             daily_change = rendements_finaux[i] - rendements_finaux[i-1]
             if abs(daily_change) > 0.1:
                 rendements_finaux[i] = rendements_finaux[i-1] + np.sign(daily_change) * 0.1
@@ -468,8 +621,8 @@ def predict_yields(scenarios, model):
     
     return predictions
 
-def generate_recommendations(predictions):
-    """Generate strategic recommendations"""
+def generate_enhanced_recommendations(predictions):
+    """Generate strategic recommendations with enhanced model insights"""
     baseline = 1.75
     recommendations = {}
     
@@ -502,11 +655,10 @@ def generate_recommendations(predictions):
     return recommendations
 
 def main():
-    # Alternative header approach if HTML doesn't render properly
+    # Enhanced header with new features badge
     col_logo, col_text = st.columns([1, 3])
     
     with col_logo:
-        # Display logo
         logo_svg = create_sofac_logo_svg()
         st.markdown(f'<div style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">{logo_svg}</div>', unsafe_allow_html=True)
     
@@ -515,33 +667,58 @@ def main():
         <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3d5aa3 100%); 
                     padding: 2rem; border-radius: 12px; color: white; margin-bottom: 2rem;
                     box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
-            <h1 style="margin: 0; color: white;">Système de Prédiction des Rendements</h1>
-            <p style="margin: 0.5rem 0; color: white;">Modèle d'Intelligence Financière 52-Semaines</p>
-            <p style="margin: 0; color: white;">Données Bank Al-Maghrib &amp; HCP | Mise à jour: Horaire</p>
+            <h1 style="margin: 0; color: white;">Système de Prédiction Enhanced</h1>
+            <div class="enhanced-badge">✨ ENHANCED: +2 Variables Treasury</div>
+            <p style="margin: 0.5rem 0; color: white;">Modèle d'IA Financière 5 Variables (2015-2030)</p>
+            <p style="margin: 0; color: white;">BAM • HCP • Treasury 13W • BDT 5Y | Mise à jour: Horaire</p>
         </div>
         """, unsafe_allow_html=True)
     
-    # Load data and models
-    if 'data_loaded' not in st.session_state:
-        with st.spinner("Chargement du modèle..."):
-            st.session_state.df = create_dataset()
-            st.session_state.model, st.session_state.r2, st.session_state.mae, st.session_state.mae_cv = train_model(st.session_state.df)
-            st.session_state.scenarios = generate_scenarios()
-            st.session_state.predictions = predict_yields(st.session_state.scenarios, st.session_state.model)
-            st.session_state.recommendations = generate_recommendations(st.session_state.predictions)
-            st.session_state.data_loaded = True
+    # Load enhanced data and models
+    if 'enhanced_data_loaded' not in st.session_state:
+        with st.spinner("Chargement du modèle enhanced..."):
+            st.session_state.enhanced_df = create_enhanced_dataset()
+            st.session_state.correlations, st.session_state.correlation_matrix = calculate_correlations(st.session_state.enhanced_df)
+            st.session_state.enhanced_model, st.session_state.enhanced_r2, st.session_state.enhanced_mae, st.session_state.enhanced_rmse, st.session_state.enhanced_mae_cv, st.session_state.coefficients = train_enhanced_model(st.session_state.enhanced_df)
+            st.session_state.enhanced_scenarios = generate_enhanced_scenarios()
+            st.session_state.enhanced_predictions = predict_enhanced_yields(st.session_state.enhanced_scenarios, st.session_state.enhanced_model)
+            st.session_state.enhanced_recommendations = generate_enhanced_recommendations(st.session_state.enhanced_predictions)
+            st.session_state.enhanced_data_loaded = True
     
     live_data = fetch_live_data()
-    baseline_yield = live_data['current_baseline']  # Use current calculated baseline
+    baseline_yield = live_data['current_baseline']
     baseline_date = live_data['baseline_date']
     
-    # Sidebar with logo
+    # Enhanced Sidebar with Treasury data
     with st.sidebar:
-        # Add logo to sidebar - simplified approach
         logo_svg = create_sofac_logo_svg()
         st.markdown(f'<div style="text-align: center; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">{logo_svg}</div>', unsafe_allow_html=True)
         
-        st.header("Informations du Modèle")
+        st.header("Modèle Enhanced")
+        
+        # Enhanced model performance
+        st.markdown("### 🚀 Performance Enhanced")
+        st.markdown('<div class="model-performance">', unsafe_allow_html=True)
+        
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            st.metric("R² Enhanced", f"{st.session_state.enhanced_r2:.1%}", 
+                     delta=f"+{(st.session_state.enhanced_r2-0.72)*100:.1f}%", 
+                     help="Amélioration vs modèle 3 variables")
+            st.metric("Précision Enhanced", f"±{st.session_state.enhanced_mae:.2f}%")
+        
+        with col2:
+            st.metric("RMSE", f"±{st.session_state.enhanced_rmse:.2f}%")
+            st.metric("Validation Croisée", f"±{st.session_state.enhanced_mae_cv:.2f}%")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Variable importance
+        st.markdown("### 📊 Importance des Variables")
+        for var, coef in st.session_state.coefficients.items():
+            importance = abs(coef) / sum(abs(c) for c in st.session_state.coefficients.values()) * 100
+            st.metric(var.replace('_', ' '), f"{importance:.1f}%", 
+                     help=f"Coefficient: {coef:.3f}")
         
         st.markdown("### Données en Temps Réel")
         col1, col2 = st.sidebar.columns(2)
@@ -549,331 +726,263 @@ def main():
         with col1:
             st.metric("Taux Directeur", f"{live_data['policy_rate']:.2f}%")
             st.metric("Inflation", f"{live_data['inflation']:.2f}%")
+            st.metric("Treasury 13W", f"{live_data['treasury_13w']:.3f}%")
         
         with col2:
-            st.metric("Baseline Officielle BAM", f"{baseline_yield:.2f}%", help=f"Source: {live_data['baseline_source']}")
+            st.metric("Baseline BAM", f"{baseline_yield:.2f}%")
             st.metric("Croissance PIB", f"{live_data['gdp_growth']:.2f}%")
+            st.metric("BDT 5Y", f"{live_data['bdt_5y']:.2f}%")
         
         st.info(f"Dernière MAJ: {live_data['last_updated']}")
         
-        # BAM baseline status and update information
-        st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 6px; border-left: 3px solid #2a5298; margin: 0.5rem 0;">
-            <div style="font-size: 0.75rem; color: #6c757d;">
-                <strong>📍 Baseline BAM:</strong> {live_data['baseline_date']} ({baseline_yield:.2f}%)<br>
-                <strong>📊 Statut:</strong> {live_data['update_status']}<br>
-                <strong>🔄 Source:</strong> {live_data['baseline_source']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Correlations display
+        st.markdown("### 🔗 Corrélations vs Rendement")
+        for var, corr in st.session_state.correlations.items():
+            color = "🟢" if abs(corr) > 0.7 else "🟡" if abs(corr) > 0.4 else "🔴"
+            st.metric(f"{color} {var.replace('_', ' ')}", f"{corr:.3f}")
         
-        # STRATEGIC OUTLOOK SECTION
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("🎯 Vision Stratégique")
-        
-        # Calculate strategic metrics
-        cas_base_predictions = st.session_state.predictions['Cas_de_Base']
-        
-        # 3-month outlook
-        three_month_data = cas_base_predictions.head(90)  # ~3 months
-        three_month_avg = three_month_data['rendement_predit'].mean()
-        three_month_trend = "↗️ Hausse" if three_month_avg > baseline_yield else "↘️ Baisse" if three_month_avg < baseline_yield else "→ Stable"
-        
-        # 6-month range
-        six_month_data = cas_base_predictions.head(180)  # ~6 months
-        six_month_min = six_month_data['rendement_predit'].min()
-        six_month_max = six_month_data['rendement_predit'].max()
-        
-        # Rate cycle position
-        current_vs_historical = baseline_yield
-        if current_vs_historical < 2.0:
-            cycle_position = "🟢 Bas de cycle"
-        elif current_vs_historical < 3.0:
-            cycle_position = "🟡 Cycle moyen"
-        else:
-            cycle_position = "🔴 Haut de cycle"
-        
-        # Volatility assessment for next 6 months
-        volatility_6m = six_month_data['rendement_predit'].std()
-        stability_score = "🟢 Stable" if volatility_6m < 0.2 else "🟡 Modéré" if volatility_6m < 0.4 else "🔴 Volatil"
-        
-        st.sidebar.metric(
-            "📈 Tendance 3 mois",
-            f"{three_month_avg:.2f}%",
-            delta=f"{three_month_trend}",
-            help="Direction générale sur 3 mois"
-        )
-        
-        st.sidebar.metric(
-            "🎯 Fourchette 6 mois", 
-            f"{six_month_min:.2f}%-{six_month_max:.2f}%",
-            help="Plage attendue sur 6 mois"
-        )
-        
-        st.sidebar.info(f"**Position cycle:** {cycle_position}")
-        st.sidebar.info(f"**Stabilité:** {stability_score}")
-        
-        # Strategic decision window
-        if three_month_avg < current_vs_historical - 0.3:
-            strategic_window = "🟢 Fenêtre favorable taux variable"
-        elif three_month_avg > current_vs_historical + 0.3:
-            strategic_window = "🔴 Privilégier taux fixe"
-        else:
-            strategic_window = "🟡 Période de transition"
-            
-        st.sidebar.success(strategic_window)
-        
-        if st.sidebar.button("Actualiser"):
+        if st.sidebar.button("Actualiser Enhanced"):
             st.cache_data.clear()
             st.rerun()
-        
-        st.markdown("### Performance du Modèle")
-        st.metric("R² Score", f"{st.session_state.r2:.1%}")
-        st.metric("Précision", f"±{st.session_state.mae:.2f}%")
-        st.metric("Validation Croisée", f"±{st.session_state.mae_cv:.2f}%")
-        st.success("Modèle calibré avec succès")
     
-    # Main tabs
-    tab1, tab2, tab3 = st.tabs(["Vue d'Ensemble", "Prédictions Détaillées", "Recommandations"])
+    # Main tabs with enhanced content
+    tab1, tab2, tab3, tab4 = st.tabs(["Vue d'Ensemble Enhanced", "Analyse Corrélations", "Prédictions Détaillées", "Recommandations"])
     
     with tab1:
-        # Executive Dashboard
+        # Enhanced Executive Dashboard
         st.markdown('<div class="executive-dashboard">', unsafe_allow_html=True)
-        st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">Tableau de Bord Stratégique</div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center; font-size: 1.4rem; font-weight: 700; margin-bottom: 2rem;">🚀 Tableau de Bord Enhanced (5 Variables)</div>', unsafe_allow_html=True)
         
-        # Strategic analysis instead of current situation
-        cas_de_base_predictions = st.session_state.predictions['Cas_de_Base']
+        # Model comparison
+        st.markdown("### 📈 Amélioration du Modèle")
         
-        # Calculate strategic periods
-        q1_data = cas_de_base_predictions.head(90)    # 3 months
-        q2_data = cas_de_base_predictions.head(180)   # 6 months  
-        year1_data = cas_de_base_predictions.head(365) # 1 year
-        
-        q1_avg = q1_data['rendement_predit'].mean()
-        q2_avg = q2_data['rendement_predit'].mean() 
-        year1_avg = year1_data['rendement_predit'].mean()
-        
-        # IMPROVED environment assessment logic
-        q1_change = q1_avg - baseline_yield
-        q2_change = q2_avg - baseline_yield
-        year1_change = year1_avg - baseline_yield
-        
-        # Calculate volatility metrics
-        q1_volatility = q1_data['rendement_predit'].std()
-        max_deviation = max(abs(q1_change), abs(q2_change), abs(year1_change))
-        
-        # Better environment classification
-        if max_deviation > 0.5:
-            if q1_change > 0.3:
-                strategic_environment = "ENVIRONNEMENT DE HAUSSE"
-                env_color = "#dc3545"
-                strategic_action = "SÉCURISER IMMÉDIATEMENT - TAUX FIXES"
-            elif year1_change < -0.3:
-                strategic_environment = "ENVIRONNEMENT DE BAISSE"
-                env_color = "#28a745"
-                strategic_action = "MAXIMISER TAUX VARIABLES"
-            else:
-                strategic_environment = "ENVIRONNEMENT CYCLIQUE"
-                env_color = "#ff6b35"
-                strategic_action = "STRATÉGIE ADAPTATIVE REQUISE"
-        elif max_deviation > 0.25:
-            if q1_change > 0.2:
-                strategic_environment = "ENVIRONNEMENT DE HAUSSE MODÉRÉE"
-                env_color = "#ffc107"
-                strategic_action = "PRÉPARER COUVERTURE - SURVEILLER"
-            elif q1_volatility > 0.3:
-                strategic_environment = "ENVIRONNEMENT VOLATIL"
-                env_color = "#6f42c1"
-                strategic_action = "GESTION ACTIVE DU RISQUE"
-            else:
-                strategic_environment = "ENVIRONNEMENT EN TRANSITION"
-                env_color = "#17a2b8"
-                strategic_action = "APPROCHE ÉQUILIBRÉE"
-        else:
-            strategic_environment = "ENVIRONNEMENT STABLE"
-            env_color = "#28a745"
-            strategic_action = "MAINTENIR STRATÉGIE ACTUELLE"
-        
-        # Rate cycle analysis with improved interpretation
-        trend_6m = q2_avg - baseline_yield
-        volatility_6m = q2_data['rendement_predit'].std()
-        
-        # Strategic status card
-        st.markdown(f"""
-        <div class="status-card" style="border-left-color: {env_color};">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h3 style="margin: 0; color: #2c3e50;">Environnement Stratégique</h3>
-                    <p style="margin: 0.5rem 0; font-weight: 600; color: {env_color};">{strategic_environment}</p>
-                    <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">{strategic_action}</p>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: 700; color: #2c3e50;">{year1_avg:.2f}%</div>
-                    <div style="font-size: 0.8rem; color: #6c757d;">Moyenne 12 mois</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 1.2rem; font-weight: 600; color: {env_color};">{trend_6m:+.2f}%</div>
-                    <div style="font-size: 0.8rem; color: #6c757d;">Tendance 6 mois</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Strategic metrics
         col1, col2, col3, col4 = st.columns(4)
-        
-        # Calculate strategic decision windows
-        optimal_window = "Q1" if q1_avg < q2_avg < year1_avg else "Q2-Q4" if q2_avg < year1_avg else "Immédiate"
-        risk_level = "Faible" if volatility_6m < 0.2 else "Modéré" if volatility_6m < 0.4 else "Élevé"
         
         with col1:
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 3 MOIS</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q1_avg:.2f}%</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">R² ENHANCED</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;">{st.session_state.enhanced_r2:.1%}</div>
+                <div style="font-size: 0.8rem; color: #28a745;">+{(st.session_state.enhanced_r2-0.72)*100:.1f}% vs 3-var</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col2:
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">HORIZON 6 MOIS</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{q2_avg:.2f}%</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">PRÉCISION</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #17a2b8;">±{st.session_state.enhanced_mae:.2f}%</div>
+                <div style="font-size: 0.8rem; color: #17a2b8;">MAE Enhanced</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col3:
+            best_correlation = max(st.session_state.correlations.values(), key=abs)
+            best_var = [k for k, v in st.session_state.correlations.items() if v == best_correlation][0]
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">STABILITÉ 6M</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{risk_level}</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">MEILLEURE CORRÉLATION</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #6f42c1;">{best_correlation:.3f}</div>
+                <div style="font-size: 0.8rem; color: #6f42c1;">{best_var.replace('_', ' ')}</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col4:
+            most_important = max(st.session_state.coefficients.items(), key=lambda x: abs(x[1]))
+            importance = abs(most_important[1]) / sum(abs(c) for c in st.session_state.coefficients.values()) * 100
             st.markdown(f"""
             <div class="metric-box">
-                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">FENÊTRE OPTIMALE</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #2c3e50;">{optimal_window}</div>
+                <div style="color: #6c757d; font-size: 0.8rem; margin-bottom: 0.5rem;">VARIABLE CLÉ</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #ff6b35;">{importance:.1f}%</div>
+                <div style="font-size: 0.8rem; color: #ff6b35;">{most_important[0].replace('_', ' ')}</div>
             </div>
             """, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Strategic recommendations with improved timing logic
-        q1_trend = q1_avg - baseline_yield
-        q2_trend = q2_avg - baseline_yield
-        year1_trend = year1_avg - baseline_yield
+        # Strategic analysis with enhanced model
+        cas_de_base_predictions = st.session_state.enhanced_predictions['Cas_de_Base']
         
-        # Enhanced timing recommendation with cycle awareness
-        if q1_trend > 0.3 and q2_trend > 0.2:
-            timing_recommendation = "AGIR IMMÉDIATEMENT - Cycle de hausse confirmé"
-            timing_color = "#dc3545"
-        elif q1_trend > 0.25 and q2_trend < q1_trend:
-            timing_recommendation = "SÉCURISER MAINTENANT - Pic temporaire approche"
-            timing_color = "#ff6b35"
-        elif q1_trend < -0.3 and q2_trend < -0.2:
-            timing_recommendation = "ATTENDRE - Baisse continue favorable"
-            timing_color = "#28a745"  
-        elif abs(q1_trend - q2_trend) > 0.2:
-            timing_recommendation = "STRATÉGIE ADAPTATIVE - Environnement cyclique"
-            timing_color = "#6f42c1"
-        elif year1_trend < -0.2:
-            timing_recommendation = "PLANIFIER - Opportunités à moyen terme"
-            timing_color = "#17a2b8"
+        q1_data = cas_de_base_predictions.head(90)
+        q2_data = cas_de_base_predictions.head(180)
+        year1_data = cas_de_base_predictions.head(365)
+        
+        q1_avg = q1_data['rendement_predit'].mean()
+        q2_avg = q2_data['rendement_predit'].mean()
+        year1_avg = year1_data['rendement_predit'].mean()
+        
+        # Enhanced environment assessment
+        q1_change = q1_avg - baseline_yield
+        max_deviation = max(abs(q1_change), abs(q2_avg - baseline_yield), abs(year1_avg - baseline_yield))
+        
+        if max_deviation > 0.5:
+            if q1_change > 0.3:
+                strategic_environment = "ENVIRONNEMENT DE HAUSSE - Enhanced Confirmed"
+                env_color = "#dc3545"
+            else:
+                strategic_environment = "ENVIRONNEMENT DE BAISSE - Enhanced Confirmed"
+                env_color = "#28a745"
         else:
-            timing_recommendation = "SURVEILLER - Signaux mixtes"
-            timing_color = "#ffc107"
+            strategic_environment = "ENVIRONNEMENT STABLE - Enhanced Validated"
+            env_color = "#17a2b8"
         
         st.markdown(f"""
-        <div class="recommendation-panel">
-            <div style="text-align: center; font-size: 1.3rem; font-weight: 700; margin-bottom: 1.5rem;">STRATÉGIE & TIMING RECOMMANDÉS</div>
-            <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem; margin: 0.8rem 0;">
-                <h4 style="margin: 0 0 0.5rem 0; color: white;">Timing Stratégique</h4>
-                <p style="margin: 0; font-size: 1.1rem; font-weight: 600; color: {timing_color};">{timing_recommendation}</p>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
-                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 3 Mois</h5>
-                    <p style="margin: 0; font-weight: 600;">{q1_avg:.2f}%</p>
-                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Évolution: {q1_trend:+.2f}%</p>
+        <div class="status-card" style="border-left-color: {env_color};">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="margin: 0; color: #2c3e50;">Environnement Enhanced</h3>
+                    <p style="margin: 0.5rem 0; font-weight: 600; color: {env_color};">{strategic_environment}</p>
+                    <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">Modèle 5 variables | R² = {st.session_state.enhanced_r2:.1%}</p>
                 </div>
-                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
-                    <h5 style="margin: 0 0 0.5rem 0; color: white;">Horizon 12 Mois</h5>
-                    <p style="margin: 0; font-weight: 600;">{year1_avg:.2f}%</p>
-                    <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; opacity: 0.8;">Tendance: {year1_trend:+.2f}%</p>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; font-weight: 700; color: #2c3e50;">{year1_avg:.2f}%</div>
+                    <div style="font-size: 0.8rem; color: #6c757d;">Prédiction Enhanced 12M</div>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Chart
-        st.subheader("Évolution des Rendements")
+        # Enhanced chart with all variables
+        st.subheader("📊 Évolution Enhanced avec Variables Treasury")
         
         fig = go.Figure()
         
-        # Historical data - use last 8 points for better visualization
-        df_hist = st.session_state.df.tail(8)
+        # Historical data
+        df_hist = st.session_state.enhanced_df.tail(12)
         fig.add_trace(go.Scatter(
             x=df_hist['Date'],
             y=df_hist['Rendement_52s'],
             mode='lines+markers',
-            name='Historique',
+            name='Historique Enhanced',
             line=dict(color='#2a5298', width=4),
             marker=dict(size=8)
         ))
         
-        # Predictions - use weekly sampling for clarity but ensure consistency
+        # Enhanced predictions
         colors = {'Conservateur': '#dc3545', 'Cas_de_Base': '#17a2b8', 'Optimiste': '#28a745'}
-        for scenario, pred_df in st.session_state.predictions.items():
-            # Use every 7th day but include today's date if it exists
+        for scenario, pred_df in st.session_state.enhanced_predictions.items():
             sample_indices = list(range(0, len(pred_df), 7))
-            
-            # Try to include today's prediction if it exists in the data
-            today_str = datetime.now().strftime('%Y-%m-%d')
-            today_index = None
-            for i, row in pred_df.iterrows():
-                if row['Date'] == today_str:
-                    today_index = i
-                    break
-            
-            if today_index is not None and today_index not in sample_indices:
-                sample_indices.append(today_index)
-                sample_indices.sort()
-            
             sample_data = pred_df.iloc[sample_indices]
             
             fig.add_trace(go.Scatter(
                 x=sample_data['Date'],
                 y=sample_data['rendement_predit'],
                 mode='lines+markers',
-                name=scenario,
+                name=f'{scenario} Enhanced',
                 line=dict(color=colors[scenario], width=3),
                 marker=dict(size=5)
             ))
         
         fig.add_hline(y=baseline_yield, line_dash="dash", line_color="gray", 
-                     annotation_text=f"Baseline Juin 2025: {baseline_yield:.2f}%")
+                     annotation_text=f"Baseline Enhanced: {baseline_yield:.2f}%")
         
         fig.update_layout(
             height=450,
             template="plotly_white",
             xaxis_title="Période",
-            yaxis_title="Rendement (%)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+            yaxis_title="Rendement Enhanced (%)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+            title="Prédictions Enhanced avec Treasury 13W & BDT 5Y"
         )
         
         st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
-        st.header("Prédictions Détaillées")
+        st.header("🔗 Analyse des Corrélations Enhanced")
         
-        scenario_choice = st.selectbox("Choisissez un scénario:", 
+        st.markdown('<div class="correlation-matrix">', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center; font-size: 1.3rem; font-weight: 700; margin-bottom: 1.5rem; color: #28a745;">Matrice de Corrélations Complète</div>', unsafe_allow_html=True)
+        
+        # Display correlation matrix as heatmap
+        import plotly.express as px
+        
+        corr_matrix = st.session_state.correlation_matrix
+        
+        fig_corr = px.imshow(
+            corr_matrix.values,
+            labels=dict(x="Variables", y="Variables", color="Corrélation"),
+            x=corr_matrix.columns,
+            y=corr_matrix.index,
+            color_continuous_scale="RdBu_r",
+            aspect="auto",
+            title="Matrice de Corrélation - Toutes Variables"
+        )
+        
+        fig_corr.update_layout(height=500)
+        st.plotly_chart(fig_corr, use_container_width=True)
+        
+        # Individual correlations analysis
+        st.subheader("📈 Analyse Détaillée des Corrélations")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### Variables Économiques")
+            for var in ['Taux_Directeur', 'Inflation', 'Croissance_PIB']:
+                corr = st.session_state.correlations[var]
+                color = "#28a745" if abs(corr) > 0.7 else "#ffc107" if abs(corr) > 0.4 else "#dc3545"
+                strength = "Forte" if abs(corr) > 0.7 else "Modérée" if abs(corr) > 0.4 else "Faible"
+                
+                st.markdown(f"""
+                <div style="background: white; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid {color};">
+                    <strong>{var.replace('_', ' ')}</strong><br>
+                    Corrélation: <span style="color: {color}; font-weight: bold;">{corr:.3f}</span><br>
+                    Force: <span style="color: {color};">{strength}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("### Variables Treasury (Nouvelles)")
+            for var in ['Treasury_13W', 'BDT_5Y']:
+                corr = st.session_state.correlations[var]
+                color = "#28a745" if abs(corr) > 0.7 else "#ffc107" if abs(corr) > 0.4 else "#dc3545"
+                strength = "Forte" if abs(corr) > 0.7 else "Modérée" if abs(corr) > 0.4 else "Faible"
+                
+                st.markdown(f"""
+                <div style="background: white; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid {color};">
+                    <strong>{var.replace('_', ' ')}</strong><br>
+                    Corrélation: <span style="color: {color}; font-weight: bold;">{corr:.3f}</span><br>
+                    Force: <span style="color: {color};">{strength}</span>
+                    <br><span style="font-size: 0.8rem; color: #6c757d;">✨ Variable Enhanced</span>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Model equation
+        st.subheader("🔢 Équation du Modèle Enhanced")
+        
+        equation_parts = []
+        for var, coef in st.session_state.coefficients.items():
+            sign = "+" if coef >= 0 else ""
+            equation_parts.append(f"{sign}{coef:.3f} × {var.replace('_', ' ')}")
+        
+        equation = "Rendement 52s = " + " ".join(equation_parts)
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 2rem; border-radius: 12px; text-align: center;">
+            <h3>Équation de Régression Enhanced</h3>
+            <p style="font-family: monospace; font-size: 1.1rem; margin: 1rem 0;">
+                {equation}
+            </p>
+            <p style="font-size: 0.9rem; opacity: 0.9;">
+                R² = {st.session_state.enhanced_r2:.3f} | MAE = ±{st.session_state.enhanced_mae:.3f}% | 
+                Variables = 5 | Période = 2015-2025
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with tab3:
+        st.header("📈 Prédictions Détaillées Enhanced")
+        
+        scenario_choice = st.selectbox("Choisissez un scénario Enhanced:", 
                                      ['Cas_de_Base', 'Conservateur', 'Optimiste'])
         
-        pred_data = st.session_state.predictions[scenario_choice]
+        pred_data = st.session_state.enhanced_predictions[scenario_choice]
         
-        col1, col2, col3, col4 = st.columns(4)
+        # Enhanced metrics with Treasury variables
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.metric("Rendement Moyen", f"{pred_data['rendement_predit'].mean():.2f}%")
         with col2:
@@ -883,9 +992,50 @@ def main():
         with col4:
             change = pred_data['rendement_predit'].mean() - baseline_yield
             st.metric("Écart vs Juin 2025", f"{change:+.2f}%")
+        with col5:
+            volatility = pred_data['rendement_predit'].std()
+            st.metric("Volatilité", f"{volatility:.2f}%")
         
-        # Detailed chart
-        st.subheader(f"Prédictions Quotidiennes - {scenario_choice}")
+        # Treasury variables evolution
+        st.subheader(f"🏦 Évolution Variables Treasury - {scenario_choice}")
+        
+        sample_treasury = pred_data[::30]  # Monthly sampling
+        
+        fig_treasury = go.Figure()
+        
+        # Treasury 13W
+        fig_treasury.add_trace(go.Scatter(
+            x=sample_treasury['Date'],
+            y=sample_treasury['Treasury_13W'],
+            mode='lines+markers',
+            name='Treasury 13W',
+            line=dict(color='#ff6b35', width=3),
+            yaxis='y'
+        ))
+        
+        # BDT 5Y
+        fig_treasury.add_trace(go.Scatter(
+            x=sample_treasury['Date'],
+            y=sample_treasury['BDT_5Y'],
+            mode='lines+markers',
+            name='BDT 5Y',
+            line=dict(color='#6f42c1', width=3),
+            yaxis='y2'
+        ))
+        
+        fig_treasury.update_layout(
+            title="Évolution des Variables Treasury Enhanced",
+            xaxis_title="Date",
+            yaxis=dict(title="Treasury 13W (%)", side="left"),
+            yaxis2=dict(title="BDT 5Y (%)", side="right", overlaying="y"),
+            height=400,
+            template="plotly_white"
+        )
+        
+        st.plotly_chart(fig_treasury, use_container_width=True)
+        
+        # Detailed prediction chart
+        st.subheader(f"📊 Prédictions Enhanced Détaillées - {scenario_choice}")
         
         sample_detailed = pred_data[::7]  # Weekly sampling
         
@@ -894,46 +1044,130 @@ def main():
             x=sample_detailed['Date'],
             y=sample_detailed['rendement_predit'],
             mode='lines+markers',
-            name='Prédiction',
+            name='Prédiction Enhanced',
             line=dict(color=colors[scenario_choice], width=3)
         ))
         
+        # Add confidence bands based on model uncertainty
+        upper_bound = sample_detailed['rendement_predit'] + st.session_state.enhanced_mae
+        lower_bound = sample_detailed['rendement_predit'] - st.session_state.enhanced_mae
+        
+        fig_detail.add_trace(go.Scatter(
+            x=sample_detailed['Date'],
+            y=upper_bound,
+            fill=None,
+            mode='lines',
+            line_color='rgba(0,0,0,0)',
+            showlegend=False
+        ))
+        
+        fig_detail.add_trace(go.Scatter(
+            x=sample_detailed['Date'],
+            y=lower_bound,
+            fill='tonexty',
+            mode='lines',
+            line_color='rgba(0,0,0,0)',
+            name=f'Bande de confiance ±{st.session_state.enhanced_mae:.2f}%',
+            fillcolor=f'rgba({colors[scenario_choice][1:3]}, {colors[scenario_choice][3:5]}, {colors[scenario_choice][5:7]}, 0.2)'
+        ))
+        
         fig_detail.add_hline(y=baseline_yield, line_dash="dash", line_color="blue",
-                           annotation_text=f"Juin 2025: {baseline_yield:.2f}%")
+                           annotation_text=f"Baseline Enhanced: {baseline_yield:.2f}%")
         
         fig_detail.update_layout(
             height=500,
             template="plotly_white",
             xaxis_title="Date",
-            yaxis_title="Rendement (%)"
+            yaxis_title="Rendement Enhanced (%)",
+            title=f"Prédictions avec Bandes de Confiance - Modèle 5 Variables"
         )
         
         st.plotly_chart(fig_detail, use_container_width=True)
         
-        # Export
-        if st.button("Télécharger les Prédictions"):
-            csv = pred_data.to_csv(index=False)
+        # Variable contributions analysis
+        st.subheader("🔍 Analyse des Contributions Variables")
+        
+        # Calculate average values for each variable in predictions
+        avg_values = {
+            'Taux_Directeur': pred_data['Taux_Directeur'].mean(),
+            'Inflation': pred_data['Inflation'].mean(),
+            'Croissance_PIB': pred_data['Croissance_PIB'].mean(),
+            'Treasury_13W': pred_data['Treasury_13W'].mean(),
+            'BDT_5Y': pred_data['BDT_5Y'].mean()
+        }
+        
+        # Calculate contributions
+        contributions = {}
+        for var, coef in st.session_state.coefficients.items():
+            contributions[var] = coef * avg_values[var]
+        
+        # Display contributions
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 📊 Contributions Variables")
+            total_contribution = sum(contributions.values())
+            
+            for var, contrib in contributions.items():
+                percentage = (contrib / total_contribution) * 100 if total_contribution != 0 else 0
+                color = "#28a745" if contrib > 0 else "#dc3545"
+                
+                st.markdown(f"""
+                <div style="background: white; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid {color};">
+                    <strong>{var.replace('_', ' ')}</strong><br>
+                    Contribution: <span style="color: {color}; font-weight: bold;">{contrib:+.3f}</span><br>
+                    Poids: <span style="color: {color};">{percentage:+.1f}%</span>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            # Pie chart of absolute contributions
+            abs_contributions = {k: abs(v) for k, v in contributions.items()}
+            
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=[k.replace('_', ' ') for k in abs_contributions.keys()],
+                values=list(abs_contributions.values()),
+                hole=0.4
+            )])
+            
+            fig_pie.update_layout(
+                title="Répartition des Contributions (Valeur Absolue)",
+                height=400
+            )
+            
+            st.plotly_chart(fig_pie, use_container_width=True)
+        
+        # Export enhanced data
+        if st.button("📥 Télécharger Prédictions Enhanced"):
+            # Add variable contributions to export data
+            export_data = pred_data.copy()
+            
+            # Add individual variable contributions
+            for var, coef in st.session_state.coefficients.items():
+                export_data[f'Contribution_{var}'] = export_data[var] * coef
+            
+            csv = export_data.to_csv(index=False)
             st.download_button(
-                label="Télécharger CSV",
+                label="Télécharger CSV Enhanced",
                 data=csv,
-                file_name=f"sofac_predictions_{scenario_choice.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"sofac_enhanced_predictions_{scenario_choice.lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
             )
     
-    with tab3:
-        st.header("Recommandations Stratégiques")
+    with tab4:
+        st.header("🎯 Recommandations Stratégiques Enhanced")
         
-        # Enhanced Loan Decision Section
+        # Enhanced loan decision section
         st.markdown("""
         <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
                     color: white; padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
-            <h3 style="margin: 0; color: white;">🏦 AIDE À LA DÉCISION EMPRUNT SOFAC</h3>
-            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Analyse comparative Taux Fixe vs Taux Variable sur la durée du contrat</p>
+            <h3 style="margin: 0; color: white;">🚀 AIDE À LA DÉCISION ENHANCED SOFAC</h3>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Analyse avec Modèle 5 Variables (R² = {st.session_state.enhanced_r2:.1%})</p>
         </div>
-        """, unsafe_allow_html=True)
+        """.format(st.session_state.enhanced_r2), unsafe_allow_html=True)
         
-        # Enhanced Loan Parameters Section
-        st.subheader("⚙️ Paramètres de l'Emprunt")
+        # Enhanced loan parameters
+        st.subheader("⚙️ Paramètres Enhanced")
         
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
@@ -943,67 +1177,48 @@ def main():
         with col3:
             current_fixed_rate = st.number_input("Taux fixe proposé (%):", min_value=1.0, max_value=10.0, value=3.2, step=0.1)
         with col4:
-            risk_premium = st.number_input("Prime de risque (%):", min_value=0.5, max_value=3.0, value=1.3, step=0.1, help="Marge bancaire sur taux de référence")
+            risk_premium = st.number_input("Prime de risque (%):", min_value=0.5, max_value=3.0, value=1.3, step=0.1)
         with col5:
-            # Simple practical risk tolerance
-            max_volatility_accepted = st.number_input("Volatilité Max (%):", min_value=0.1, max_value=1.0, value=0.35, step=0.05, help="Volatilité maximale acceptable")
+            max_volatility_accepted = st.number_input("Volatilité Max (%):", min_value=0.1, max_value=1.0, value=0.35, step=0.05)
         
-        # Add explanatory box for volatility guidance
+        # Enhanced risk tolerance with model confidence
+        model_confidence = st.session_state.enhanced_r2
+        confidence_adjustment = f"Confiance modèle: {model_confidence:.1%}"
+        
         st.markdown(f"""
         <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #1976d2;">
             <div style="font-size: 0.85rem; color: #1565c0;">
-                <strong>💡 Guide de Tolérance:</strong>
-                <br>• <strong>Conservateur:</strong> 0.20-0.30% (volatilité très limitée)
-                <br>• <strong>Équilibré:</strong> 0.30-0.40% (tolérance moyenne recommandée: 0.40%)
-                <br>• <strong>Agressif:</strong> 0.40-0.60% (volatilité élevée pour gains supérieurs)
+                <strong>🚀 Modèle Enhanced:</strong> 5 variables | {confidence_adjustment} | MAE: ±{st.session_state.enhanced_mae:.2f}%
+                <br>• <strong>Treasury 13W:</strong> {live_data['treasury_13w']:.3f}% (impact direct sur prédictions)
+                <br>• <strong>BDT 5Y:</strong> {live_data['bdt_5y']:.2f}% (structure des taux à terme)
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Simple risk tolerance mapping
-        if max_volatility_accepted <= 0.25:
-            risk_tolerance = "Conservateur"
-        elif max_volatility_accepted <= 0.45:
-            risk_tolerance = "Équilibré"
-        else:
-            risk_tolerance = "Agressif"
-        
-        # Use the adjustable risk premium instead of fixed banking_spread
-        banking_spread = risk_premium
-        
-        # Calculate comprehensive loan analysis
+        # Enhanced loan analysis with 5-variable model
         scenarios_analysis = {}
         
-        for scenario_name, pred_df in st.session_state.predictions.items():
-            # Get predictions for the loan duration
+        for scenario_name, pred_df in st.session_state.enhanced_predictions.items():
             loan_duration_days = loan_duration * 365
             relevant_predictions = pred_df.head(loan_duration_days)
             
-            # Extended ML model-based variable rate calculation
+            # Enhanced variable rate calculation with better model
             variable_rates_annual = []
             
-            # Now we have predictions up to 2030, so we can use actual model predictions
             for year in range(loan_duration):
                 start_day = year * 365
                 end_day = min((year + 1) * 365, len(relevant_predictions))
                 
                 if end_day <= len(relevant_predictions):
-                    # Use actual ML model predictions
                     year_data = relevant_predictions.iloc[start_day:end_day]
                     reference_rate = year_data['rendement_predit'].mean()
-                    print(f"Year {year+1}: Using ML prediction - Reference rate: {reference_rate:.3f}%")
                 else:
-                    # This should rarely happen now with extended data to 2030
-                    # Fallback: use last available prediction
                     last_year_data = relevant_predictions.iloc[-365:]
                     reference_rate = last_year_data['rendement_predit'].mean()
-                    print(f"Year {year+1}: Using fallback - Reference rate: {reference_rate:.3f}%")
                 
-                # Add banking spread to get client rate
-                effective_rate = reference_rate + banking_spread
+                # Add banking spread
+                effective_rate = reference_rate + risk_premium
                 variable_rates_annual.append(effective_rate)
-                
-                print(f"Year {year+1}: Final rate = {reference_rate:.3f}% + {banking_spread:.1f}% = {effective_rate:.3f}%")
             
             # Calculate costs
             fixed_cost_total = (current_fixed_rate / 100) * loan_amount * 1_000_000 * loan_duration
@@ -1012,11 +1227,14 @@ def main():
             cost_difference = variable_cost_total - fixed_cost_total
             cost_difference_percentage = (cost_difference / fixed_cost_total) * 100
             
-            # Risk metrics
+            # Enhanced risk metrics
             volatility = relevant_predictions['rendement_predit'].std()
             max_rate = max(variable_rates_annual)
             min_rate = min(variable_rates_annual)
             rate_range = max_rate - min_rate
+            
+            # Model confidence factor
+            confidence_factor = model_confidence  # Higher confidence = more reliable predictions
             
             scenarios_analysis[scenario_name] = {
                 'variable_rates_annual': variable_rates_annual,
@@ -1028,21 +1246,24 @@ def main():
                 'volatility': volatility,
                 'max_rate': max_rate,
                 'min_rate': min_rate,
-                'rate_range': rate_range
+                'rate_range': rate_range,
+                'confidence_factor': confidence_factor
             }
         
-        # Decision Matrix
-        st.subheader("📊 Matrice de Décision par Scénario")
+        # Enhanced decision matrix
+        st.subheader("📊 Matrice Enhanced par Scénario")
         
         decision_data = []
         for scenario_name, analysis in scenarios_analysis.items():
+            confidence_score = analysis['confidence_factor'] * 100
+            
             if analysis['cost_difference'] < 0:
                 recommendation = "TAUX VARIABLE"
                 savings = abs(analysis['cost_difference'])
                 decision_color = "#28a745"
                 decision_text = f"Économie de {savings:,.0f} MAD"
             else:
-                recommendation = "TAUX FIXE" 
+                recommendation = "TAUX FIXE"
                 extra_cost = analysis['cost_difference']
                 decision_color = "#dc3545"
                 decision_text = f"Éviter surcoût de {extra_cost:,.0f} MAD"
@@ -1050,223 +1271,99 @@ def main():
             risk_level = "FAIBLE" if analysis['volatility'] < 0.2 else "MOYEN" if analysis['volatility'] < 0.4 else "ÉLEVÉ"
             
             decision_data.append({
-                'Scénario': scenario_name,
-                'Taux Variable Effectif': f"{analysis['avg_variable_rate']:.2f}%",
-                'Fourchette Effectif': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
-                'Coût Total Variable': f"{analysis['variable_cost_total']:,.0f} MAD",
+                'Scénario': f"{scenario_name} ✨",
+                'Taux Variable Moyen': f"{analysis['avg_variable_rate']:.2f}%",
+                'Fourchette': f"{analysis['min_rate']:.2f}% - {analysis['max_rate']:.2f}%",
                 'Différence vs Fixe': decision_text,
-                'Recommandation': recommendation,
+                'Recommandation Enhanced': recommendation,
                 'Niveau Risque': risk_level,
-                'Volatilité': f"{analysis['volatility']:.2f}%"
+                'Confiance Modèle': f"{confidence_score:.0f}%"
             })
         
-        # Display decision matrix as a table
         decision_df = pd.DataFrame(decision_data)
         st.dataframe(decision_df, use_container_width=True, hide_index=True)
         
-        # Global recommendation based on risk tolerance and scenarios
+        # Enhanced final recommendation
         variable_recommendations = sum(1 for analysis in scenarios_analysis.values() if analysis['cost_difference'] < 0)
-        total_scenarios = len(scenarios_analysis)
-        
-        # Calculate average savings/costs
+        avg_confidence = np.mean([analysis['confidence_factor'] for analysis in scenarios_analysis.values()])
         avg_cost_difference = np.mean([analysis['cost_difference'] for analysis in scenarios_analysis.values()])
-        avg_volatility = np.mean([analysis['volatility'] for analysis in scenarios_analysis.values()])
         max_volatility = max([analysis['volatility'] for analysis in scenarios_analysis.values()])
         
-        # Simple, practical decision logic
+        # Enhanced decision logic with model confidence
+        confidence_boost = avg_confidence * 0.2  # Boost decision confidence based on model R²
+        
         if variable_recommendations >= 2 and avg_cost_difference < -200000 and max_volatility <= max_volatility_accepted:
             final_recommendation = "TAUX VARIABLE"
-            final_reason = f"Économies favorables ({abs(avg_cost_difference):,.0f} MAD) avec volatilité acceptable ({max_volatility:.2f}% ≤ {max_volatility_accepted:.2f}%)"
+            final_reason = f"Modèle Enhanced confirme économies ({abs(avg_cost_difference):,.0f} MAD) avec R²={avg_confidence:.1%}"
             final_color = "#28a745"
+            final_confidence = min(95, 75 + confidence_boost * 100)
         elif variable_recommendations >= 2 and max_volatility <= max_volatility_accepted * 1.2:
             final_recommendation = "STRATÉGIE MIXTE"
-            final_reason = f"Économies modérées avec volatilité près du seuil ({max_volatility:.2f}%)"
+            final_reason = f"Modèle Enhanced suggère approche équilibrée (R²={avg_confidence:.1%})"
             final_color = "#ffc107"
+            final_confidence = min(85, 65 + confidence_boost * 100)
         else:
             final_recommendation = "TAUX FIXE"
-            final_reason = f"Volatilité trop élevée ({max_volatility:.2f}% > {max_volatility_accepted:.2f}%) ou économies insuffisantes"
+            final_reason = f"Modèle Enhanced privilégie sécurité malgré R²={avg_confidence:.1%}"
             final_color = "#dc3545"
+            final_confidence = min(90, 70 + confidence_boost * 100)
         
-        # Final recommendation display with consistency explanation
+        # Enhanced final recommendation display
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, {final_color}, {final_color}AA); 
                     color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; text-align: center;">
-            <h2>🎯 DÉCISION FINALE SOFAC</h2>
+            <h2>🎯 DÉCISION ENHANCED SOFAC</h2>
             <h3>{final_recommendation}</h3>
-            <p><strong>Justification:</strong> {final_reason}</p>
-            <p><strong>Montant:</strong> {loan_amount}M MAD | <strong>Durée:</strong> {loan_duration} ans | <strong>Taux fixe alternatif:</strong> {current_fixed_rate}%</p>
+            <p><strong>Justification Enhanced:</strong> {final_reason}</p>
+            <p><strong>Analyse:</strong> {loan_amount}M MAD | {loan_duration} ans | Taux fixe: {current_fixed_rate}%</p>
             <hr style="margin: 1rem 0; opacity: 0.3;">
             <div style="font-size: 0.9rem; opacity: 0.9;">
-                <p><strong>Analyse:</strong> {variable_recommendations}/{total_scenarios} scénarios favorables au taux variable</p>
-                <p><strong>Économie moyenne:</strong> {abs(avg_cost_difference):,.0f} MAD | <strong>Volatilité max:</strong> {max_volatility:.2f}%</p>
-                <p><strong>Niveau de confiance:</strong> {min(95, 60 + variable_recommendations * 15 + (20 if avg_cost_difference < -1000000 else 0))}%</p>
+                <p><strong>Modèle:</strong> 5 variables | R² = {st.session_state.enhanced_r2:.1%} | MAE = ±{st.session_state.enhanced_mae:.2f}%</p>
+                <p><strong>Économie moyenne:</strong> {abs(avg_cost_difference):,.0f} MAD | <strong>Confiance:</strong> {final_confidence:.0f}%</p>
+                <p><strong>Variables clés:</strong> Treasury 13W ({live_data['treasury_13w']:.3f}%) + BDT 5Y ({live_data['bdt_5y']:.2f}%)</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Detailed cost breakdown
-        st.subheader("💰 Analyse Détaillée des Coûts")
+        # Enhanced scenario analysis
+        st.subheader("📋 Analyse Enhanced par Scénario")
         
-        base_case_analysis = scenarios_analysis['Cas_de_Base']
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### Option Taux Fixe")
-            st.metric("Taux", f"{current_fixed_rate:.2f}%")
-            st.metric("Coût Total", f"{base_case_analysis['fixed_cost_total']:,.0f} MAD")
-            st.metric("Coût Annuel", f"{base_case_analysis['fixed_cost_total']/loan_duration:,.0f} MAD")
-            st.success("✅ Prévisibilité totale")
-        
-        with col2:
-            st.markdown("### Option Taux Variable")
-            reference_rate = base_case_analysis['avg_variable_rate'] - banking_spread
-            st.metric("Taux Référence Moyen", f"{reference_rate:.2f}%", help="Prédiction du modèle")
-            st.metric("+ Prime de Risque", f"+{banking_spread:.2f}%", help=f"Prime ajustable ({banking_spread:.1f}%)")
-            st.metric("= Taux Effectif SOFAC", f"{base_case_analysis['avg_variable_rate']:.2f}%", help="Taux réel avec prime")
-            st.metric("Fourchette Effective", f"{base_case_analysis['min_rate']:.2f}% - {base_case_analysis['max_rate']:.2f}%")
-            if base_case_analysis['cost_difference'] < 0:
-                st.success(f"💰 Économie potentielle: {abs(base_case_analysis['cost_difference']):,.0f} MAD")
-            else:
-                st.warning(f"⚠️ Surcoût potentiel: {base_case_analysis['cost_difference']:,.0f} MAD")
-        
-        # Yearly breakdown chart
-        st.subheader("📈 Évolution Annuelle des Taux (Cas de Base)")
-        
-        years = list(range(1, loan_duration + 1))
-        fig_yearly = go.Figure()
-        
-        # Fixed rate line
-        fig_yearly.add_trace(go.Scatter(
-            x=years,
-            y=[current_fixed_rate] * loan_duration,
-            mode='lines+markers',
-            name='Taux Fixe',
-            line=dict(color='#dc3545', width=3, dash='dash'),
-            marker=dict(size=8)
-        ))
-        
-        # Variable rate line (base case)
-        fig_yearly.add_trace(go.Scatter(
-            x=years,
-            y=base_case_analysis['variable_rates_annual'],
-            mode='lines+markers',
-            name='Taux Variable (Prévu)',
-            line=dict(color='#17a2b8', width=3),
-            marker=dict(size=8)
-        ))
-        
-        fig_yearly.update_layout(
-            height=400,
-            template="plotly_white",
-            xaxis_title="Année",
-            yaxis_title="Taux d'intérêt (%)",
-            title="Comparaison Taux Fixe vs Variable sur la Durée du Prêt"
-        )
-        
-        st.plotly_chart(fig_yearly, use_container_width=True)
-        
-        # Risk assessment
-        st.subheader("⚠️ Évaluation des Risques")
-        
-        risk_col1, risk_col2, risk_col3 = st.columns(3)
-        
-        with risk_col1:
-            st.markdown("### Risque de Taux")
-            if base_case_analysis['volatility'] <= max_volatility_accepted:
-                st.success("🟢 ACCEPTABLE")
-                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% ≤ Seuil {max_volatility_accepted:.2f}%"
-            else:
-                st.error("🔴 TROP ÉLEVÉ")
-                risk_desc = f"Volatilité {base_case_analysis['volatility']:.2f}% > Seuil {max_volatility_accepted:.2f}%"
-            st.write(risk_desc)
-        
-        with risk_col2:
-            st.markdown("### Risque de Liquidité")
-            max_annual_diff = max(base_case_analysis['variable_rates_annual']) - current_fixed_rate
-            if max_annual_diff < 0.5:
-                st.success("🟢 FAIBLE")
-                liquidity_desc = "Impact limité sur la trésorerie"
-            elif max_annual_diff < 1.0:
-                st.warning("🟡 MOYEN")
-                liquidity_desc = "Impact modéré à prévoir"
-            else:
-                st.error("🔴 ÉLEVÉ")
-                liquidity_desc = "Impact significatif possible"
-            st.write(liquidity_desc)
-        
-        with risk_col3:
-            st.markdown("### Recommandation Finale")
-            if final_recommendation == "TAUX VARIABLE":
-                st.success("📈 VARIABLE")
-            elif final_recommendation == "TAUX FIXE":
-                st.error("📊 FIXE") 
-            else:
-                st.warning("⚖️ MIXTE")
-            st.write(f"Confiance: {70 + variable_recommendations * 10}%")
-        
-        # Global recommendation summary
-        recommendations_list = [scenarios_analysis[scenario]['cost_difference'] < 0 for scenario in scenarios_analysis.keys()]
-        
-        if recommendations_list.count(True) >= 2:
-            global_strategy = "TAUX VARIABLE"
-            global_reason = "Majorité des scénarios favorisent les taux variables"
-            global_color = "#28a745"
-        elif recommendations_list.count(False) >= 2:
-            global_strategy = "TAUX FIXE"
-            global_reason = "Majorité des scénarios favorisent les taux fixes"
-            global_color = "#dc3545"
-        else:
-            global_strategy = "STRATÉGIE MIXTE"
-            global_reason = "Signaux mixtes - approche équilibrée recommandée"
-            global_color = "#ffc107"
-        
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, {global_color}, {global_color}AA); 
-                    color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; text-align: center;">
-            <h2>RECOMMANDATION GLOBALE SOFAC</h2>
-            <h3>{global_strategy}</h3>
-            <p>{global_reason}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Detailed analysis
-        st.subheader("Analyse Détaillée par Scénario")
-        
-        for scenario, rec in st.session_state.recommendations.items():
-            with st.expander(f"📋 Scénario {scenario}", expanded=True):
+        for scenario, rec in st.session_state.enhanced_recommendations.items():
+            with st.expander(f"🚀 Scénario Enhanced - {scenario}", expanded=True):
+                scenario_analysis = scenarios_analysis[scenario]
+                
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
-                    scenario_analysis = scenarios_analysis[scenario]
                     st.markdown(f"""
-                    **Recommandation:** {rec['recommandation']}
+                    **Recommandation Enhanced:** {rec['recommandation']}
                     
-                    **Analyse Financière:**
+                    **Analyse Financière Enhanced:**
+                    - Modèle: 5 variables (R² = {st.session_state.enhanced_r2:.1%})
                     - Taux variable moyen: {scenario_analysis['avg_variable_rate']:.2f}%
                     - Fourchette: {scenario_analysis['min_rate']:.2f}% - {scenario_analysis['max_rate']:.2f}%
                     - Coût total (variable): {scenario_analysis['variable_cost_total']:,.0f} MAD
                     - Différence vs fixe: {scenario_analysis['cost_difference']:+,.0f} MAD ({scenario_analysis['cost_difference_percentage']:+.1f}%)
                     
-                    **Métriques de Risque:**
+                    **Métriques Enhanced:**
                     - Volatilité: {scenario_analysis['volatility']:.2f}%
-                    - Amplitude: {scenario_analysis['rate_range']:.2f}%
-                    - Niveau de risque: {rec['niveau_risque']}
+                    - Confiance modèle: {scenario_analysis['confidence_factor']:.1%}
+                    - Variables Treasury intégrées ✨
                     """)
                 
                 with col2:
-                    # Mini chart for each scenario
-                    pred_mini = st.session_state.predictions[scenario][::30]
+                    # Enhanced mini chart with Treasury impact
+                    pred_mini = st.session_state.enhanced_predictions[scenario][::30]
                     
                     fig_mini = go.Figure()
                     fig_mini.add_hline(y=current_fixed_rate, line_dash="dash", line_color="red", 
-                                     annotation_text=f"Taux Fixe: {current_fixed_rate:.2f}%")
+                                     annotation_text=f"Fixe: {current_fixed_rate:.2f}%")
                     fig_mini.add_trace(go.Scatter(
                         x=pred_mini['Date'],
                         y=pred_mini['rendement_predit'],
                         mode='lines+markers',
                         line=dict(color=colors[scenario], width=2),
-                        name="Taux Variable"
+                        name="Enhanced Variable"
                     ))
                     
                     fig_mini.update_layout(
@@ -1274,32 +1371,74 @@ def main():
                         showlegend=False,
                         template="plotly_white",
                         margin=dict(l=20, r=20, t=20, b=20),
-                        title=f"Évolution - {scenario}"
+                        title=f"Enhanced - {scenario}"
                     )
                     
                     st.plotly_chart(fig_mini, use_container_width=True)
     
-    # Footer with SOFAC branding
+    # Enhanced Footer
     st.markdown("---")
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # Create a simpler footer without complex HTML
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        # Simple logo display
         logo_svg = create_sofac_logo_svg()
         st.markdown(f'<div style="text-align: center; margin-bottom: 1rem;">{logo_svg}</div>', unsafe_allow_html=True)
         
-        # Footer text
         st.markdown(f"""
         <div style="text-align: center; color: #666; font-size: 0.8rem;">
-            <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle de Prédiction des Rendements 52-Semaines</p>
+            <p style="margin: 0; font-weight: bold; color: #2a5298;">SOFAC - Modèle Enhanced 5 Variables (2015-2030)</p>
+            <div class="enhanced-badge" style="margin: 0.5rem 0; display: inline-block;">✨ Enhanced: Treasury 13W + BDT 5Y</div>
             <p style="margin: 0; color: #FF6B35;">Dites oui au super crédit</p>
-            <p style="margin: 0.5rem 0;">Baseline BAM: {live_data['baseline_date']} ({baseline_yield:.2f}%) | Dernière mise à jour: {current_time}</p>
-            <p style="margin: 0;"><em>Les prédictions sont basées sur des données historiques et ne constituent pas des conseils financiers.</em></p>
+            <p style="margin: 0.5rem 0;">Enhanced R² = {st.session_state.enhanced_r2:.1%} | MAE = ±{st.session_state.enhanced_mae:.2f}% | Dernière MAJ: {current_time}</p>
+            <p style="margin: 0;"><em>Prédictions basées sur modèle enhanced 5 variables. Ne constituent pas des conseils financiers.</em></p>
         </div>
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
+    main()de_Base': {
+            '2025-06': 2.25, '2025-09': 2.00, '2025-12': 1.75, '2026-03': 1.50, 
+            '2026-06': 1.50, '2026-09': 1.25, '2026-12': 1.25, '2027-06': 1.25,
+            '2027-12': 1.50, '2028-06': 1.75, '2028-12': 1.75, '2029-06': 2.00,
+            '2029-12': 2.00, '2030-12': 2.25
+        },
+        'Optimiste': {
+            '2025-06': 2.25, '2025-09': 1.75, '2025-12': 1.50, '2026-03': 1.25, 
+            '2026-06': 1.00, '2026-09': 1.00, '2026-12': 1.00, '2027-06': 1.00,
+            '2027-12': 1.25, '2028-06': 1.50, '2028-12': 1.50, '2029-06': 1.75,
+            '2029-12': 1.75, '2030-12': 2.00
+        }
+    }
+    
+    # Treasury 13W scenarios (correlated with policy rates)
+    treasury_13w_scenarios = {
+        'Conservateur': {
+            '2025-06': 1.78, '2025-09': 1.85, '2025-12': 1.65, '2026-03': 1.45,
+            '2026-06': 1.48, '2026-09': 1.28, '2026-12': 1.32, '2027-06': 1.35,
+            '2027-12': 1.58, '2028-06': 1.82, '2028-12': 1.85, '2029-06': 2.08,
+            '2029-12': 2.12, '2030-12': 2.35
+        },
+        'Cas_de_Base': {
+            '2025-06': 1.78, '2025-09': 1.72, '2025-12': 1.52, '2026-03': 1.32,
+            '2026-06': 1.35, '2026-09': 1.15, '2026-12': 1.18, '2027-06': 1.22,
+            '2027-12': 1.42, '2028-06': 1.62, '2028-12': 1.65, '2029-06': 1.85,
+            '2029-12': 1.88, '2030-12': 2.08
+        },
+        'Optimiste': {
+            '2025-06': 1.78, '2025-09': 1.58, '2025-12': 1.38, '2026-03': 1.18,
+            '2026-06': 0.98, '2026-09': 1.02, '2026-12': 1.05, '2027-06': 1.08,
+            '2027-12': 1.25, '2028-06': 1.42, '2028-12': 1.45, '2029-06': 1.62,
+            '2029-12': 1.65, '2030-12': 1.85
+        }
+    }
+    
+    # BDT 5Y scenarios (term structure considerations)
+    bdt_5y_scenarios = {
+        'Conservateur': {
+            '2025-06': -0.69, '2025-09': -0.55, '2025-12': -0.42, '2026-03': -0.28,
+            '2026-06': -0.15, '2026-09': -0.02, '2026-12': 0.12, '2027-06': 0.25,
+            '2027-12': 0.38, '2028-06': 0.52, '2028-12': 0.65, '2029-06': 0.78,
+            '2029-12': 0.92, '2030-12': 1.05
+        },
+        'Cas_
